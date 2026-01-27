@@ -2,14 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Terminal Settings:
-All commands executed with the bash tool are run in the user's fish shell, so ensure compatibility.
 
 ## Project Overview
 
 This is a Lean 4 formalization project for basic homology computations in algebraic topology. The project follows proofs from Hatcher's *Algebraic Topology* textbook and builds upon Mathlib's algebraic topology foundations.
 
-**Main theorem**: The n-dimensional sphere is simply connected for n ≥ 2 (`EuclideanSphere.simplyConnectedSpace`).
+## Terminal Settings:
+All commands executed with the bash tool are run in the user's fish shell, so ensure compatibility.
+
+## Operating instructions
+1. *Always* verify the proof a lemma or theorem upon completion before moving onto the next one.
 
 ## Build System: Lake
 

@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 Sebastian Kumar. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Sebastian Kumar
+Authors:Sebastian Kumar
 -/
 
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
@@ -10,6 +10,7 @@ import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
 import Mathlib.Topology.Homotopy.Lifting
 import Mathlib.Topology.Connected.PathConnected
 import Mathlib.Data.Complex.Exponential
+import Mathlib.Analysis.Convex.Contractible
 import HomologyLean.FundamentalGroupoid.Basic
 
 /-!
@@ -130,12 +131,102 @@ lemma windingNumber_standardLoop_pow (n : ℤ) : windingNumber (standardLoop_pow
     apply mul_ne_zero <;> [norm_num; exact Real.pi_ne_zero]
   exact Int.cast_injective (mul_right_cancel₀ pi_ne_zero this)
 
+open scoped Real
+open scoped Circle
+
 /-- Step 2b: Every path is homotopic to the standard loop with the same winding number. -/
 theorem homotopic_standardLoop_of_windingNumber (γ : Path (1 : Circle) 1) :
     γ.Homotopic (standardLoop_pow (windingNumber γ)) := by
-  sorry
-open scoped Real
-open scoped Circle
+  set n := windingNumber γ
+  let h_basepoint := γ.source.trans Circle.exp_zero.symm
+  let h_basepoint' := (standardLoop_pow n).source.trans Circle.exp_zero.symm
+  -- Step 1: Lift both paths to ℝ
+  set lift_γ := Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0 h_basepoint
+  set lift_std := Circle.isCoveringMap_exp.liftPath
+    (standardLoop_pow n).toContinuousMap 0 h_basepoint'
+  -- Step 2: Show the endpoints are the same in ℝ
+  have endpoint_eq : lift_γ 1 = lift_std 1 := by
+    -- Both endpoints are n * (2π) by definition of winding number
+    have h_γ : lift_γ 1 = n * (2 * Real.pi) := by
+      -- By definition, n = windingNumber γ = choose from the existence proof
+      -- and choose_spec says the lift endpoint equals choose * (2π)
+      exact (liftPath_loop_endpoint_eq_int_mul_two_pi γ).choose_spec
+    have h_std : lift_std 1 = n * (2 * Real.pi) := by
+      -- We proved windingNumber (standardLoop_pow n) = n
+      -- So the lift of standardLoop_pow n also ends at n * (2π)
+      have h_endpoint := (liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose_spec
+      have h_winding := windingNumber_standardLoop_pow n
+      -- Convert: windingNumber is defined as choose, so choose = n
+      have : (liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose = n := by
+        exact h_winding
+      rw [this] at h_endpoint
+      exact h_endpoint
+    rw [h_γ, h_std]
+  -- Step 3: Show the lifts agree at 0
+  have start_eq : lift_γ 0 = lift_std 0 := by
+    rw [Circle.isCoveringMap_exp.liftPath_zero, Circle.isCoveringMap_exp.liftPath_zero]
+  -- Step 4: Since ℝ is simply connected and the lifts have the same endpoints,
+  -- they are homotopic rel {0,1} in ℝ
+  have lifts_homotopic : lift_γ.HomotopicRel lift_std {0, 1} := by
+    -- Extract h_γ and h_std from Step 2
+    have h_γ : lift_γ 1 = n * (2 * Real.pi) := by
+      exact (liftPath_loop_endpoint_eq_int_mul_two_pi γ).choose_spec
+    have h_std : lift_std 1 = n * (2 * Real.pi) := by
+      have h_endpoint := (liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose_spec
+      have : (liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose = n :=
+        windingNumber_standardLoop_pow n
+      rw [this] at h_endpoint
+      exact h_endpoint
+    -- Convert the continuous maps to paths in ℝ
+    let path_γ : Path (0 : ℝ) (n * (2 * Real.pi)) := {
+      toFun := lift_γ
+      continuous_toFun := lift_γ.continuous
+      source' := start_eq ▸ Circle.isCoveringMap_exp.liftPath_zero _ _ _
+      target' := h_γ
+    }
+    let path_std : Path (0 : ℝ) (n * (2 * Real.pi)) := {
+      toFun := lift_std
+      continuous_toFun := lift_std.continuous
+      source' := Circle.isCoveringMap_exp.liftPath_zero _ _ _
+      target' := h_std
+    }
+    -- Use simply connected ℝ to show paths are homotopic
+    -- ℝ is contractible (RealTopologicalVectorSpace.contractibleSpace)
+    -- and contractible spaces are simply connected (SimplyConnectedSpace.ofContractible)
+    have : path_γ.Homotopic path_std := SimplyConnectedSpace.paths_homotopic path_γ path_std
+    -- Path.Homotopic is Nonempty (Path.Homotopy) which is HomotopicRel {0,1}
+    exact this
+  -- Step 5: Use IsCoveringMap.homotopicRel_iff_comp to project the homotopy to S¹
+  -- This says: lifts are homotopic rel S ↔ projections are homotopic rel S
+  have : (Circle.exp.comp lift_γ).HomotopicRel (Circle.exp.comp lift_std) {0, 1} := by
+    apply (Circle.isCoveringMap_exp.homotopicRel_iff_comp ?_).mp lifts_homotopic
+    use 0
+    simp only [Set.mem_insert_iff, Set.mem_singleton_iff, true_or, start_eq, and_self]
+  -- Step 6: The compositions are exactly γ and standardLoop_pow n
+  have γ_eq : Circle.exp.comp lift_γ = γ.toContinuousMap := by
+    -- liftPath_lifts says: Circle.exp ∘ lift_γ = γ.toContinuousMap
+    have h := Circle.isCoveringMap_exp.liftPath_lifts γ.toContinuousMap 0 h_basepoint
+    -- Convert function composition to ContinuousMap.comp
+    ext t
+    simp only [ContinuousMap.comp_apply]
+    rw [← h]
+    rfl
+--
+  have std_eq : Circle.exp.comp lift_std = (standardLoop_pow n).toContinuousMap := by
+    -- liftPath_lifts says: Circle.exp ∘ lift_std = (standardLoop_pow n).toContinuousMap
+    have h := Circle.isCoveringMap_exp.liftPath_lifts
+      (standardLoop_pow n).toContinuousMap 0 h_basepoint'
+    -- Convert function composition to ContinuousMap.comp
+    ext t
+    simp only [ContinuousMap.comp_apply]
+    rw [← h]
+    rfl
+--
+  -- Conclude: HomotopicRel {0,1} for paths is exactly Path.Homotopic
+  -- this : (exp.comp lift_γ).HomotopicRel (exp.comp lift_std) {0, 1}
+  -- After substituting the equalities, this becomes Path.Homotopic
+  rwa [γ_eq, std_eq] at this
+
 /-- Step 3: Composing standard loops with winding numbers n and m is homotopic
     to the standard loop with winding number n + m. -/
 theorem standardLoop_pow_trans (n m : ℤ) :
@@ -265,10 +356,6 @@ lemma windingNumber_standardLoop : windingNumber standardLoop = 1 := by
 
 /-- The winding number homomorphism is surjective. -/
 theorem windingNumberHom_surjective : Function.Surjective windingNumberHom := by
-  sorry
-
-/-- The real line is simply connected. -/
-instance : SimplyConnectedSpace ℝ := by
   sorry
 
 /-- The winding number homomorphism is injective.
