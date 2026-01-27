@@ -46,7 +46,8 @@ namespace Circle
 lemma liftPath_loop_endpoint_eq_int_mul_two_pi (γ : Path (1 : Circle) 1) :
     ∃ n : ℤ, Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0
       (γ.source.trans Circle.exp_zero.symm) 1 = n * (2 * Real.pi) := by
-  set lift := Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0 (γ.source.trans Circle.exp_zero.symm)
+  let h_basepoint := γ.source.trans Circle.exp_zero.symm
+  set lift := Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0 h_basepoint
   have h_lift : Circle.exp ∘ lift = γ.toContinuousMap :=
     Circle.isCoveringMap_exp.liftPath_lifts _ _ _
   have h_endpoint : Circle.exp (lift 1) = 1 := by
@@ -90,14 +91,50 @@ theorem windingNumber_eq_of_homotopic {γ₁ γ₂ : Path (1 : Circle) 1}
     · exact Real.pi_ne_zero
   exact Int.cast_injective (mul_right_cancel₀ pi_ne_zero this)
 
+/-- Step 1: The standard loop that wraps n times around the circle.
+    For positive n, wraps counterclockwise; for negative n, wraps clockwise. -/
+def standardLoop_pow (n : ℤ) : Path (1 : Circle) 1 where
+  toFun := fun t => Circle.exp (2 * Real.pi * n * t)
+  continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul continuous_subtype_val)
+  source' := by simp [Circle.exp_zero]
+  target' := by
+    simp only [Set.Icc.coe_one, mul_one]
+    exact Circle.exp_two_pi_mul_int n
+
+/-- Step 2a: The winding number of standardLoop_pow n is n. -/
+lemma windingNumber_standardLoop_pow (n : ℤ) : windingNumber (standardLoop_pow n) = n := by
+  sorry
+
+/-- Step 2b: Every path is homotopic to the standard loop with the same winding number. -/
+theorem homotopic_standardLoop_of_windingNumber (γ : Path (1 : Circle) 1) :
+    γ.Homotopic (standardLoop_pow (windingNumber γ)) := by
+  sorry
+
+/-- Step 3: Composing standard loops with winding numbers n and m is homotopic
+    to the standard loop with winding number n + m. -/
+theorem standardLoop_pow_trans (n m : ℤ) :
+    (standardLoop_pow n).trans (standardLoop_pow m) |>.Homotopic (standardLoop_pow (n + m)) := by
+  sorry
+
 /-- The winding number of a concatenated path is the sum of the individual winding numbers. -/
 theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
     windingNumber (γ₁.trans γ₂) = windingNumber γ₁ + windingNumber γ₂ := by
-  unfold windingNumber
-  -- For now, use a simplified approach with sorry
-  -- The proof requires showing that the lift of γ₁.trans γ₂ has endpoint equal to
-  -- the sum of the endpoints of the individual lifts (modulo the fiber structure)
-  sorry
+  set n₁ := windingNumber γ₁
+  set n₂ := windingNumber γ₂
+  -- Step 3: γ₁.trans γ₂ ~ standardLoop_pow n₁ .trans standardLoop_pow n₂
+  have h1 : γ₁.Homotopic (standardLoop_pow n₁) := homotopic_standardLoop_of_windingNumber γ₁
+  have h2 : γ₂.Homotopic (standardLoop_pow n₂) := homotopic_standardLoop_of_windingNumber γ₂
+  have h_trans : (γ₁.trans γ₂).Homotopic ((standardLoop_pow n₁).trans (standardLoop_pow n₂)) :=
+    h1.hcomp h2
+  -- Step 4: standardLoop_pow n₁ .trans standardLoop_pow n₂ ~ standardLoop_pow (n₁ + n₂)
+  have h_standard : ((standardLoop_pow n₁).trans (standardLoop_pow n₂)).Homotopic
+      (standardLoop_pow (n₁ + n₂)) := standardLoop_pow_trans n₁ n₂
+  -- Step 5: By transitivity and well-definedness
+  have h_final : (γ₁.trans γ₂).Homotopic (standardLoop_pow (n₁ + n₂)) :=
+    h_trans.trans h_standard
+  calc windingNumber (γ₁.trans γ₂)
+      = windingNumber (standardLoop_pow (n₁ + n₂)) := windingNumber_eq_of_homotopic h_final
+    _ = n₁ + n₂ := windingNumber_standardLoop_pow (n₁ + n₂)
 
 /-- The winding number as a group homomorphism. -/
 def windingNumberMonoidHom : FundamentalGroup Circle 1 →* ℤ := by
@@ -119,10 +156,6 @@ lemma windingNumber_standardLoop : windingNumber standardLoop = 1 := by
   unfold windingNumber standardLoop
   -- The lift of the standard loop starting at 0 should be t ↦ 2πt
   -- So it ends at 2π = 1 * 2π
-  sorry
-
-/-- For any integer n, construct a loop with winding number n. -/
-def standardLoop_pow (n : ℤ) : Path (1 : Circle) 1 := by
   sorry
 
 /-- The winding number homomorphism is surjective. -/
