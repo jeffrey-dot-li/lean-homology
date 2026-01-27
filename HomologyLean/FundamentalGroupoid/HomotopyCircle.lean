@@ -103,7 +103,31 @@ def standardLoop_pow (n : ℤ) : Path (1 : Circle) 1 where
 
 /-- Step 2a: The winding number of standardLoop_pow n is n. -/
 lemma windingNumber_standardLoop_pow (n : ℤ) : windingNumber (standardLoop_pow n) = n := by
-  sorry
+  unfold windingNumber
+  -- The lift of standardLoop_pow n starting at 0 is t ↦ 2π * n * t
+  let candidate : C(I, ℝ) := ⟨fun t => 2 * Real.pi * n * t, by continuity⟩
+  have h_candidate_is_lift : candidate =
+      Circle.isCoveringMap_exp.liftPath (standardLoop_pow n).toContinuousMap 0
+        ((standardLoop_pow n).source.trans Circle.exp_zero.symm) := by
+    rw [Circle.isCoveringMap_exp.eq_liftPath_iff']
+    refine ⟨?_, ?_⟩
+    · ext t
+      simp [candidate, standardLoop_pow, Circle.coe_exp]
+    · simp [candidate]
+  -- Therefore the endpoint of the lift is 2π * n
+  have h_endpoint : Circle.isCoveringMap_exp.liftPath (standardLoop_pow n).toContinuousMap 0
+      ((standardLoop_pow n).source.trans Circle.exp_zero.symm) 1 = 2 * Real.pi * n := by
+    rw [← h_candidate_is_lift]
+    simp only [candidate, ContinuousMap.coe_mk, Set.Icc.coe_one, mul_one]
+  -- This equals n * (2 * π), so the extracted integer is n
+  have choose_spec := (liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose_spec
+  have : ((liftPath_loop_endpoint_eq_int_mul_two_pi (standardLoop_pow n)).choose : ℝ) *
+      (2 * Real.pi) = n * (2 * Real.pi) := by
+    rw [← choose_spec, h_endpoint]
+    ring
+  have pi_ne_zero : (2 : ℝ) * Real.pi ≠ 0 := by
+    apply mul_ne_zero <;> [norm_num; exact Real.pi_ne_zero]
+  exact Int.cast_injective (mul_right_cancel₀ pi_ne_zero this)
 
 /-- Step 2b: Every path is homotopic to the standard loop with the same winding number. -/
 theorem homotopic_standardLoop_of_windingNumber (γ : Path (1 : Circle) 1) :
