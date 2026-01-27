@@ -6,7 +6,10 @@
       "mcp__lean-lsp__lean_diagnostic_messages",
       "mcp__lean-lsp__lean_goal",
       "WebSearch",
-      "WebFetch(domain:leanprover-community.github.io)"
+      "WebFetch(domain:leanprover-community.github.io)",
+      "Bash(grep:*)",
+      "mcp__lean-lsp__lean_local_search",
+      "mcp__lean-lsp__lean_run_code"
     ]
   },
   "enableAllProjectMcpServers": true,

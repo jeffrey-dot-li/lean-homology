@@ -253,7 +253,6 @@ instance (v : S n) : ContractibleSpace ({v}ᶜ : Set (S n)) := by
 
 /-- The Euclidean `n`-sphere minus a point is path connected for `n ≥ 1`. -/
 theorem isPathConnected_compl_singleton (v : S (n + 1)) : IsPathConnected ({v}ᶜ) := by
-
   rw [isPathConnected_iff_pathConnectedSpace]
   infer_instance
 
