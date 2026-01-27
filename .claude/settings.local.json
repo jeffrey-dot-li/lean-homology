@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lake:*)",
+      "mcp__ide__getDiagnostics",
+      "mcp__lean-lsp__lean_diagnostic_messages",
+      "mcp__lean-lsp__lean_goal",
+      "WebSearch",
+      "WebFetch(domain:leanprover-community.github.io)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "lean-lsp"
+  ]
+}
