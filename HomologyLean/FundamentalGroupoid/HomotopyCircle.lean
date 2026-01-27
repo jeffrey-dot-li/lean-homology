@@ -46,22 +46,57 @@ namespace Circle
 lemma liftPath_loop_endpoint_eq_int_mul_two_pi (γ : Path (1 : Circle) 1) :
     ∃ n : ℤ, Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0
       (γ.source.trans Circle.exp_zero.symm) 1 = n * (2 * Real.pi) := by
-  sorry
+  set lift := Circle.isCoveringMap_exp.liftPath γ.toContinuousMap 0 (γ.source.trans Circle.exp_zero.symm)
+  have h_lift : Circle.exp ∘ lift = γ.toContinuousMap :=
+    Circle.isCoveringMap_exp.liftPath_lifts _ _ _
+  have h_endpoint : Circle.exp (lift 1) = 1 := by
+    have := congr_fun h_lift 1
+    simp only [Function.comp_apply] at this
+    rw [this]
+    exact γ.target
+  rw [Circle.exp_eq_one] at h_endpoint
+  exact h_endpoint
 
 /-- The winding number of a loop in the circle at basepoint 1.
     This is defined by lifting the loop to ℝ via the covering map Circle.exp
     and measuring how many times the lift "winds around" (in units of 2π). -/
-def windingNumber (γ : Path (1 : Circle) 1) : ℤ := by
-  sorry
+def windingNumber (γ : Path (1 : Circle) 1) : ℤ :=
+  (liftPath_loop_endpoint_eq_int_mul_two_pi γ).choose
 
 /-- The winding number is constant on homotopy classes. -/
 theorem windingNumber_eq_of_homotopic {γ₁ γ₂ : Path (1 : Circle) 1}
     (h : γ₁.Homotopic γ₂) : windingNumber γ₁ = windingNumber γ₂ := by
-  sorry
+  unfold windingNumber
+  let h₁ := γ₁.source.trans Circle.exp_zero.symm
+  let h₂ := γ₂.source.trans Circle.exp_zero.symm
+  set lift₁ := Circle.isCoveringMap_exp.liftPath γ₁.toContinuousMap 0 h₁
+  set lift₂ := Circle.isCoveringMap_exp.liftPath γ₂.toContinuousMap 0 h₂
+  have endpoint_eq : lift₁ 1 = lift₂ 1 :=
+    Circle.isCoveringMap_exp.liftPath_apply_one_eq_of_homotopicRel h 0 h₁ h₂
+  -- Since the endpoints are equal and both are integer multiples of 2π, the integers must be equal
+  have eq₁ := (liftPath_loop_endpoint_eq_int_mul_two_pi γ₁).choose_spec
+  have eq₂ := (liftPath_loop_endpoint_eq_int_mul_two_pi γ₂).choose_spec
+  -- Now eq₁ and eq₂ both say possibly different things equal different multiples of 2π
+  have : ((liftPath_loop_endpoint_eq_int_mul_two_pi γ₁).choose : ℝ) * (2 * Real.pi) =
+      (liftPath_loop_endpoint_eq_int_mul_two_pi γ₂).choose * (2 * Real.pi) := by
+    calc ((liftPath_loop_endpoint_eq_int_mul_two_pi γ₁).choose : ℝ) * (2 * Real.pi)
+        = lift₁ 1 := eq₁.symm
+      _ = lift₂ 1 := endpoint_eq
+      _ = (liftPath_loop_endpoint_eq_int_mul_two_pi γ₂).choose * (2 * Real.pi) := eq₂
+  -- Cancel 2π (which is nonzero)
+  have pi_ne_zero : (2 : ℝ) * Real.pi ≠ 0 := by
+    apply mul_ne_zero
+    · norm_num
+    · exact Real.pi_ne_zero
+  exact Int.cast_injective (mul_right_cancel₀ pi_ne_zero this)
 
 /-- The winding number of a concatenated path is the sum of the individual winding numbers. -/
 theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
     windingNumber (γ₁.trans γ₂) = windingNumber γ₁ + windingNumber γ₂ := by
+  unfold windingNumber
+  -- For now, use a simplified approach with sorry
+  -- The proof requires showing that the lift of γ₁.trans γ₂ has endpoint equal to
+  -- the sum of the endpoints of the individual lifts (modulo the fiber structure)
   sorry
 
 /-- The winding number as a group homomorphism. -/
@@ -72,12 +107,18 @@ def windingNumberMonoidHom : FundamentalGroup Circle 1 →* ℤ := by
 abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ := windingNumberMonoidHom
 
 /-- The standard loop that wraps once around the circle counterclockwise.
-    Defined as t ↦ exp(2πt * I). -/
-def standardLoop : Path (1 : Circle) 1 := by
-  sorry
+    Defined as t ↦ exp(2πt). -/
+def standardLoop : Path (1 : Circle) 1 where
+  toFun := fun t => Circle.exp (2 * Real.pi * t)
+  continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul continuous_subtype_val)
+  source' := by simp [Circle.exp_zero]
+  target' := by simp [Circle.exp_two_pi]
 
 /-- The standard loop has winding number 1. -/
 lemma windingNumber_standardLoop : windingNumber standardLoop = 1 := by
+  unfold windingNumber standardLoop
+  -- The lift of the standard loop starting at 0 should be t ↦ 2πt
+  -- So it ends at 2π = 1 * 2π
   sorry
 
 /-- For any integer n, construct a loop with winding number n. -/

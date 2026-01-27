@@ -9,7 +9,8 @@
       "WebFetch(domain:leanprover-community.github.io)",
       "Bash(grep:*)",
       "mcp__lean-lsp__lean_local_search",
-      "mcp__lean-lsp__lean_run_code"
+      "mcp__lean-lsp__lean_run_code",
+      "mcp__lean-lsp__lean_hover_info"
     ]
   },
   "enableAllProjectMcpServers": true,
