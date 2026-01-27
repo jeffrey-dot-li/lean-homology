@@ -9,6 +9,7 @@ import Mathlib.AlgebraicTopology.FundamentalGroupoid.FundamentalGroup
 import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
 import Mathlib.Topology.Homotopy.Lifting
 import Mathlib.Topology.Connected.PathConnected
+import Mathlib.Data.Complex.Exponential
 import HomologyLean.FundamentalGroupoid.Basic
 
 /-!
@@ -133,12 +134,92 @@ lemma windingNumber_standardLoop_pow (n : ℤ) : windingNumber (standardLoop_pow
 theorem homotopic_standardLoop_of_windingNumber (γ : Path (1 : Circle) 1) :
     γ.Homotopic (standardLoop_pow (windingNumber γ)) := by
   sorry
-
+open scoped Real
+open scoped Circle
 /-- Step 3: Composing standard loops with winding numbers n and m is homotopic
     to the standard loop with winding number n + m. -/
 theorem standardLoop_pow_trans (n m : ℤ) :
     (standardLoop_pow n).trans (standardLoop_pow m) |>.Homotopic (standardLoop_pow (n + m)) := by
-  sorry
+      -- Define the two “winding-number as a function of t”
+      -- functions A (piecewise) and B (straight).
+  let A : I → ℝ := fun t =>
+    if (t : ℝ) ≤ (1 / 2 : ℝ) then
+      (2 : ℝ) * (n : ℝ) * (t : ℝ)
+    else
+      (n : ℝ) + (m : ℝ) * ((2 : ℝ) * (t : ℝ) - 1)
+  let B : I → ℝ := fun t =>
+    (n + m : ℤ) * (t : ℝ)  -- coerces to ℝ
+--
+  refine ⟨{
+    toFun := fun ⟨s, t⟩ =>
+      exp (2 * Real.pi * (((1 : ℝ) - (s : ℝ)) * A t + (s : ℝ) * B t))
+    continuous_toFun := by
+      -- First show A is continuous
+      have hA : Continuous A := by
+        refine Continuous.if_le
+          (continuous_const.mul continuous_subtype_val)
+          (continuous_const.add (continuous_const.mul
+            ((continuous_const.mul continuous_subtype_val).sub continuous_const)))
+          continuous_subtype_val continuous_const ?_
+        intro t ht
+        rw [ht]
+        norm_num
+        ring
+      -- Show B is continuous
+      have hB : Continuous B := continuous_const.mul continuous_subtype_val
+      -- Now show the full homotopy is continuous
+      apply Circle.exp.continuous.comp
+      refine Continuous.mul continuous_const ?_
+      refine Continuous.add ?_ ?_
+      · refine Continuous.mul ?_ (hA.comp continuous_snd)
+        exact continuous_const.sub (continuous_induced_dom.comp continuous_fst)
+      · refine Continuous.mul ?_ (hB.comp continuous_snd)
+        exact continuous_induced_dom.comp continuous_fst
+    map_zero_left := by
+      intro t
+      simp only [Set.Icc.coe_zero, zero_mul, coe_toContinuousMap, Path.trans_apply,
+        standardLoop_pow, Circle.ext_iff]
+      split_ifs with h
+      · -- t ≤ 1/2: both sides simplify to exp(2πn * (2t))
+        simp only [Circle.coe_exp]
+        congr 1
+        simp only [A, h, ↓reduceIte]
+        ring_nf
+      · -- t > 1/2: exp(2π*(n + m*(2t-1))) = exp(2πm*(2t-1)) via periodicity
+        simp only [Circle.coe_exp, add_zero, one_mul, sub_zero, A, h, ↓reduceIte]
+        rw [show (2 * Real.pi * (↑n + ↑m * (2 * ↑t - 1))) =
+          2 * Real.pi * ↑n + 2 * Real.pi * ↑m * (2 * ↑t - 1) by ring]
+        rw [Complex.ofReal_add, add_mul, Complex.exp_add]
+        simp
+        -- Same as simp [rules]; exact h
+        simpa [mul_assoc, mul_left_comm, mul_comm] using
+          (Complex.exp_int_mul_two_pi_mul_I n)
+    map_one_left := by
+      intro t
+      simp only [Set.Icc.coe_one, sub_self, zero_mul, one_mul, zero_add]
+      simp [standardLoop_pow, B]
+      ring_nf
+    prop' := by
+      intro s t ht
+      simp only [coe_toContinuousMap]
+      rcases ht with ht | ht
+      · -- t = 0: both sides give 1
+        rw [ht, ((standardLoop_pow n).trans (standardLoop_pow m)).source]
+        simp only [coe_mk, A, B]
+        simp
+      · -- t = 1: both sides give 1
+        rw [Set.mem_singleton_iff] at ht
+        rw [ht, ((standardLoop_pow n).trans (standardLoop_pow m)).target]
+        have h : ¬ (1 : ℝ) ≤ (2 : ℝ)⁻¹ := by
+          nlinarith
+--
+        simp? [A, B, h]
+        ring_nf
+        have h_alg : (π: ℝ) * ↑n * 2 + (π: ℝ) * ↑m * 2 = 2 * (π: ℝ) * (n + m) := by ring
+        rw [h_alg]
+        simpa [mul_assoc, mul_left_comm, mul_comm] using
+          (Circle.exp_int_mul_two_pi (n + m))
+  }⟩
 
 /-- The winding number of a concatenated path is the sum of the individual winding numbers. -/
 theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
