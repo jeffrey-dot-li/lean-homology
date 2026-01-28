@@ -9,8 +9,8 @@ import Mathlib.AlgebraicTopology.FundamentalGroupoid.FundamentalGroup
 import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
 import Mathlib.Topology.Homotopy.Lifting
 import Mathlib.Topology.Connected.PathConnected
-import Mathlib.Data.Complex.Exponential
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Algebra.Group.TypeTags.Basic
 import HomologyLean.FundamentalGroupoid.Basic
 
 /-!
@@ -227,6 +227,27 @@ theorem homotopic_standardLoop_of_windingNumber (γ : Path (1 : Circle) 1) :
   -- After substituting the equalities, this becomes Path.Homotopic
   rwa [γ_eq, std_eq] at this
 
+/-- If two paths have the same winding number, they are homotopic.
+    Both are homotopic to the standard loop with that winding number. -/
+theorem homotopic_of_windingNumber_eq {γ₁ γ₂ : Path (1 : Circle) 1}
+    (h : windingNumber γ₁ = windingNumber γ₂) : γ₁.Homotopic γ₂ := by
+  -- Both γ₁ and γ₂ are homotopic to standardLoop_pow n
+  have h₁ : γ₁.Homotopic (standardLoop_pow (windingNumber γ₁)) :=
+    homotopic_standardLoop_of_windingNumber γ₁
+  have h₂ : γ₂.Homotopic (standardLoop_pow (windingNumber γ₂)) :=
+    homotopic_standardLoop_of_windingNumber γ₂
+  -- Since windingNumber γ₁ = windingNumber γ₂, they're both homotopic to the same loop
+  rw [h] at h₁
+  -- Use transitivity: γ₁ ~ standardLoop_pow n ~ γ₂
+  exact h₁.trans h₂.symm
+
+/-- Two paths are homotopic if and only if they have the same winding number. -/
+theorem homotopic_iff_windingNumber_eq {γ₁ γ₂ : Path (1 : Circle) 1} :
+    γ₁.Homotopic γ₂ ↔ windingNumber γ₁ = windingNumber γ₂ := by
+  constructor
+  · exact windingNumber_eq_of_homotopic
+  · exact homotopic_of_windingNumber_eq
+
 /-- Step 3: Composing standard loops with winding numbers n and m is homotopic
     to the standard loop with winding number n + m. -/
 theorem standardLoop_pow_trans (n m : ℤ) :
@@ -331,47 +352,77 @@ theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
   calc windingNumber (γ₁.trans γ₂)
       = windingNumber (standardLoop_pow (n₁ + n₂)) := windingNumber_eq_of_homotopic h_final
     _ = n₁ + n₂ := windingNumber_standardLoop_pow (n₁ + n₂)
-
+open scoped Multiplicative
 /-- The winding number as a group homomorphism. -/
-def windingNumberMonoidHom : FundamentalGroup Circle 1 →* ℤ := by
-  sorry
+def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
+  toFun p := Multiplicative.ofAdd (windingNumber (Quotient.out p))
+  map_zero' := by
+    -- rw [ofAdd_eq_one]
+    -- rw [Quotient.out]
+    -- rw [Quot.out]
+    sorry
+  map_add' := fun x y => by
+    -- Need: ofAdd (windingNumber (Quotient.out (x * y))) =
+    --       ofAdd (windingNumber (Quotient.out x)) * ofAdd (windingNumber (Quotient.out y))
+    -- In Multiplicative, multiplication is addition, so this is:
+    -- ofAdd (windingNumber (Quotient.out (x * y))) = ofAdd (windingNumber (Quotient.out x) + windingNumber (Quotient.out y))
+    simp only [← ofAdd_add]
+    congr 1
+
+    sorry
 
 /-- The winding number descends to a well-defined map on the fundamental group. -/
-abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ := windingNumberMonoidHom
+abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ :=
+  Multiplicative.toAdd ∘ windingNumberMonoidHom
 
-/-- The standard loop that wraps once around the circle counterclockwise.
-    Defined as t ↦ exp(2πt). -/
-def standardLoop : Path (1 : Circle) 1 where
-  toFun := fun t => Circle.exp (2 * Real.pi * t)
-  continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul continuous_subtype_val)
-  source' := by simp [Circle.exp_zero]
-  target' := by simp [Circle.exp_two_pi]
-
-/-- The standard loop has winding number 1. -/
-lemma windingNumber_standardLoop : windingNumber standardLoop = 1 := by
-  unfold windingNumber standardLoop
-  -- The lift of the standard loop starting at 0 should be t ↦ 2πt
-  -- So it ends at 2π = 1 * 2π
-  sorry
 
 /-- The winding number homomorphism is surjective. -/
 theorem windingNumberHom_surjective : Function.Surjective windingNumberHom := by
-  sorry
+  intro n
+  -- The preimage of n is the homotopy class of standardLoop_pow n
+  use FundamentalGroupoid.fromPath' (standardLoop_pow n)
+  -- Show windingNumberHom applied to this equals n
+  unfold windingNumberHom windingNumberMonoidHom
+  simp only [Function.comp_apply, toAdd_ofAdd, MonoidHom.coe_mk, OneHom.coe_mk]
+  -- Now need: windingNumber (Quotient.out (fromPath' (standardLoop_pow n))) = n
+  -- Quotient.out gives a representative homotopic to the original
+  have h_out_homotopic : (Quotient.out
+      (FundamentalGroupoid.fromPath' (standardLoop_pow n))).Homotopic
+      (standardLoop_pow n) := by
+    -- fromPath' is Quotient.mk _, and out gives a representative in the same equivalence class
+    have : ⟦Quotient.out (FundamentalGroupoid.fromPath' (standardLoop_pow n))⟧ =
+        FundamentalGroupoid.fromPath' (standardLoop_pow n) := Quotient.out_eq _
+    rw [FundamentalGroupoid.fromPath'] at this
+    simp only at this
+    exact Quotient.exact this
+  calc windingNumber (Quotient.out (FundamentalGroupoid.fromPath' (standardLoop_pow n)))
+      = windingNumber (standardLoop_pow n) := windingNumber_eq_of_homotopic h_out_homotopic
+    _ = n := windingNumber_standardLoop_pow n
 
 /-- The winding number homomorphism is injective.
     Uses the fact that ℝ is simply connected. -/
 theorem windingNumberHom_injective : Function.Injective windingNumberHom := by
-  sorry
-
+  rw[Function.Injective]
+  intro a b
+  unfold windingNumberHom windingNumberMonoidHom
+  intro h
+  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, Function.comp_apply, toAdd_ofAdd,
+    ← homotopic_iff_windingNumber_eq] at h
+  -- h : (Quotient.out a).Homotopic (Quotient.out b)
+  -- Need to show a = b in the quotient
+  -- Use Quotient.sound to show quotients of equivalent elements are equal
+  calc a = ⟦Quotient.out a⟧ := (Quotient.out_eq a).symm
+    _ = ⟦Quotient.out b⟧ := Quotient.sound h
+    _ = b := Quotient.out_eq b
 /-- The fundamental group of the circle is isomorphic to the integers. -/
-noncomputable def fundamentalGroupCircleEquivInt : FundamentalGroup Circle 1 ≃* ℤ :=
-  MulEquiv.ofBijective windingNumberMonoidHom
+noncomputable def fundamentalGroupCircleEquivInt : Additive (FundamentalGroup Circle 1) ≃+ ℤ :=
+  AddEquiv.ofBijective windingNumberMonoidHom
     ⟨windingNumberHom_injective, windingNumberHom_surjective⟩
 
 /-- Main theorem: The fundamental group of the circle is isomorphic to the integers.
     This is Theorem 1.7 from Hatcher's Algebraic Topology. -/
 theorem fundamentalGroup_circle_eq_int :
-    Nonempty (FundamentalGroup Circle 1 ≃* ℤ) :=
+    Nonempty (Additive (FundamentalGroup Circle 1) ≃+ ℤ) :=
   ⟨fundamentalGroupCircleEquivInt⟩
 
 end Circle
