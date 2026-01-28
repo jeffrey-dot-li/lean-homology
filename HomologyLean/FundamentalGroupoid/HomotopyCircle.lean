@@ -385,15 +385,9 @@ lemma winding_const_is_zero : windingNumber (Path.refl 1) = 0 := by
   rw [h_cast] at hspec
   simp [hspec]
 
-lemma h_out_homotopic {X : Type*} [TopologicalSpace X] {x : X} (f : Path x x) : (Quotient.out (FundamentalGroupoid.fromPath' (f))).Homotopic
-        (f) := by
-    unfold fromPath'
-    simpa using (Quotient.exact (Quotient.out_eq (⟦f⟧ : FundamentalGroup X x)))
-
-
 
 /-- The winding number as a group homomorphism. -/
-def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
+def windingNumberHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
 -- TODO: Use Quotient.lift
   toFun := Quotient.lift (fun γ => windingNumber γ) (by
     -- prove well-defined: homotopic loops have same windingNumber
@@ -411,32 +405,23 @@ def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
     simp only [windingNumber_mul]
     ring_nf
 
-
-/-- The winding number descends to a well-defined map on the fundamental group. -/
-abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ :=
-  Multiplicative.toAdd ∘ windingNumberMonoidHom
-
-
 /-- The winding number homomorphism is surjective. -/
 theorem windingNumberHom_surjective : Function.Surjective windingNumberHom := by
   intro n
   -- The preimage of n is the homotopy class of standardLoop_pow n
   use ⟦ (standardLoop_pow n) ⟧
   unfold windingNumberHom
-  simp only [windingNumberMonoidHom, AddMonoidHom.coe_mk, ZeroHom.coe_mk,
-    Homotopic.Quotient.mk''_eq_mk, Function.comp_apply]
+  simp only [ AddMonoidHom.coe_mk, ZeroHom.coe_mk, Homotopic.Quotient.mk''_eq_mk]
   erw [Quotient.lift_mk]
   simp [windingNumber_standardLoop_pow]
-  rfl
 
 /-- The winding number homomorphism is injective.
     Uses the fact that ℝ is simply connected. -/
 theorem windingNumberHom_injective : Function.Injective windingNumberHom := by
   rw[Function.Injective]
   intro x y
-  unfold windingNumberHom windingNumberMonoidHom
-  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, Function.comp_apply,
-    EmbeddingLike.apply_eq_iff_eq]
+  unfold windingNumberHom
+  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk]
   refine Quotient.inductionOn₂ x y ?_
   intro a b
   simp only [Quotient.lift_mk]
@@ -446,7 +431,7 @@ theorem windingNumberHom_injective : Function.Injective windingNumberHom := by
 
 
 noncomputable def fundamentalGroupCircleEquivInt : Additive (FundamentalGroup Circle 1) ≃+ ℤ :=
-  AddEquiv.ofBijective windingNumberMonoidHom
+  AddEquiv.ofBijective windingNumberHom
     ⟨windingNumberHom_injective, windingNumberHom_surjective⟩
 
 /-- Main theorem: The fundamental group of the circle is isomorphic to the integers.
