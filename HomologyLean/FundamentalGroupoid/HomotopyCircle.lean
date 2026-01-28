@@ -392,74 +392,25 @@ lemma h_out_homotopic {X : Type*} [TopologicalSpace X] {x : X} (f : Path x x) : 
 
 
 
-
 /-- The winding number as a group homomorphism. -/
 def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
 -- TODO: Use Quotient.lift
--- toFun := Quotient.lift (fun γ => windingNumber γ) (by
---   -- prove well-defined: homotopic loops have same windingNumber
---   intro γ₁ γ₂ hγ
---   exact windingNumber_eq_of_homotopic hγ
--- )
---   map_zero' := by
---    simp [windingNumber]  -- or your lemma `windingNumber_refl = 0`
-  toFun p := (windingNumber (Quotient.out p))
+  toFun := Quotient.lift (fun γ => windingNumber γ) (by
+    -- prove well-defined: homotopic loops have same windingNumber
+    intro γ₁ γ₂ hγ
+    exact windingNumber_eq_of_homotopic hγ
+  )
   map_zero' := by
-    change windingNumber (Quotient.out (Additive.ofMul (1 : FundamentalGroup Circle 1))) = 0
-    -- rw [←FundamentalGroupoid.fromPath'_refl]
-    -- Then show ⟦standardLoop_pow 0⟧ = 1 in FundamentalGroup
-    have std_zero_is_id : FundamentalGroupoid.fromPath' (Path.refl 1) =
-        (1 : FundamentalGroup Circle 1) := by
-      rw [FundamentalGroupoid.fromPath'_refl]
-      rfl_cat
-    rw [←std_zero_is_id]
-    -- Now need: windingNumber (Quotient.out (fromPath' (Path.refl 1))) = 0
-    change windingNumber (Quotient.out (FundamentalGroupoid.fromPath' (Path.refl 1))) = 0
-    -- Quotient.out gives a representative homotopic to the original
-    have h_out_htpic := h_out_homotopic (Path.refl (1 : Circle))
---
-    calc windingNumber (Quotient.out (FundamentalGroupoid.fromPath' (Path.refl 1)))
-        = windingNumber (Path.refl 1) := windingNumber_eq_of_homotopic h_out_htpic
-      _ = 0 := winding_const_is_zero
+    erw [Quotient.lift_mk]
+    exact winding_const_is_zero
   map_add' := fun x y => by
-    -- In Additive, addition is the underlying multiplication
-    -- So x + y in Additive (FundamentalGroup) corresponds to multiplication in FundamentalGroup
-    -- which is path composition
-    -- Need: windingNumber (Quotient.out (x + y)) =
-    --       windingNumber (Quotient.out x) + windingNumber (Quotient.out y)
-    -- The key is that Quotient.out (x + y) is homotopic to (Quotient.out x).trans (Quotient.out y)
-    have h_out_mul : (Quotient.out (x + y)).Homotopic
-        ((Quotient.out (Additive.toMul y)).trans (Quotient.out (Additive.toMul x))) := by
-      -- In Additive, x + y = ofMul (toMul x * toMul y)
-      -- rw [homotopic_iff_windingNumber_eq]
-      -- rw [windingNumber_mul]
-      have h_eq : (x + y : Additive (FundamentalGroup Circle 1)) =
-          Additive.ofMul (Additive.toMul x * Additive.toMul y) := by rfl
-      rw [h_eq]
-      -- Since ofMul/toMul are identity on the underlying type, this is definitional
-      change (Quotient.out (Additive.toMul x * Additive.toMul y)).Homotopic
-        ((Additive.toMul y).out.trans (Additive.toMul x).out)
---
-      -- Use Quotient.out_eq and the fact that multiplication is path composition
-      have h_out : (Additive.toMul x * Additive.toMul y) =
-          FundamentalGroupoid.fromPath' ((Additive.toMul y).out.trans (Additive.toMul x).out) := by
-        rw [fromPath'_trans]
-        simp [Mul.mul, HMul.hMul]
---
-      have : (⟦Quotient.out (Additive.toMul x * Additive.toMul y)⟧ : FundamentalGroup Circle 1) =
-          ⟦(Additive.toMul y).out.trans (Additive.toMul x).out⟧ := by
-        rw [Quotient.out_eq, h_out]
-      exact Quotient.exact this
---
-    calc windingNumber (Quotient.out (x + y))
-        = windingNumber ((Quotient.out (Additive.toMul y)).trans
-                        (Quotient.out (Additive.toMul x)))
-          := windingNumber_eq_of_homotopic h_out_mul
-      _ = windingNumber (Quotient.out (Additive.toMul y)) +
-          windingNumber (Quotient.out (Additive.toMul x)) :=
-          windingNumber_mul _ _
-      _ = windingNumber (Quotient.out y) + windingNumber (Quotient.out x) := by rfl
-      _ = windingNumber (Quotient.out x) + windingNumber (Quotient.out y) := by ring_nf
+    refine Quotient.inductionOn₂ x y ?_
+    intro a b
+    simp only [Quotient.lift_mk]
+    erw [Quotient.lift_mk]
+    simp only [windingNumber_mul]
+    ring_nf
+
 
 /-- The winding number descends to a well-defined map on the fundamental group. -/
 abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ :=
@@ -470,42 +421,30 @@ abbrev windingNumberHom : FundamentalGroup Circle 1 → ℤ :=
 theorem windingNumberHom_surjective : Function.Surjective windingNumberHom := by
   intro n
   -- The preimage of n is the homotopy class of standardLoop_pow n
-  use FundamentalGroupoid.fromPath' (standardLoop_pow n)
-  -- Show windingNumberHom applied to this equals n
-  unfold windingNumberHom windingNumberMonoidHom
-  simp only [Function.comp_apply]
-  -- Now need: windingNumber (Quotient.out (fromPath' (standardLoop_pow n))) = n
-  -- Quotient.out gives a representative homotopic to the original
-  have h_out_homotopic : (Quotient.out
-      (FundamentalGroupoid.fromPath' (standardLoop_pow n))).Homotopic
-      (standardLoop_pow n) := by
-    -- fromPath' is Quotient.mk _, and out gives a representative in the same equivalence class
-    have : ⟦Quotient.out (FundamentalGroupoid.fromPath' (standardLoop_pow n))⟧ =
-        FundamentalGroupoid.fromPath' (standardLoop_pow n) := Quotient.out_eq _
-    rw [FundamentalGroupoid.fromPath'] at this
-    simp only at this
-    exact Quotient.exact this
-  calc windingNumber (Quotient.out (FundamentalGroupoid.fromPath' (standardLoop_pow n)))
-      = windingNumber (standardLoop_pow n) := windingNumber_eq_of_homotopic h_out_homotopic
-    _ = n := windingNumber_standardLoop_pow n
+  use ⟦ (standardLoop_pow n) ⟧
+  unfold windingNumberHom
+  simp only [windingNumberMonoidHom, AddMonoidHom.coe_mk, ZeroHom.coe_mk,
+    Homotopic.Quotient.mk''_eq_mk, Function.comp_apply]
+  erw [Quotient.lift_mk]
+  simp [windingNumber_standardLoop_pow]
+  rfl
 
 /-- The winding number homomorphism is injective.
     Uses the fact that ℝ is simply connected. -/
 theorem windingNumberHom_injective : Function.Injective windingNumberHom := by
   rw[Function.Injective]
-  intro a b
+  intro x y
   unfold windingNumberHom windingNumberMonoidHom
-  intro h
   simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, Function.comp_apply,
-    EmbeddingLike.apply_eq_iff_eq] at h
-  rw [←homotopic_iff_windingNumber_eq] at h
-  -- h : (Quotient.out a).Homotopic (Quotient.out b)
-  -- Need to show a = b in the quotient
-  -- Use Quotient.sound to show quotients of equivalent elements are equal
-  calc a = ⟦Quotient.out a⟧ := (Quotient.out_eq a).symm
-    _ = ⟦Quotient.out b⟧ := Quotient.sound h
-    _ = b := Quotient.out_eq b
-/-- The fundamental group of the circle is isomorphic to the integers. -/
+    EmbeddingLike.apply_eq_iff_eq]
+  refine Quotient.inductionOn₂ x y ?_
+  intro a b
+  simp only [Quotient.lift_mk]
+  rw [←homotopic_iff_windingNumber_eq]
+  intro h
+  exact Quot.sound h
+
+
 noncomputable def fundamentalGroupCircleEquivInt : Additive (FundamentalGroup Circle 1) ≃+ ℤ :=
   AddEquiv.ofBijective windingNumberMonoidHom
     ⟨windingNumberHom_injective, windingNumberHom_surjective⟩
