@@ -1,1 +1,1 @@
-# Basic Homology Computations in Lean4
+# Basic Homotopy Computations in Lean4
