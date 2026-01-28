@@ -353,14 +353,69 @@ theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
       = windingNumber (standardLoop_pow (n₁ + n₂)) := windingNumber_eq_of_homotopic h_final
     _ = n₁ + n₂ := windingNumber_standardLoop_pow (n₁ + n₂)
 open scoped Multiplicative
+
+lemma winding_const_is_zero : windingNumber (Path.refl 1) = 0 := by
+  unfold windingNumber
+  -- The lift of Path.refl 1 starting at 0 is the constant path at 0 in ℝ
+  let h_basepoint := (Path.refl 1).source.trans Circle.exp_zero.symm
+  -- set lift := Circle.isCoveringMap_exp.liftPath (Path.refl 1).toContinuousMap 0 h_basepoint
+  let const_lift : C(I, ℝ) := ContinuousMap.const _ 0
+  have const_lifts : Circle.exp ∘ const_lift = (Path.refl 1).toContinuousMap := by
+    ext t
+    simp only [const_lift]
+    simp
+  have const_starts_at_zero : const_lift 0 = 0 := rfl
+  -- By uniqueness of path lifting (eq_liftPath_iff'), lift = const_lift
+  have : const_lift = Circle.isCoveringMap_exp.liftPath (Path.refl 1).toContinuousMap 0 h_basepoint := by
+    rw [Circle.isCoveringMap_exp.eq_liftPath_iff']
+    simp only [const_lift]
+    simp
+    simp only [Path.refl]
+    simp
+  -- Now extract the integer: since lift = const_lift, endpoint is 0 = 0 * (2π)
+  have h_endpoint : Circle.isCoveringMap_exp.liftPath (Path.refl 1).toContinuousMap 0 h_basepoint 1 = 0 := by
+    rw [← this]
+    simp only [const_lift, ContinuousMap.const_apply]
+  have choose_spec := (liftPath_loop_endpoint_eq_int_mul_two_pi (Path.refl 1)).choose_spec
+  have : (liftPath_loop_endpoint_eq_int_mul_two_pi (Path.refl 1)).choose * (2 * Real.pi) = 0 := by
+    rw [← choose_spec, h_endpoint]
+  have h_cast : ((liftPath_loop_endpoint_eq_int_mul_two_pi (Path.refl 1)).choose : ℝ) * (2 * Real.pi) = 0 := by
+    norm_cast
+  have hspec := (liftPath_loop_endpoint_eq_int_mul_two_pi (Path.refl 1)).choose_spec
+  rw [h_cast] at hspec
+  simp [hspec]
+
+
 /-- The winding number as a group homomorphism. -/
 def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
   toFun p := (windingNumber (Quotient.out p))
   map_zero' := by
-    -- rw [ofAdd_eq_one]
-    rw [Quotient.out]
-    -- rw [Quot.out]
-    sorry
+    -- First show that standardLoop_pow 0 is homotopic to Path.refl 1 (the identity)
+    have std_zero_is_refl : (standardLoop_pow 0).Homotopic (Path.refl 1) := by
+      -- standardLoop_pow 0 is the constant path at 1
+      -- Show it's homotopic to Path.refl 1
+      sorry
+
+    -- Then show ⟦standardLoop_pow 0⟧ = 1 in FundamentalGroup
+    have std_zero_is_id : FundamentalGroupoid.fromPath' (standardLoop_pow 0) =
+        (1 : FundamentalGroup Circle 1) := by
+      rw [← FundamentalGroupoid.fromPath'_refl]
+      exact Quotient.sound std_zero_is_refl
+
+    -- Therefore windingNumber of the identity representative is 0
+    have h_out_zero : (Quotient.out (0 : Additive (FundamentalGroup Circle 1))).Homotopic
+        (standardLoop_pow 0) := by
+      -- 0 in Additive is 1 in the underlying FundamentalGroup
+      change (Quotient.out (Additive.ofMul 1)).Homotopic (standardLoop_pow 0)
+      -- Quotient.out 1 is homotopic to any representative of 1
+      have : (Quotient.out (1 : FundamentalGroup Circle 1)).Homotopic (standardLoop_pow 0) := by
+        rw [← std_zero_is_id]
+        exact Quotient.mk_out _
+      exact this
+
+    calc windingNumber (Quotient.out 0)
+        = windingNumber (standardLoop_pow 0) := windingNumber_eq_of_homotopic h_out_zero
+      _ = 0 := windingNumber_standardLoop_pow 0
   map_add' := fun x y => by
     -- In Additive, addition is the underlying multiplication
     -- So x + y in Additive (FundamentalGroup) corresponds to multiplication in FundamentalGroup
@@ -373,13 +428,9 @@ def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
       -- In Additive, x + y = ofMul (toMul x * toMul y)
       -- rw [homotopic_iff_windingNumber_eq]
       -- rw [windingNumber_mul]
-
-
-
       have h_eq : (x + y : Additive (FundamentalGroup Circle 1)) =
           Additive.ofMul (Additive.toMul x * Additive.toMul y) := by rfl
       rw [h_eq]
-
       -- Since ofMul/toMul are identity on the underlying type, this is definitional
       change (Quotient.out (Additive.toMul x * Additive.toMul y)).Homotopic
         ((Additive.toMul y).out.trans (Additive.toMul x).out)
