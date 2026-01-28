@@ -355,10 +355,10 @@ theorem windingNumber_mul (γ₁ γ₂ : Path (1 : Circle) 1) :
 open scoped Multiplicative
 /-- The winding number as a group homomorphism. -/
 def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
-  toFun p := Multiplicative.ofAdd (windingNumber (Quotient.out p))
+  toFun p := (windingNumber (Quotient.out p))
   map_zero' := by
     -- rw [ofAdd_eq_one]
-    -- rw [Quotient.out]
+    rw [Quotient.out]
     -- rw [Quot.out]
     sorry
   map_add' := fun x y => by
@@ -366,8 +366,8 @@ def windingNumberMonoidHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
     --       ofAdd (windingNumber (Quotient.out x)) * ofAdd (windingNumber (Quotient.out y))
     -- In Multiplicative, multiplication is addition, so this is:
     -- ofAdd (windingNumber (Quotient.out (x * y))) = ofAdd (windingNumber (Quotient.out x) + windingNumber (Quotient.out y))
-    simp only [← ofAdd_add]
-    congr 1
+    -- simp only [← ofAdd_add]
+    -- congr 1
 
     sorry
 
@@ -383,7 +383,7 @@ theorem windingNumberHom_surjective : Function.Surjective windingNumberHom := by
   use FundamentalGroupoid.fromPath' (standardLoop_pow n)
   -- Show windingNumberHom applied to this equals n
   unfold windingNumberHom windingNumberMonoidHom
-  simp only [Function.comp_apply, toAdd_ofAdd, MonoidHom.coe_mk, OneHom.coe_mk]
+  simp only [Function.comp_apply]
   -- Now need: windingNumber (Quotient.out (fromPath' (standardLoop_pow n))) = n
   -- Quotient.out gives a representative homotopic to the original
   have h_out_homotopic : (Quotient.out
@@ -406,8 +406,9 @@ theorem windingNumberHom_injective : Function.Injective windingNumberHom := by
   intro a b
   unfold windingNumberHom windingNumberMonoidHom
   intro h
-  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, Function.comp_apply, toAdd_ofAdd,
-    ← homotopic_iff_windingNumber_eq] at h
+  simp only [AddMonoidHom.coe_mk, ZeroHom.coe_mk, Function.comp_apply,
+    EmbeddingLike.apply_eq_iff_eq] at h
+  rw [←homotopic_iff_windingNumber_eq] at h
   -- h : (Quotient.out a).Homotopic (Quotient.out b)
   -- Need to show a = b in the quotient
   -- Use Quotient.sound to show quotients of equivalent elements are equal
