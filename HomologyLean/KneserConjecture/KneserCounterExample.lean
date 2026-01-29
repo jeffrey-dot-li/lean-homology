@@ -4,10 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Sebastian Kumar
 -/
 
-import HomologyLean.KneserConjecture.KneserConjecture
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Finset.Card
-import Mathlib.Data.Fintype.Basic
+import HomologyLean.KneserConjecture.Basic
 import Mathlib.Tactic
 
 /-!
@@ -22,6 +19,7 @@ is tight and cannot be strengthened to k + 2 colors.
 ## Main Results
 
 * `kneser_counterexample`: With k + 2 colors, we can avoid monochromatic disjoint pairs
+* `KneserGraph.colorable`: The Kneser graph is (k+2)-colorable
 
 ## Implementation
 
@@ -58,6 +56,11 @@ theorem nSubset_nonempty {n k : ℕ} (hn : 0 < n)
   unfold nSubsets at hA
   rw [Finset.mem_powersetCard] at hA
   rw [← Finset.card_pos, hA.2]
+  exact hn
+
+/-- A KneserVertex is nonempty when n > 0 -/
+theorem KneserVertex.nonempty {n k : ℕ} (hn : 0 < n) (A : KneserVertex n k) : A.1.Nonempty := by
+  rw [← Finset.card_pos, A.2]
   exact hn
 
 /-- Two n-subsets of {k+1, ..., 2n+k-1} must intersect when n > 0 (pigeonhole).
@@ -126,6 +129,7 @@ This gives k + 2 classes where no class contains two disjoint n-subsets. -/
 def minElementColoring (n k : ℕ) (A : Finset (Fin (2 * n + k))) (hA : A.Nonempty) : Fin (k + 2) :=
   let m := A.min' hA
   if h : m.val < k + 1 then ⟨m.val, Nat.lt_add_one_of_lt h⟩ else ⟨k + 1, Nat.lt_succ_self _⟩
+
 /-- The coloring for the counterexample, adapted for n-subsets -/
 def counterexampleColoring (n k : ℕ) (hn : 0 < n)
     (A : nSubsets (Finset.univ : Finset (Fin (2 * n + k))) n) : Fin (k + 2) :=
@@ -183,5 +187,68 @@ theorem kneser_counterexample (n k : ℕ) (hn : 0 < n) :
       have : mB ≤ x := Finset.min'_le B.1 x hx
       omega
     exact high_min_subsets_intersect hn hA_card hB_card hA_min_bound hB_min_bound h_disj
+
+/-! ### Graph Coloring Version -/
+
+/-- The minimum element coloring for KneserVertex.
+Uses color 0 for empty sets (when n = 0). -/
+def KneserGraph.minColoring (n k : ℕ) (A : KneserVertex n k) : Fin (k + 2) :=
+  if h : A.1.Nonempty then minElementColoring n k A.1 h
+  else ⟨0, Nat.zero_lt_succ _⟩
+
+/-- The minimum element coloring gives a valid graph coloring. -/
+theorem KneserGraph.minColoring_valid (n k : ℕ) :
+    ∀ {A B : KneserVertex n k}, (KneserGraph n k).Adj A B →
+      KneserGraph.minColoring n k A ≠ KneserGraph.minColoring n k B := by
+  intro A B ⟨hne, hdisj⟩
+  unfold minColoring
+  by_cases hA : A.1.Nonempty <;> by_cases hB : B.1.Nonempty
+  · -- Both nonempty
+    simp only [dif_pos hA, dif_pos hB]
+    unfold minElementColoring
+    by_cases hmA : (A.1.min' hA).val < k + 1 <;> by_cases hmB : (B.1.min' hB).val < k + 1
+    · -- Both mins < k + 1
+      simp only [dif_pos hmA, dif_pos hmB, ne_eq, Fin.mk.injEq]
+      intro h_eq
+      have h_same : A.1.min' hA = B.1.min' hB := Fin.ext h_eq
+      exact same_min_not_disjoint hA hB h_same hdisj
+    · -- mA < k + 1, mB ≥ k + 1
+      simp only [dif_pos hmA, dif_neg hmB, ne_eq, Fin.mk.injEq]
+      push_neg at hmB
+      omega
+    · -- mA ≥ k + 1, mB < k + 1
+      simp only [dif_neg hmA, dif_pos hmB, ne_eq, Fin.mk.injEq]
+      push_neg at hmA
+      omega
+    · -- Both mins ≥ k + 1
+      push_neg at hmA hmB
+      have hn : 0 < n := by rw [← A.2]; exact Finset.card_pos.mpr hA
+      exact absurd hdisj (high_min_subsets_intersect hn A.2 B.2
+        (fun x hx => Nat.le_trans hmA (Fin.val_fin_le.mpr (Finset.min'_le A.1 x hx)))
+        (fun x hx => Nat.le_trans hmB (Fin.val_fin_le.mpr (Finset.min'_le B.1 x hx))))
+  · -- A nonempty, B empty - impossible since both have same cardinality n
+    exfalso
+    have hn : 0 < n := by rw [← A.2]; exact Finset.card_pos.mpr hA
+    have hBemp := Finset.not_nonempty_iff_eq_empty.mp hB
+    have hBcard : B.1.card = 0 := by rw [hBemp]; exact Finset.card_empty
+    rw [B.2] at hBcard
+    omega
+  · -- A empty, B nonempty - impossible
+    exfalso
+    have hn : 0 < n := by rw [← B.2]; exact Finset.card_pos.mpr hB
+    have hAemp := Finset.not_nonempty_iff_eq_empty.mp hA
+    have hAcard : A.1.card = 0 := by rw [hAemp]; exact Finset.card_empty
+    rw [A.2] at hAcard
+    omega
+  · -- Both empty - then A = B, contradiction with hne
+    exfalso
+    have hAemp : A.1 = ∅ := Finset.not_nonempty_iff_eq_empty.mp hA
+    have hBemp : B.1 = ∅ := Finset.not_nonempty_iff_eq_empty.mp hB
+    exact hne (Subtype.ext (hAemp.trans hBemp.symm))
+
+/-- The Kneser graph is (k+2)-colorable.
+This is the upper bound, proved via the minimum element coloring. -/
+theorem KneserGraph.colorable (n k : ℕ) : (KneserGraph n k).Colorable (k + 2) :=
+  ⟨SimpleGraph.Coloring.mk (minColoring n k) (fun hadj => minColoring_valid n k hadj)⟩
 
 end Kneser
