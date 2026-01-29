@@ -119,6 +119,13 @@ theorem high_min_subsets_intersect {n k : ℕ} (hn : 0 < n)
   rw [h_union_card, hS_card] at this
   omega
 
+
+/-- The minimum element coloring: partition n-subsets by their minimum element.
+Classes are {min = 0}, {min = 1}, ..., {min = k}, {min ≥ k + 1}.
+This gives k + 2 classes where no class contains two disjoint n-subsets. -/
+def minElementColoring (n k : ℕ) (A : Finset (Fin (2 * n + k))) (hA : A.Nonempty) : Fin (k + 2) :=
+  let m := A.min' hA
+  if h : m.val < k + 1 then ⟨m.val, Nat.lt_add_one_of_lt h⟩ else ⟨k + 1, Nat.lt_succ_self _⟩
 /-- The coloring for the counterexample, adapted for n-subsets -/
 def counterexampleColoring (n k : ℕ) (hn : 0 < n)
     (A : nSubsets (Finset.univ : Finset (Fin (2 * n + k))) n) : Fin (k + 2) :=

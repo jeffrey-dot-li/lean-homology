@@ -10,6 +10,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Topology.Basic
+import Mathlib.Analysis.InnerProductSpace.PiL2
 
 /-!
 # Kneser's Conjecture
@@ -48,13 +49,45 @@ variable {α : Type*} [DecidableEq α]
 def nSubsets (S : Finset α) (n : ℕ) : Finset (Finset α) :=
   S.powersetCard n
 
+/-! ### Borsuk's Theorem -/
 
-/-- The minimum element coloring: partition n-subsets by their minimum element.
-Classes are {min = 0}, {min = 1}, ..., {min = k}, {min ≥ k + 1}.
-This gives k + 2 classes where no class contains two disjoint n-subsets. -/
-def minElementColoring (n k : ℕ) (A : Finset (Fin (2 * n + k))) (hA : A.Nonempty) : Fin (k + 2) :=
-  let m := A.min' hA
-  if h : m.val < k + 1 then ⟨m.val, Nat.lt_add_one_of_lt h⟩ else ⟨k + 1, Nat.lt_succ_self _⟩
+/-- The n-dimensional sphere in ℝⁿ⁺¹ -/
+def Sphere (n : ℕ) : Set (EuclideanSpace ℝ (Fin (n + 1))) :=
+  Metric.sphere 0 1
+
+/-- Two points on the sphere are antipodal if one is the negation of the other -/
+def Antipodal {n : ℕ} (x y : Sphere n) : Prop :=
+  y.1 = -x.1
+
+/-- A set contains an antipodal pair if there exists x such that both x and -x are in the set -/
+def HasAntipodalPair {n : ℕ} (F : Set (Sphere n)) : Prop :=
+  ∃ x : Sphere n, x ∈ F ∧ ∃ y : Sphere n, y ∈ F ∧ Antipodal x y
+
+/-- **Borsuk's Theorem (Covering Version)**: If the n-sphere Sⁿ is covered by n + 1 closed sets,
+then at least one of the sets contains a pair of antipodal points.
+
+This is equivalent to the Borsuk-Ulam theorem and is the key topological input for
+Lovász's proof of Kneser's conjecture. -/
+theorem borsuk_covering {n : ℕ} (F : Fin (n + 1) → Set (Sphere n))
+    (hClosed : ∀ i, IsClosed (F i))
+    (hCover : ∀ x : Sphere n, ∃ i, x ∈ F i) :
+    ∃ i, HasAntipodalPair (F i) := by
+  sorry
+
+/-- The antipodal point of x on the sphere -/
+def antipode {n : ℕ} (x : Sphere n) : Sphere n :=
+  ⟨-x.1, by
+    simp only [Sphere, Metric.mem_sphere, dist_zero_right, norm_neg]
+    have hx := x.2
+    simp only [Sphere, Metric.mem_sphere, dist_zero_right] at hx
+    exact hx⟩
+
+/-- **Borsuk-Ulam Theorem**: Any continuous map from Sⁿ to ℝⁿ sends some pair of
+antipodal points to the same point. -/
+theorem borsuk_ulam {n : ℕ} (f : Sphere n → EuclideanSpace ℝ (Fin n))
+    (hf : Continuous f) :
+    ∃ x : Sphere n, f x = f (antipode x) := by
+  sorry
 
 /-! ### Kneser's Conjecture (Set-Theoretic Formulation) -/
 
