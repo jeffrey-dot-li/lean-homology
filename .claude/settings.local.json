@@ -11,7 +11,9 @@
       "mcp__lean-lsp__lean_local_search",
       "mcp__lean-lsp__lean_run_code",
       "mcp__lean-lsp__lean_hover_info",
-      "mcp__lean-lsp__lean_completions"
+      "mcp__lean-lsp__lean_completions",
+      "mcp__lean-lsp__lean_loogle",
+      "mcp__lean-lsp__lean_leansearch"
     ]
   },
   "enableAllProjectMcpServers": true,
