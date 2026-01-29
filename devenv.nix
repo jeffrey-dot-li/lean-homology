@@ -8,6 +8,7 @@
   env.UV = "1";
 
   packages = with pkgs; [
+    elan
   ];
 
   git-hooks.hooks = {
@@ -17,14 +18,16 @@
     alejandra.enable = true;
   };
 
-  languages.python = {
-    package = pkgs.python312;
-    libraries = [
-    ];
-    enable = true;
-    uv = {
+  languages = {
+    python = {
+      package = pkgs.python312;
+      libraries = [
+      ];
       enable = true;
+      uv = {
+        enable = true;
+      };
+      venv.enable = true;
     };
-    venv.enable = true;
   };
 }
