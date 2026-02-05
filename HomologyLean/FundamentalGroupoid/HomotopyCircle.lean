@@ -388,7 +388,6 @@ lemma winding_const_is_zero : windingNumber (Path.refl 1) = 0 := by
 
 /-- The winding number as a group homomorphism. -/
 def windingNumberHom : Additive (FundamentalGroup Circle 1) →+ ℤ where
--- TODO: Use Quotient.lift
   toFun := Quotient.lift (fun γ => windingNumber γ) (by
     -- prove well-defined: homotopic loops have same windingNumber
     intro γ₁ γ₂ hγ
