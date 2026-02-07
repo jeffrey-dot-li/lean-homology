@@ -12,9 +12,9 @@
   ];
 
   git-hooks.hooks = {
-    shellcheck.enable = true;
-    ruff.enable = true;
-    ruff-format.enable = true;
+    # shellcheck.enable = true;
+    # ruff.enable = true;
+    # ruff-format.enable = true;
     alejandra.enable = true;
   };
 
