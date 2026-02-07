@@ -15,7 +15,10 @@
       "mcp__lean-lsp__lean_loogle",
       "mcp__lean-lsp__lean_leansearch",
       "mcp__lean-lsp__lean_file_outline",
-      "mcp__lean-lsp__lean_multi_attempt"
+      "mcp__lean-lsp__lean_multi_attempt",
+      "Bash(git -C /Users/jeffrey/Projects/math/homology-lean diff --cached)",
+      "Bash(git -C /Users/jeffrey/Projects/math/homology-lean diff)",
+      "Bash(git -C /Users/jeffrey/Projects/math/homology-lean log --oneline -5)"
     ]
   },
   "enableAllProjectMcpServers": true,
