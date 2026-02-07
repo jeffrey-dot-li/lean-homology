@@ -8,6 +8,8 @@ import HomologyLean.KneserConjecture.Basic
 import HomologyLean.KneserConjecture.BorsukUlam
 import HomologyLean.KneserConjecture.KneserCounterExample
 
+import Mathlib.Combinatorics.SimpleGraph.Basic
+import Mathlib.Data.Finset.Basic
 /-!
 # Kneser's Conjecture
 
@@ -28,6 +30,28 @@ This file formalizes Lovász's proof of Kneser's Conjecture using algebraic topo
 noncomputable section
 
 namespace Kneser
+
+-- open scoped Classical
+
+variable {V : Type*} (G : SimpleGraph V)
+
+/-- A finite set of vertices has a common neighbor in `G`. -/
+def HasCommonNeighbor (s : Finset V) : Prop :=
+  ∃ v : V, ∀ w : V, w ∈ s → G.Adj v w
+
+/-- The faces of the neighborhood complex as a `Set (Finset V)`. -/
+def NeighborhoodFaces : Set (Finset V) :=
+  { s | HasCommonNeighbor G s }
+
+theorem neighborhood_downClosed {s t : Finset V}
+    (hst : s ⊆ t) :
+    t ∈ NeighborhoodFaces G → s ∈ NeighborhoodFaces G := by
+  intro ht
+  -- unfold the definitions and reuse the same witness neighbor
+  rcases ht with ⟨v, hv⟩
+  refine ⟨v, ?_⟩
+  intro w hw
+  exact hv w (hst hw)
 
 variable {α : Type*} [DecidableEq α]
 

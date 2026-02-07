@@ -1,1 +1,8 @@
 import HomologyLean.Basic
+
+-- Cellular Homology
+import HomologyLean.CellularHomology.CellularChainComplex
+import HomologyLean.CellularHomology.Basic
+import HomologyLean.CellularHomology.Degree
+import HomologyLean.CellularHomology.Agreement
+import HomologyLean.CellularHomology.Computations
