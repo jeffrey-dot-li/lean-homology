@@ -20,6 +20,7 @@ import Mathlib.Algebra.Homology.ShortComplex.ShortExact
 import Mathlib.Algebra.Homology.HomologySequenceLemmas
 import Mathlib.CategoryTheory.Abelian.Projective.Resolution
 import Mathlib.Algebra.Homology.HomologicalComplexAbelian
+import HomologyLean.Homology.Biprod
 
 
 noncomputable section
@@ -115,26 +116,6 @@ def horseshoeDiff {S : ShortComplex C} (hS : S.ShortExact)
     biprod.snd ≫ horseshoeCorrection hS P₁ P₃ n ≫ biprod.inl
 
 
-
-variable {X Y X' Y' X'' Y'' : C}
-  [HasBinaryBiproduct X Y] [HasBinaryBiproduct X' Y'] [HasBinaryBiproduct X'' Y'']
-
-/-- `biprod.map` respects composition (componentwise). -/
-@[simp]
-lemma biprod.map_comp
-    (f1 : X ⟶ X') (g1 : Y ⟶ Y')
-    (f2 : X' ⟶ X'') (g2 : Y' ⟶ Y'') :
-    biprod.map f1 g1 ≫ biprod.map f2 g2 = biprod.map (f1 ≫ f2) (g1 ≫ g2) := by
-  -- ext on the *codomain* biproduct
-  apply biprod.hom_ext
-  · -- fst component
-    simp [Category.assoc]
-  · -- snd component
-    simp [Category.assoc]
-
-@[simp] lemma biprod.map_zero :
-  biprod.map (0 : X ⟶ X') (0 : Y ⟶ Y') = 0 := by
-  apply biprod.hom_ext <;> simp
 
 
 lemma horseshoeDiffCompEq0 {S : ShortComplex C} (hS : S.ShortExact)
