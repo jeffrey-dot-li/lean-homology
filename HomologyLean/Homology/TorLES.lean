@@ -148,21 +148,37 @@ def horseshoeCorrection {S : ShortComplex C} (hS : S.ShortExact)
     (n : ℕ) : P₃.complex.X (n + 1) ⟶ P₁.complex.X n :=
   (horseshoeCorrectionAux hS P₁ P₃ n).1
 
+omit [MonoidalCategory C] [MonoidalPreadditive C] [HasProjectiveResolutions C] in
 /-- The augmentation compatibility for the correction terms:
 `d₃(0) ≫ liftToX₂ + α(0) ≫ P₁.π.f 0 ≫ f = 0`. -/
-theorem horseshoeCorrection_aug {S : ShortComplex C} (hS : S.ShortExact)
+lemma horseshoeCorrection_aug {S : ShortComplex C} (hS : S.ShortExact)
     (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
     P₃.complex.d 1 0 ≫ liftToX₂ hS P₃ +
       horseshoeCorrection hS P₁ P₃ 0 ≫ P₁.π.f 0 ≫ S.f = 0 := by
-  sorry
+  unfold horseshoeCorrection horseshoeCorrectionAux horseshoeCorrection₀
+  simp [ShortComplex.Exact.lift_f]
 
+omit [MonoidalCategory C] [MonoidalPreadditive C] [HasProjectiveResolutions C] in
 /-- The chain homotopy condition for the correction terms:
 `d₃(n+1) ≫ α(n) + α(n+1) ≫ d₁(n) = 0`. -/
-theorem horseshoeCorrection_chain {S : ShortComplex C} (hS : S.ShortExact)
+lemma horseshoeCorrection_chain {S : ShortComplex C} (hS : S.ShortExact)
     (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) (n : ℕ) :
     P₃.complex.d (n + 2) (n + 1) ≫ horseshoeCorrection hS P₁ P₃ n +
       horseshoeCorrection hS P₁ P₃ (n + 1) ≫ P₁.complex.d (n + 1) n = 0 := by
-  sorry
+  simp only [horseshoeCorrection]
+  cases n with
+  | zero =>
+    change P₃.complex.d 2 1 ≫ (horseshoeCorrectionAux hS P₁ P₃ 0).1 +
+      (horseshoeCorrectionAux hS P₁ P₃ 1).1 ≫ P₁.complex.d 1 0 = 0
+    simp only [horseshoeCorrectionAux]
+    rw [ShortComplex.Exact.liftFromProjective_comp]
+    simp
+  | succ n =>
+    change P₃.complex.d (n + 3) (n + 2) ≫ (horseshoeCorrectionAux hS P₁ P₃ (n + 1)).1 +
+      (horseshoeCorrectionAux hS P₁ P₃ (n + 2)).1 ≫ P₁.complex.d (n + 2) (n + 1) = 0
+    simp only [horseshoeCorrectionAux]
+    rw [ShortComplex.Exact.liftFromProjective_comp]
+    simp
 
 /-! ### Horseshoe complex construction
 
