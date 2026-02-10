@@ -10,11 +10,116 @@ Lean 4 formalization of homotopy computations in algebraic topology.
 
 Commands use `fish` shell syntax.
 
-## Operating Instructions
+## Workflow Modes
+
+The user works in distinct modes. Modes are activated by slash commands (e.g., `/research`) or inferred from context.
+
+### Modal behavior
+
+- **Stay in the current mode** until the user explicitly switches (e.g., `/fill-sorry`) or the conversation ends.
+- If the user's request fits a different mode, **ask before switching**: e.g., "This sounds like it needs `/refactor` — want me to switch modes?"
+- If no mode has been set yet, infer from the first request. If ambiguous, ask.
+- When in a read-only mode (`/research`, `/discuss`), **do not edit files** unless the user explicitly asks to switch to an editing mode.
+
+### Mode 1: Research (`/research`)
+
+**Goal**: Find whether a theorem/concept exists in Mathlib, and locate the building blocks needed for a new theorem.
+
+**Procedure**:
+1. Use `lean_leansearch`, `lean_loogle`, `lean_leanfinder` to search for the concept.
+2. Use `lean_local_search` to check what already exists in this project.
+3. For each relevant result, use `lean_hover_info` and/or `lean_declaration_file` to get the full signature and source location.
+4. **Always cite results with `file_path:line_number`** format so the user can alt+click to navigate.
+5. Summarize findings: what exists, what's missing, and what building blocks are available.
+
+**Output**: A structured summary with clickable references. No code edits.
+
+### Mode 2: Plan (`/plan`)
+
+**Goal**: Draft the theorem/lemma structure needed to prove a larger result, given a proof sketch or mathematical reference (e.g., from Hatcher).
+
+**Procedure**:
+1. **Research first** — run Mode 1 to understand what Mathlib already provides.
+2. Work **interactively** with the user to decompose the proof into lemmas.
+3. Write all declarations with `sorry` proofs — no filled proofs in this mode.
+4. Each lemma should be **provable independently in ~30 lines or fewer**.
+5. Verify each `sorry`'d statement compiles with `lean_diagnostic_messages` before moving on.
+6. Present the full dependency structure: which lemmas feed into which.
+
+**Output**: A compilable file (or section) of `sorry`'d declarations with clear names and docstrings. Iterate with the user until the decomposition is right.
+
+### Mode 3: Fill Sorry (`/fill-sorry`)
+
+**Goal**: Prove a specific `sorry`'d lemma using the LSP tools iteratively.
+
+**Procedure**:
+1. Read the lemma and use `lean_goal` at the `sorry` to understand the proof state.
+2. Try simple tactics first via `lean_multi_attempt`: `["simp", "ring", "omega", "exact?", "aesop"]`.
+3. If those fail, use the search decision tree:
+   - `lean_state_search` / `lean_hammer_premise` to find closing lemmas
+   - `lean_leansearch` / `lean_loogle` for specific lemma lookup
+4. Build the proof incrementally — add tactics one at a time, checking `lean_goal` after each.
+5. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
+6. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
+
+**Key rules**:
+- Never leave a proof unverified.
+- If a proof exceeds ~30 lines, suggest decomposing into helper lemmas (switch to Mode 2).
+
+### Mode 4: Refactor (`/refactor`)
+
+**Goal**: Improve an existing working proof for brevity, clarity, or documentation.
+
+**Procedure**:
+1. Read the current proof and understand it with `lean_goal` at key positions.
+2. Propose a specific refactoring (e.g., "replace lines 15-25 with `simp [lemma_a, lemma_b]`").
+3. Apply the change and **immediately verify** with `lean_diagnostic_messages`.
+4. If the refactor breaks the proof, **revert** and try a different approach.
+5. Work **one change at a time** — never batch multiple refactors before verifying.
+6. After each successful change, show the user the before/after diff.
+
+**Key rules**:
+- The proof must compile after every single edit. No intermediate breakage.
+- Prefer `simp only [...]` over `simp` for stability.
+- If adding documentation, use Lean doc comments (`/-- ... -/`).
+
+### Mode 5: Discuss (`/discuss`)
+
+**Goal**: Read and discuss proofs, strategies, or math concepts without making any edits.
+
+**Use for**:
+- "Can this proof be simplified?"
+- "Would it be better to use X instead of Y?"
+- "Explain what this definition does."
+- Comparing proof strategies before committing.
+
+**Procedure**:
+1. Read the relevant code with `Read`, `lean_goal`, `lean_hover_info`, search tools, etc.
+2. Give a clear, direct analysis or answer.
+3. **Do not edit any files.** If the discussion leads to a concrete action, ask the user if they want to switch modes.
+
+### Mode 6: Improve Workflow (`/improve-workflow`)
+
+**Goal**: Improve the Claude Code setup — instructions, skills, memory, and conventions.
+
+**Procedure**:
+1. Read current state: `assistants.md`, relevant skill files, `CLAUDE.md`, `.claude/` contents.
+2. Discuss with the user what's working and what to change.
+3. Propose changes before applying them.
+4. Keep instructions concise and actionable — avoid bloat.
+
+**Key rules**:
+- Don't duplicate content across `assistants.md` and skill files.
+- Verify project-specific patterns against actual repo code.
+- Remove stale guidance when adding new guidance.
+- **All project config must be git-tracked.** The user works on multiple machines (laptop + VM). Store everything under the repo (`.claude/`, `assistants.md`, etc.), not in `~/.claude/`. The only exception is the auto-loaded `~/.claude/projects/.../memory/MEMORY.md` which should just redirect to the in-repo files.
+
+## General Operating Rules
 
 1. **Always** verify the proof of a lemma or theorem upon completion before moving onto the next one.
 2. Use `lean_diagnostic_messages` to check for errors after writing/editing proofs.
 3. Use `lean_goal` to inspect proof states at specific positions.
+4. Follow modal behavior rules: stay in the active mode, ask before switching.
 
 ## Build System: Lake
 
@@ -99,47 +204,16 @@ The Lean LSP MCP server provides powerful tools for interactive theorem proving.
 **`lean_profile_proof`**: Profile theorem performance
 - SLOW! Shows per-line timing for optimization
 
-## Effective Proof Development Workflow
+## Lemma Search Decision Tree
 
-### Step 1: Start with Type Signatures and `sorry`
-
-```lean
-theorem my_theorem (x : X) : P x := by
-  sorry
-```
-
-Verify the theorem statement compiles before attempting the proof.
-
-### Step 2: Explore the Goal State
-
-Use `lean_goal` at the `sorry` to understand what needs to be proven:
-- What hypotheses are available?
-- What is the goal structure?
-- Are there obvious tactics to try?
-
-### Step 3: Incremental Proof Development
-
-1. **Try simple tactics first**: `rfl`, `simp`, `ring`, `norm_num`, `exact`
-2. **Check goal after each tactic**: Use `lean_goal` after adding each line
-3. **Use `lean_diagnostic_messages`** to catch errors immediately
-4. **Use `lean_multi_attempt`** to test multiple approaches
-
-### Step 4: Finding the Right Lemmas
-
-**Decision tree**:
 1. "Does X exist locally?" → `lean_local_search`
 2. "I need a lemma that says X" → `lean_leansearch`
 3. "Find lemma with type pattern" → `lean_loogle`
-4. "What closes this goal?" → `lean_state_search`
-5. "What to feed simp?" → `lean_hammer_premise`
+4. "What's the Lean name for concept X?" → `lean_leanfinder`
+5. "What closes this goal?" → `lean_state_search`
+6. "What to feed simp?" → `lean_hammer_premise`
 
 After finding a name: verify with `lean_local_search`, then get details with `lean_hover_info`.
-
-### Step 5: Verify and Move Forward
-
-- Use `lean_diagnostic_messages` on the entire theorem
-- Ensure no errors before proceeding to the next proof
-- **Never leave a theorem without verifying it compiles**
 
 
 ## Output Formatting
@@ -168,33 +242,20 @@ Loogle accepts several query forms, but **bare unquoted names silently return no
 - `lean_loogle(query="Measure ?X → (?X → ?Y) → Measure ?Y")` → finds Measure.map (type pattern)
 
 
-## Project-Specific Patterns
+## Learning and Memory
 
-### Working with Quotients
+Project-specific patterns, useful Mathlib APIs, and pitfalls are stored in **memory files** at `.claude/memory/` (git-tracked, not in this document). Memory persists across sessions and machines.
 
-```lean
-have h := Quotient.mk_out q          -- extract representative
-exact Quotient.exact (some_equality)  -- quotient equality → relation
-exact Quotient.sound (some_relation)  -- relation → quotient equality
-```
+Memory files:
+- `.claude/memory/proof-patterns.md` — Tactics and strategies for recurring proof shapes
+- `.claude/memory/mathlib-api.md` — Useful Mathlib lemmas/APIs discovered during work
+- `.claude/memory/pitfalls.md` — Things that look like they should work but don't
 
-### Working with Homotopies
-
-```lean
--- Path.Homotopic ≈ ContinuousMap.HomotopyRel ... {0, 1}
-refine ⟨{
-  toFun := fun ⟨s, t⟩ => ...
-  continuous_toFun := by continuity / fun_prop
-  map_zero_left := by ...
-  map_one_left := by ...
-  prop' := by ...
-}⟩
-```
-
-### Using Covering Maps
-
-```lean
-set lift := cov.liftPath γ e γ_0
-have h_lifts := cov.liftPath_lifts γ e γ_0
-have h_mono := cov.liftPath_apply_one_eq_of_homotopicRel h e₁ e₂
-```
+Rules:
+- **Before starting proof work**: Consult `proof-patterns.md` and `pitfalls.md` for relevant strategies.
+- **After completing a tricky proof**: Proactively save reusable strategies to memory:
+  - New tactic pattern or proof shape? → `proof-patterns.md`
+  - Discovered a useful Mathlib lemma? → `mathlib-api.md`
+  - Hit a surprising failure or gotcha? → `pitfalls.md`
+- **Keep entries concise**: include the pattern, a code snippet, and a one-line explanation of when to use it.
+- **Don't save trivial things**: only patterns that were non-obvious or took multiple attempts to discover.
