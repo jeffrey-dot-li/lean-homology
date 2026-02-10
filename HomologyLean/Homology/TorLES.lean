@@ -83,8 +83,8 @@ and the augmentation compatibility `d₃(0) ≫ liftToX₂ + α(0) ≫ P₁.π.f
 def horseshoeCorrection {S : ShortComplex C} (hS : S.ShortExact)
     (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
     ∀ n : ℕ, P₃.complex.X (n + 1) ⟶ P₁.complex.X n := by
-  sorry
-
+    -- α(0): lift -(d ≫ liftToX₂) through S.f, then through the augmentation P₁.π.f 0
+    sorry
 /-- The augmentation compatibility for the correction terms:
 `d₃(0) ≫ liftToX₂ + α(0) ≫ P₁.π.f 0 ≫ f = 0`. -/
 theorem horseshoeCorrection_aug {S : ShortComplex C} (hS : S.ShortExact)
@@ -116,8 +116,6 @@ def horseshoeDiff {S : ShortComplex C} (hS : S.ShortExact)
     biprod.snd ≫ horseshoeCorrection hS P₁ P₃ n ≫ biprod.inl
 
 
-
-
 lemma horseshoeDiffCompEq0 {S : ShortComplex C} (hS : S.ShortExact)
     (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) (n : ℕ) :
     horseshoeDiff hS P₁ P₃ (n+1) ≫ horseshoeDiff hS P₁ P₃ (n) = 0 := by
@@ -144,33 +142,7 @@ def horseshoeComplex {S : ShortComplex C} (hS : S.ShortExact)
       simp only
       apply (horseshoeDiffCompEq0 hS P₁ P₃ _)
     )
--- simp only [horseshoeDiff]
--- -- Need to show d₂(n+1) ≫ d₂(n) = 0
--- -- Expanding: (biprod.map d₁' d₃' + inr ≫ α' ≫ inl) ≫ (biprod.map d₁ d₃ + inr ≫ α ≫ inl)
--- -- = biprod.map (d₁'≫d₁) (d₃'≫d₃)     [diagonal ≫ diagonal]
--- --   + biprod.map d₁' d₃' ≫ inr ≫ α ≫ inl  [diagonal ≫ correction]
--- --   + inr ≫ α' ≫ inl ≫ biprod.map d₁ d₃    [correction ≫ diagonal]
--- --   + inr ≫ α' ≫ inl ≫ inr ≫ α ≫ inl      [correction ≫ correction]
--- -- = 0 + inr ≫ d₃' ≫ α ≫ inl + inr ≫ α' ≫ d₁ ≫ inl + 0
--- -- = inr ≫ (d₃' ≫ α + α' ≫ d₁) ≫ inl
--- -- = 0    by horseshoeCorrection_chain
--- ext
--- · -- inl component: inl ≫ d₂(n+1) ≫ d₂(n) = 0
---   simp [P₁.complex.d_comp_d (n + 2) (n + 1) n]
--- · -- inr component: inr ≫ d₂(n+1) ≫ d₂(n) = 0
---   simp only [Preadditive.add_comp, Preadditive.comp_add, biprod.inr_map_assoc,
---     Category.assoc, biprod.inr_snd_assoc, biprod.inr_fst_assoc]
---   simp only [biprod.map_snd, biprod.inl_snd, biprod.inl_fst]
---   simp only [comp_zero, zero_comp, zero_add, add_zero]
---   -- Now: d₃' ≫ d₃ + d₃' ≫ α ≫ inl + α' ≫ d₁ ≫ inl = 0
---   rw [show P₃.complex.d (n + 1 + 1) (n + 1) ≫ P₃.complex.d (n + 1) n = 0 from
---     P₃.complex.d_comp_d (n + 2) (n + 1) n]
---   simp only [zero_add, ← biprod.inl_comp_assoc (f := horseshoeCorrection hS P₁ P₃ n),
---     ← Category.assoc]
---   rw [show P₃.complex.d (n + 2) (n + 1) ≫ horseshoeCorrection hS P₁ P₃ n +
---     horseshoeCorrection hS P₁ P₃ (n + 1) ≫ P₁.complex.d (n + 1) n = 0 from
---     horseshoeCorrection_chain hS P₁ P₃ n]
---   simp)
+
 
 /-- The differential of `horseshoeComplex` is `horseshoeDiff`. -/
 theorem horseshoeComplex_d {S : ShortComplex C} (hS : S.ShortExact)
