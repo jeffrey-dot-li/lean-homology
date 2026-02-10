@@ -278,7 +278,35 @@ theorem horseshoeComplex_exactAt_succ {S : ShortComplex C} (hS : S.ShortExact)
     (P₃ : ProjectiveResolution S.X₃)
     (n : ℕ) :
     (horseshoeComplex hS P₁ P₃).ExactAt (n + 1) := by
-  sorry
+  -- Construct a SES P₁ → horseshoeComplex → P₃ directly (avoiding horseshoeResolution
+  -- which depends on this lemma)
+  let inl_chain : P₁.complex ⟶ horseshoeComplex hS P₁ P₃ :=
+    { f := fun n => biprod.inl
+      comm' := fun i j hij => by
+        obtain ⟨rfl⟩ : j + 1 = i := by simp only [ComplexShape.down_Rel] at hij; omega
+        exact horseshoeComplex_inl_comm hS P₁ P₃ j }
+  let snd_chain : horseshoeComplex hS P₁ P₃ ⟶ P₃.complex :=
+    { f := fun n => biprod.snd
+      comm' := fun i j hij => by
+        obtain ⟨rfl⟩ : j + 1 = i := by simp only [ComplexShape.down_Rel] at hij; omega
+        exact (horseshoeComplex_snd_comm hS P₁ P₃ j).symm }
+  let ses : ShortComplex (HomologicalComplex C (ComplexShape.down ℕ)) :=
+    ShortComplex.mk inl_chain snd_chain (by ext n; simp [inl_chain, snd_chain])
+  have hses : ses.ShortExact := by
+    apply HomologicalComplex.shortExact_of_degreewise_shortExact
+    intro n
+    have σ : (ses.map (eval C _ n)).Splitting := by
+      refine ShortComplex.Splitting.ofIso
+        (ShortComplex.Splitting.ofHasBinaryBiproduct (P₁.complex.X n) (P₃.complex.X n))
+        (ShortComplex.isoMk (Iso.refl _) (Iso.refl _) (Iso.refl _) ?_ ?_)
+      · simp [ses, inl_chain]
+      · simp [ses, snd_chain]
+    exact { exact := σ.exact, mono_f := σ.mono_f, epi_g := σ.epi_g }
+  rw [HomologicalComplex.exactAt_iff_isZero_homology]
+  have hP₁ := (P₁.complex.exactAt_iff_isZero_homology (n + 1)).mp (P₁.complex_exactAt_succ n)
+  have hP₃ := (P₃.complex.exactAt_iff_isZero_homology (n + 1)).mp (P₃.complex_exactAt_succ n)
+  have hexact := hses.homology_exact₂ (n + 1)
+  exact hexact.isZero_of_both_zeros (hP₁.eq_zero_of_src _) (hP₃.eq_zero_of_tgt _)
 
 /-- The projective resolution of `X₂` with `P₂(n) = P₁(n) ⊕ P₃(n)`,
 constructed via the horseshoe lemma. -/
