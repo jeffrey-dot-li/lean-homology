@@ -77,14 +77,77 @@ The correction terms `α(n) : P₃(n+1) → P₁(n)` are constructed inductively
 - `α(n+1)` is chosen so that `d₃(n+1) ≫ α(n) + α(n+1) ≫ d₁(n) = 0`,
   using projectivity of `P₃(n+2)` and exactness of P₁ at degree n. -/
 
+/-- The base case correction term `α(0) : P₃(1) → P₁(0)`.
+Extracted so its properties can be used in the inductive construction. -/
+def horseshoeCorrection₀ {S : ShortComplex C} (hS : S.ShortExact)
+    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
+    P₃.complex.X 1 ⟶ P₁.complex.X 0 := by
+  have := P₃.projective 1
+  have := hS.mono_f
+  exact Projective.factorThru
+    (hS.exact.lift (-(P₃.complex.d 1 0 ≫ liftToX₂ hS P₃)) (by
+      simp [liftToX₂_comp_g]))
+    (P₁.π.f 0)
+
+omit [MonoidalCategory C] [MonoidalPreadditive C] [HasProjectiveResolutions C] in
+/-- Key property of `horseshoeCorrection₀`:
+`d₃(2,1) ≫ α(0) ≫ π.f 0 = 0`, which enables the inductive step. -/
+theorem horseshoeCorrection₀_property {S : ShortComplex C} (hS : S.ShortExact)
+    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
+    P₃.complex.d 2 1 ≫ horseshoeCorrection₀ hS P₁ P₃ ≫ P₁.π.f 0 = 0 := by
+  have := hS.mono_f
+  unfold horseshoeCorrection₀
+  rw [Projective.factorThru_comp]
+  apply (cancel_mono S.f).mp
+  simp [Category.assoc, ShortComplex.Exact.lift_f,
+    P₃.complex.d_comp_d_assoc]
+
+/-- The inductive invariant for the horseshoe correction construction.
+- At `n = 0`: `d₃(2,1) ≫ α ≫ P₁.π.f 0 = 0`
+- At `n + 1`: `d₃(n+3,n+2) ≫ α ≫ d₁(n+1,n) = 0` -/
+@[simp]
+def horseshoeCorrectionProp {S : ShortComplex C}
+    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
+    (n : ℕ) → (α : P₃.complex.X (n + 1) ⟶ P₁.complex.X n) → Prop
+  | 0, α => P₃.complex.d 2 1 ≫ α ≫ P₁.π.f 0 = 0
+  | n + 1, α => P₃.complex.d (n + 3) (n + 2) ≫ α ≫ P₁.complex.d (n + 1) n = 0
+
+/-- The correction terms bundled with the inductive invariant. -/
+private def horseshoeCorrectionAux {S : ShortComplex C} (hS : S.ShortExact)
+    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
+    ∀ n : ℕ, { α : P₃.complex.X (n + 1) ⟶ P₁.complex.X n //
+      horseshoeCorrectionProp P₁ P₃ n α }
+  | 0 => ⟨horseshoeCorrection₀ hS P₁ P₃, by
+      simp only [horseshoeCorrectionProp]
+      exact horseshoeCorrection₀_property hS P₁ P₃⟩
+  | 1 => by
+    have ⟨α₀, hα₀⟩ := horseshoeCorrectionAux hS P₁ P₃ 0
+    simp only [horseshoeCorrectionProp] at hα₀
+    have := P₃.projective 2
+    refine ⟨P₁.exact₀.liftFromProjective (-(P₃.complex.d 2 1 ≫ α₀))
+      (by rw [Preadditive.neg_comp, neg_eq_zero]; simp only [Nat.reduceAdd,
+        ChainComplex.single₀_obj_zero, Category.assoc]; exact hα₀), ?_⟩
+    simp only [horseshoeCorrectionProp]
+    rw [ShortComplex.Exact.liftFromProjective_comp]
+    simp [P₃.complex.d_comp_d_assoc]
+  | n + 2 => by
+    obtain ⟨αprev, hprev⟩ := horseshoeCorrectionAux hS P₁ P₃ (n + 1)
+    simp only [horseshoeCorrectionProp] at hprev
+    have := P₃.projective (n + 3)
+    refine ⟨(P₁.exact_succ n).liftFromProjective (-(P₃.complex.d (n + 3) (n + 2) ≫ αprev))
+      (by rw [Preadditive.neg_comp, neg_eq_zero]; simp only [Category.assoc]; exact hprev), ?_⟩
+    simp only [horseshoeCorrectionProp]
+    rw [ShortComplex.Exact.liftFromProjective_comp]
+    simp [P₃.complex.d_comp_d_assoc]
+
 /-- The correction terms `α(n) : P₃(n+1) → P₁(n)` for the horseshoe differential.
 These satisfy `d₃(n+1) ≫ α(n) + α(n+1) ≫ d₁(n) = 0` (chain homotopy condition)
 and the augmentation compatibility `d₃(0) ≫ liftToX₂ + α(0) ≫ P₁.π.f 0 ≫ f = 0`. -/
 def horseshoeCorrection {S : ShortComplex C} (hS : S.ShortExact)
-    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃) :
-    ∀ n : ℕ, P₃.complex.X (n + 1) ⟶ P₁.complex.X n := by
-    -- α(0): lift -(d ≫ liftToX₂) through S.f, then through the augmentation P₁.π.f 0
-    sorry
+    (P₁ : ProjectiveResolution S.X₁) (P₃ : ProjectiveResolution S.X₃)
+    (n : ℕ) : P₃.complex.X (n + 1) ⟶ P₁.complex.X n :=
+  (horseshoeCorrectionAux hS P₁ P₃ n).1
+
 /-- The augmentation compatibility for the correction terms:
 `d₃(0) ≫ liftToX₂ + α(0) ≫ P₁.π.f 0 ≫ f = 0`. -/
 theorem horseshoeCorrection_aug {S : ShortComplex C} (hS : S.ShortExact)
