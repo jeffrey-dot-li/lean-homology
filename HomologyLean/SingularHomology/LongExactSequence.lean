@@ -72,6 +72,20 @@ theorem connectingMorphism_natural (R : C) {A X B Y : TopCat}
       homologyMap (singularChainMap C R fA) n₀ =
     homologyMap (relativeSingularChainMap C R i j f fA comm) n₁ ≫
       connectingMorphism C R j n₁ n₀ h := by
-  sorry
+  simp only [connectingMorphism]
+  -- Apply Mathlib's abstract δ-naturality to the morphism of short exact sequences
+  -- φ : (C_*(A) → C_*(X) → C_*(X,A)) ⟶ (C_*(B) → C_*(Y) → C_*(Y,B))
+  have := δ_naturality
+    (ShortComplex.homMk
+      (singularChainMap C R fA)
+      (singularChainMap C R f)
+      (relativeSingularChainMap C R i j f fA comm)
+      (by simp only [relativeSingularChainSC, singularChainMap, ← Functor.map_comp, comm])
+      (by simp only [relativeSingularChainSC, relativeSingularChainComplex.π,
+            relativeSingularChainMap, Limits.cokernel.π_desc]))
+    (relativeSingularChainSES_shortExact C R i)
+    (relativeSingularChainSES_shortExact C R j) n₁ n₀ h
+  simp only [ShortComplex.homMk_τ₁, ShortComplex.homMk_τ₃] at this
+  exact this
 
 end HomologyLean.SingularHomology
