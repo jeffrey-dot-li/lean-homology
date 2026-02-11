@@ -20,6 +20,7 @@ import Mathlib.Algebra.Homology.ShortComplex.ShortExact
 import Mathlib.Algebra.Homology.HomologySequenceLemmas
 import Mathlib.CategoryTheory.Abelian.Projective.Resolution
 import Mathlib.Algebra.Homology.HomologicalComplexAbelian
+import Mathlib.CategoryTheory.Abelian.Pseudoelements
 import HomologyLean.Homology.Biprod
 
 
@@ -308,6 +309,50 @@ theorem horseshoeComplex_exactAt_succ {S : ShortComplex C} (hS : S.ShortExact)
   have hexact := hses.homology_exact₂ (n + 1)
   exact hexact.isZero_of_both_zeros (hP₁.eq_zero_of_src _) (hP₃.eq_zero_of_tgt _)
 
+open scoped Pseudoelement
+
+/-- The augmented horseshoe complex is exact at degree 0:
+`P₂(1) →[d₂] P₂(0) →[aug] X₂` is exact. -/
+theorem horseshoeComplex_exact₀ {S : ShortComplex C} (hS : S.ShortExact)
+    (P₁ : ProjectiveResolution S.X₁)
+    (P₃ : ProjectiveResolution S.X₃) :
+    (ShortComplex.mk ((horseshoeComplex hS P₁ P₃).d 1 0) ((horseshoeπ hS P₁ P₃).f 0)
+      (by rw [← (horseshoeπ hS P₁ P₃).comm 1 0]; simp)).Exact := by
+  -- Diagram chase via pseudoelements
+  open Abelian.Pseudoelement in
+  apply exact_of_pseudo_exact
+  intro b hb
+  simp at hb b
+  simp
+
+
+
+  -- b : Pseudoelement P₂(0), hb : aug(b) = 0
+  -- Step 1: snd(b) ∈ ker(ε₃)
+  set b₃ := pseudoApply biprod.snd b
+  have hb₃ : pseudoApply (P₃.π.f 0) b₃ = 0 := by
+    -- aug ≫ g = snd ≫ ε₃, so (aug ≫ g)(b) = 0 = (snd ≫ ε₃)(b) = ε₃(b₃)
+    -- aug ≫ g = snd ≫ ε₃
+    have haug_g : (horseshoeπ hS P₁ P₃).f 0 ≫ S.g = biprod.snd ≫ P₃.π.f 0 := by
+      rw [show (horseshoeπ hS P₁ P₃).f 0 = horseshoeAug hS P₁ P₃ from by
+        simp [horseshoeπ, ChainComplex.toSingle₀Equiv_symm_apply_f_zero]]
+      apply biprod.hom_ext'
+      · simp [horseshoeAug]
+      · simp [horseshoeAug, liftToX₂_comp_g]
+    rw [← Abelian.Pseudoelement.comp_apply, ← haug_g,
+        Abelian.Pseudoelement.comp_apply, hb, apply_zero]
+  simp at hb₃
+
+  -- Step 2: Lift b₃ to P3
+  obtain ⟨a₃, ha₃⟩ := pseudo_exact_of_exact P₃.exact₀ b₃ hb₃
+  simp at a₃ ha₃
+  set b₂ : Abelian.Pseudoelement ((horseshoeComplex hS P₁ P₃).X 1) := pseudoApply biprod.inr a₃
+
+  have hb₂:  pseudoApply b₂ - b  = 0 := by sorry
+
+
+
+
 /-- The projective resolution of `X₂` with `P₂(n) = P₁(n) ⊕ P₃(n)`,
 constructed via the horseshoe lemma. -/
 def horseshoeResolution {S : ShortComplex C} (hS : S.ShortExact)
@@ -321,7 +366,30 @@ def horseshoeResolution {S : ShortComplex C} (hS : S.ShortExact)
     cases n with
     | zero =>
       rw [ChainComplex.quasiIsoAt₀_iff, ShortComplex.quasiIso_iff_of_zeros']
-      · sorry
+      · simp only [shortComplexFunctor'_obj_X₁, shortComplexFunctor'_obj_X₂,
+          ChainComplex.single₀_obj_zero, shortComplexFunctor'_obj_f, shortComplexFunctor'_map_τ₂]
+        constructor
+        · -- Exactness of P₂(1) →[d₂] P₂(0) →[aug] X₂
+          exact horseshoeComplex_exact₀ hS P₁ P₃
+        · -- Epi (horseshoeπ.f 0) = Epi (horseshoeAug = biprod.desc (ε₁ ≫ f) (liftToX₂))
+          have : (horseshoeπ hS P₁ P₃).f 0 = horseshoeAug hS P₁ P₃ := by
+            simp [horseshoeπ, ChainComplex.toSingle₀Equiv_symm_apply_f_zero]
+          rw [this, horseshoeAug, Preadditive.epi_iff_cancel_zero]
+          intro R h hh
+          have hinl : (P₁.π.f 0 ≫ S.f) ≫ h = 0 := by
+            rw [← biprod.inl_desc (P₁.π.f 0 ≫ S.f) (liftToX₂ hS P₃), Category.assoc, hh,
+              comp_zero]
+          have hinr : liftToX₂ hS P₃ ≫ h = 0 := by
+            rw [← biprod.inr_desc (P₁.π.f 0 ≫ S.f) (liftToX₂ hS P₃), Category.assoc, hh,
+              comp_zero]
+          have hfh : S.f ≫ h = 0 :=
+            (cancel_epi (P₁.π.f 0)).mp (by rw [comp_zero, ← Category.assoc]; exact hinl)
+          have := hS.epi_g
+          obtain ⟨k, hk⟩ := hS.exact.desc' h hfh
+          have hε₃k : P₃.π.f 0 ≫ k = 0 := by
+            rw [← liftToX₂_comp_g hS P₃, Category.assoc, hk, hinr]
+          have hk0 : k = 0 := (cancel_epi (P₃.π.f 0)).mp (by rw [hε₃k, comp_zero])
+          rw [← hk, hk0, comp_zero]
       all_goals rfl
     | succ n =>
       rw [quasiIsoAt_iff_exactAt']
