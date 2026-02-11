@@ -147,7 +147,7 @@ After writing each file:
 3. Confirm no circular dependencies
 
 
-## Status: IN PROGRESS (3/6 files done)
+## Status: ALL 6 FILES DONE (sorry'd structure complete)
 
 ## Completed Files
 
@@ -172,48 +172,41 @@ After writing each file:
 - `singularHomologyLES_exact` — exact via `composableArrows₅_exact`
 - **1 sorry:** `connectingMorphism_natural` (naturality of δ w.r.t. maps of pairs). Should follow from `δ_naturality` in Mathlib.
 
-## Remaining Files
-
-### 4. `HomologyLean/SingularHomology/Additivity.lean` — NOT STARTED
-**Goal**: `H_n(⊔_α X_α) ≅ ∏_α H_n(X_α)`
-
-Key declarations needed:
+### 4. `HomologyLean/SingularHomology/Additivity.lean` ✅
+- `singular_simplex_factors_through_summand` — connected Δⁿ lands in one summand
 - `singularChainComplex_coprod_iso` — `C_*(⊔_α X_α) ≅ ⊕_α C_*(X_α)`
-- `singularHomology_coprod_iso` — `H_n(⊔_α X_α) ≅ ∏_α H_n(X_α)`
+- `singularChainComplex_coprod_iso_ι` — naturality w.r.t. coproduct inclusions
+- `singularHomology_coprod_iso` — `H_n(⊔_α X_α) ≅ ⊕_α H_n(X_α)`
+- `singularHomology_coprod_iso_ι` — naturality for homology iso
+- **5 sorry's.** Key geometric fact: Δⁿ is connected, so simplices land in one component.
 
-Key fact: Δⁿ is path-connected (instance exists: `SimplexCategory.instPathConnectedSpaceElemForallToTypeOrderHomFinHAddNatLenOfNatNNRealToTopObj`), so singular simplices into a coproduct land in a single component.
+### 5. `HomologyLean/SingularHomology/HomotopyInvariance.lean` ✅
+- `singularChain_chainHomotopy_of_homotopy` — chain homotopy from `ContinuousMap.Homotopy` via prism operator
+- `singularHomology_map_eq_of_homotopy` — homotopic maps ⟹ equal maps on homology
+- `singularHomology_iso_of_homotopyEquiv` — homotopy equivalences ⟹ iso on homology
+- **3 sorry's.** Hard: prism operator construction and boundary formula. Uses `f.hom'` to extract `ContinuousMap` from TopCat morphisms.
 
-Mathlib building blocks:
-- `TopCat.sigmaIsoSigma` — categorical coproduct ≅ Σ-type in TopCat
-- `coproductUniqueIso` — coproduct over unique type ≅ object
-- `HomologicalComplex.homologyMapIso` — homology of iso complexes
+### 6. `HomologyLean/SingularHomology/Excision.lean` ✅
+- `subsetInclusion` / `subsetInclusionSub` — subspace inclusions as TopCat morphisms
+- `subsetInclusion_mono` / `subsetInclusionSub_mono` — monomorphism instances
+- `subsetInclusionSub_comp` — composition law for subset inclusions
+- `barycentricSubdivision` — Sd : C_*(X) → C_*(X) chain endomorphism
+- `barycentricSubdivision_homotopic_id` — Sd chain homotopic to identity
+- `barycentricSubdivision_natural` — naturality of Sd
+- `excision` — the excision isomorphism: `H_n(X\U, A\U; R) ≅ H_n(X, A; R)`
+- **7 sorry's.** Very hard: barycentric subdivision, smallness theorem, quasi-iso of small chains. Imports `Relative.lean` for `relativeSingularHomology`.
 
-### 5. `HomologyLean/SingularHomology/HomotopyInvariance.lean` — NOT STARTED
-**Goal**: Homotopic maps ⟹ equal maps on homology.
+## Sorry Summary
 
-Key declarations needed:
-- `singularChainPrismOperator` — P_n : C_n(X) → C_{n+1}(X × I)
-- `prismOperator_boundary` — ∂P + P∂ = (i₁)_* - (i₀)_*
-- `singularChain_chainHomotopy_of_homotopy` — chain homotopy from topological homotopy
-- `singularHomology_map_eq_of_homotopy` — H_n(f) = H_n(g)
-
-Mathlib building blocks:
-- `TopCat.toSSetObjEquiv` — n-simplices ≃ C(Δⁿ, X)
-- `SimplexCategory.toTop` — the cosimplicial topological simplex
-- `Homotopy.homologyMap_eq` — abstract chain homotopy ⟹ equal homology maps (already in Mathlib)
-
-**Difficulty**: Hard. The prism operator requires careful combinatorial/geometric work.
-
-### 6. `HomologyLean/SingularHomology/Excision.lean` — NOT STARTED
-**Goal**: Excision isomorphism on relative homology.
-
-Key declarations needed:
-- `barycentricSubdivision` — Sd : C_n(X) → C_n(X) chain map
-- `barycentricSubdivision_homotopic_id` — Sd ≃ id via chain homotopy
-- `iterated_subdivision_small` — iterated Sd makes chains small
-- `excision` — the excision isomorphism
-
-**Difficulty**: Very hard. Most technically demanding axiom.
+| File | Sorry count | Difficulty | Key blockers |
+|------|------------|------------|-------------|
+| DimensionAxiom | 0 | Done | — |
+| Relative | 1 | Medium | `singularChainMap_mono` |
+| LongExactSequence | 1 | Easy | `connectingMorphism_natural` (δ_naturality) |
+| Additivity | 5 | Medium | connected Δⁿ, chain complex decomposition |
+| HomotopyInvariance | 3 | Hard | prism operator, boundary formula |
+| Excision | 7 | Very hard | barycentric subdivision, smallness |
+| **Total** | **17** | | |
 
 ## Key Lessons Learned
 
@@ -229,6 +222,8 @@ Key declarations needed:
 - LES pattern: same as TorLES — apply `composableArrows₅_exact` to a `ShortExact` of chain complexes.
 - Cokernel functoriality: `cokernel.map` takes a commutative square and produces a map between cokernels.
 - For functor map composition: use `simp only [singularChainMap, ← Functor.map_comp, comm]` (not `rw` which can fail due to abbrev unfolding).
+- **TopCat morphism → ContinuousMap**: Use `f.hom'` to extract `ContinuousMap` from a TopCat morphism `f : X ⟶ Y`. Needed for `ContinuousMap.Homotopy`. For composition/identity, use type ascription: `(f ≫ g : X ⟶ X).hom'`, `(𝟙 X : X ⟶ X).hom'`.
+- **Subspace inclusions**: `TopCat.of A` for `A : Set X` gives the subspace. Inclusion via `⟨Subtype.val, continuous_subtype_val⟩`. Between subsets: `⟨Set.inclusion h, continuous_inclusion h⟩`.
 
 ### Style
 - Use `change` not `show` when the tactic changes the goal (linter enforces this).
@@ -242,12 +237,16 @@ Relative.lean ──────► LongExactSequence.lean
      │
      ▼
 DimensionAxiom.lean   HomotopyInvariance.lean   Additivity.lean   Excision.lean
+                                                                       │
+                                                                  (imports Relative)
 ```
 
-Only LongExactSequence depends on Relative. The other 4 files are independent.
+Only LongExactSequence and Excision depend on Relative. The other files are independent.
 
-## Suggested Resume Order
+## Suggested Fill-Sorry Order
 
-1. **Additivity.lean** — next up, medium difficulty
-2. **HomotopyInvariance.lean** — hard, needs prism operator
-3. **Excision.lean** — very hard, needs barycentric subdivision
+1. **LongExactSequence: `connectingMorphism_natural`** — Easy, should follow from Mathlib's `δ_naturality`
+2. **Relative: `singularChainMap_mono`** — Medium, needs functors-preserve-monos chain
+3. **Additivity** — Medium, 5 sorry's, needs connected Δⁿ argument
+4. **HomotopyInvariance** — Hard, 3 sorry's, prism operator is the crux
+5. **Excision** — Very hard, 7 sorry's, barycentric subdivision + smallness theorem
