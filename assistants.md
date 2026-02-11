@@ -75,6 +75,7 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 - **Detect cycles.** If you catch yourself considering an approach you already rejected, you are looping. Stop immediately and report.
 - **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/plan` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/plan`?"
 - **Never silently struggle.** The user prefers a concise "I'm stuck because X" message over 5000 tokens of increasingly desperate attempts.
+- **Narrate your reasoning.** Before each tool call, write a one-line summary of *why* you're making it (e.g., "Checking whether `liftFromProjective_comp` gives the rewrite I need" or "Goal has `biprod` — trying `simp` with biprod lemmas"). This lets the user follow your thought process and interrupt early if you're going down a wrong path.
 
 ### Mode 4: Refactor (`/refactor`)
 
