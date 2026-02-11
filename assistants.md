@@ -125,6 +125,17 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 - Remove stale guidance when adding new guidance.
 - **All project config must be git-tracked.** The user works on multiple machines (laptop + VM). Store everything under the repo (`.claude/`, `assistants.md`, etc.), not in `~/.claude/`. The only exception is the auto-loaded `~/.claude/projects/.../memory/MEMORY.md` which should just redirect to the in-repo files.
 
+## Lean Conventions
+
+### `lemma` vs `theorem`
+
+In Lean 4 + Mathlib, `lemma` is a macro that expands to `theorem` — no semantic difference. Use the keyword to signal the result's role:
+
+- **`theorem`** — main results, the "point" of a file or section (e.g., `fundamentalGroup_circle_eq_int`)
+- **`lemma`** — supporting/auxiliary results that exist to serve a theorem (e.g., `liftPath_loop_endpoint_eq_int_mul_two_pi`)
+
+When in doubt, use `lemma`. Reserve `theorem` for results a reader would want to find by scanning the file.
+
 ## General Operating Rules
 
 1. **Always** verify the proof of a lemma or theorem upon completion before moving onto the next one.
