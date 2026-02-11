@@ -164,13 +164,13 @@ After writing each file:
 - `relativeSingularChainSC_exact` — exact via `exact_of_g_is_cokernel`
 - `relativeSingularChainSES_shortExact` — short exact when `i` is mono
 - `relativeSingularChainMap` — functoriality via `cokernel.map`
-- **1 sorry:** `singularChainMap_mono` (mono inclusion ⟹ mono chain map). Needs: TopCat.toSSet preserves monos, free module functor preserves monos, alternating face map complex preserves degreewise monos.
+- **No sorry's.** `singularChainMap_mono` proven via `mono_of_mono_f` + `MonoCoprod.mono_map'_of_injective` + mono cancellation on ULift-wrapped Yoneda elements.
 
 ### 3. `HomologyLean/SingularHomology/LongExactSequence.lean` ✅
 - `connectingMorphism` — δ : H_n(X,A) → H_{n-1}(A) via `ShortExact.δ`
 - `singularHomologyLES` — 6-term sequence via `composableArrows₅`
 - `singularHomologyLES_exact` — exact via `composableArrows₅_exact`
-- **1 sorry:** `connectingMorphism_natural` (naturality of δ w.r.t. maps of pairs). Should follow from `δ_naturality` in Mathlib.
+- **No sorry's.** `connectingMorphism_natural` proven via `δ_naturality` with `ShortComplex.homMk`.
 
 ### 4. `HomologyLean/SingularHomology/Additivity.lean` ✅
 - `singular_simplex_factors_through_summand` — connected Δⁿ lands in one summand
@@ -201,12 +201,12 @@ After writing each file:
 | File | Sorry count | Difficulty | Key blockers |
 |------|------------|------------|-------------|
 | DimensionAxiom | 0 | Done | — |
-| Relative | 1 | Medium | `singularChainMap_mono` |
-| LongExactSequence | 1 | Easy | `connectingMorphism_natural` (δ_naturality) |
+| Relative | 0 | Done | — |
+| LongExactSequence | 0 | Done | — |
 | Additivity | 5 | Medium | connected Δⁿ, chain complex decomposition |
 | HomotopyInvariance | 3 | Hard | prism operator, boundary formula |
 | Excision | 7 | Very hard | barycentric subdivision, smallness |
-| **Total** | **17** | | |
+| **Total** | **15** | | |
 
 ## Key Lessons Learned
 
@@ -245,8 +245,8 @@ Only LongExactSequence and Excision depend on Relative. The other files are inde
 
 ## Suggested Fill-Sorry Order
 
-1. **LongExactSequence: `connectingMorphism_natural`** — Easy, should follow from Mathlib's `δ_naturality`
-2. **Relative: `singularChainMap_mono`** — Medium, needs functors-preserve-monos chain
+1. ~~**LongExactSequence: `connectingMorphism_natural`**~~ ✅ Done
+2. ~~**Relative: `singularChainMap_mono`**~~ ✅ Done
 3. **Additivity** — Medium, 5 sorry's, needs connected Δⁿ argument
 4. **HomotopyInvariance** — Hard, 3 sorry's, prism operator is the crux
 5. **Excision** — Very hard, 7 sorry's, barycentric subdivision + smallness theorem

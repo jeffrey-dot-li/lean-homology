@@ -10,6 +10,7 @@
 import Mathlib.AlgebraicTopology.SingularHomology.Basic
 import Mathlib.Algebra.Homology.HomologicalComplexAbelian
 import Mathlib.Algebra.Homology.ShortComplex.ShortExact
+import Mathlib.CategoryTheory.Limits.MonoCoprod
 
 noncomputable section
 
@@ -95,7 +96,14 @@ composition of functors that preserve monomorphisms:
 3. The alternating face map complex preserves degreewise monos. -/
 theorem singularChainMap_mono (R : C) {A X : TopCat} (i : A ⟶ X) [Mono i] :
     Mono (singularChainMap C R i) := by
-  sorry
+  apply HomologicalComplex.mono_of_mono_f
+  intro n
+  dsimp [singularChainMap, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  apply CategoryTheory.Limits.MonoCoprod.mono_map'_of_injective
+  intro σ₁ σ₂ h
+  simp only [TopCat.toSSet, Presheaf.restrictedULiftYoneda_map_app] at h
+  dsimp [uliftYoneda] at h
+  exact ULift.ext _ _ ((cancel_mono i).mp (congrArg ULift.down h))
 
 /-- When `i : A ⟶ X` is mono, the relative singular chain sequence is short exact. -/
 theorem relativeSingularChainSES_shortExact (R : C) {A X : TopCat} (i : A ⟶ X) [Mono i] :
