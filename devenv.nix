@@ -9,7 +9,6 @@
 
   packages = with pkgs; [
     elan
-    claude-code
   ];
 
   git-hooks.hooks = {
