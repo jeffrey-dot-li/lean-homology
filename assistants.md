@@ -165,6 +165,7 @@ The Lean LSP MCP server provides powerful tools for interactive theorem proving.
 **`lean_diagnostic_messages`**: Get compiler errors and warnings
 - Filter by line range to focus on specific proof sections
 - Check after every significant edit to catch type errors early
+- **Always use this instead of `getDiagnostics`** — the IDE diagnostics tool returns cspell and other non-Lean noise that pollutes context
 
 ### 2. Finding Lemmas and Definitions
 
