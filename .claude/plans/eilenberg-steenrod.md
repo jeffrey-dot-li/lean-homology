@@ -173,12 +173,14 @@ After writing each file:
 - **No sorry's.** `connectingMorphism_natural` proven via `δ_naturality` with `ShortComplex.homMk`.
 
 ### 4. `HomologyLean/SingularHomology/Additivity.lean` ✅
-- `singular_simplex_factors_through_summand` — connected Δⁿ lands in one summand
-- `singularChainComplex_coprod_iso` — `C_*(⊔_α X_α) ≅ ⊕_α C_*(X_α)`
-- `singularChainComplex_coprod_iso_ι` — naturality w.r.t. coproduct inclusions
-- `singularHomology_coprod_iso` — `H_n(⊔_α X_α) ≅ ⊕_α H_n(X_α)`
-- `singularHomology_coprod_iso_ι` — naturality for homology iso
-- **5 sorry's.** Key geometric fact: Δⁿ is connected, so simplices land in one component.
+- `singular_simplex_factors_through_summand` — ✅ PROVEN. Connected Δⁿ lands in one summand via `Continuous.exists_lift_sigma`.
+- `singularChainComplexFunctor_preservesCoproducts` — sorry'd instance. Needs: (1) `TopCat.toSSet ⋙ eval [n]` preserves coproducts (from connectivity of Δⁿ), (2) `sigmaConst.obj R` preserves colimits (left adjoint via `sigmaConstAdj`).
+- `singularChainComplex_coprod_iso` — definition using sorry'd instance, no sorry in the def itself.
+- `singularChainComplex_coprod_iso_ι` — ✅ PROVEN via `PreservesCoproduct.inv_hom` + `ι_comp_sigmaComparison`.
+- `homologyFunctor_preservesCoproducts` — sorry'd instance. Needs: homology functor on chain complexes preserves coproducts (AB4 property). No existing Mathlib instance.
+- `singularHomology_coprod_iso` — definition using sorry'd instances, no sorry in the def itself.
+- `singularHomology_coprod_iso_ι` — ✅ PROVEN via `change` to resolve definitional mismatch, then `singularChainComplex_coprod_iso_ι` + `ι_comp_sigmaComparison`.
+- **2 sorry's remaining** (down from original 5). Both are `PreservesColimitsOfShape` instances requiring non-trivial infrastructure.
 
 ### 5. `HomologyLean/SingularHomology/HomotopyInvariance.lean` ✅
 - `singularChain_chainHomotopy_of_homotopy` — chain homotopy from `ContinuousMap.Homotopy` via prism operator
@@ -203,10 +205,10 @@ After writing each file:
 | DimensionAxiom | 0 | Done | — |
 | Relative | 0 | Done | — |
 | LongExactSequence | 0 | Done | — |
-| Additivity | 5 | Medium | connected Δⁿ, chain complex decomposition |
+| Additivity | 2 | Medium | `PreservesColimitsOfShape` for chain/homology functors |
 | HomotopyInvariance | 3 | Hard | prism operator, boundary formula |
 | Excision | 7 | Very hard | barycentric subdivision, smallness |
-| **Total** | **15** | | |
+| **Total** | **12** | | |
 
 ## Key Lessons Learned
 
@@ -247,6 +249,6 @@ Only LongExactSequence and Excision depend on Relative. The other files are inde
 
 1. ~~**LongExactSequence: `connectingMorphism_natural`**~~ ✅ Done
 2. ~~**Relative: `singularChainMap_mono`**~~ ✅ Done
-3. **Additivity** — Medium, 5 sorry's, needs connected Δⁿ argument
+3. ~~**Additivity**~~ Partially done: 2 sorry's remain (PreservesColimitsOfShape instances)
 4. **HomotopyInvariance** — Hard, 3 sorry's, prism operator is the crux
 5. **Excision** — Very hard, 7 sorry's, barycentric subdivision + smallness theorem

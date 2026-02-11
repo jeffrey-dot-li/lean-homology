@@ -20,3 +20,15 @@ Record the declaration name, its type signature, and when/why it's useful.
 - `HomologicalComplex.HomologySequence.δ_naturality` — naturality of δ for short exact sequences of chain complexes. Takes a `ShortComplex.homMk` morphism between the two SES's.
 - `ShortComplex.homMk τ₁ τ₂ τ₃ comm₁₂ comm₂₃` — constructs morphism of short complexes.
 - `ShortComplex.homMk_τ₁`, `homMk_τ₃` — simp lemmas to extract components.
+
+## Coproduct preservation / comparison
+- `PreservesCoproduct.iso F X` — `F.obj (∐ X) ≅ ∐ (F.obj ∘ X)` when `F` has `PreservesColimitsOfShape (Discrete ι)`.
+- `PreservesCoproduct.inv_hom` — the `.inv` of the above iso equals `sigmaComparison F X`.
+- `ι_comp_sigmaComparison G f i` — `Sigma.ι (G.obj ∘ f) i ≫ sigmaComparison G f = G.map (Sigma.ι f i)`.
+- `HomologicalComplex.preservesColimitsOfShape_of_eval` — to show `G : D ⥤ HomologicalComplex C c` preserves colimits of shape J, suffice to show `G ⋙ eval n` preserves for each n.
+- `comp_preservesColimitsOfShape` — composition of colimit-preserving functors preserves colimits (instance).
+
+## Connectivity and sigma types
+- `Continuous.exists_lift_sigma` — a continuous map `f : X → Σ_i Y_i` from a connected space factors: `∃ i g, Continuous g ∧ f = Sigma.mk i ∘ g`.
+- Access via `σ.hom'.continuous_toFun.exists_lift_sigma` for TopCat morphisms.
+- Close the equality with `TopCat.ext (congr_fun hfg)`.

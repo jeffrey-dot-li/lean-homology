@@ -14,6 +14,9 @@ import Mathlib.AlgebraicTopology.SingularHomology.Basic
 import Mathlib.Topology.Category.TopCat.Limits.Products
 import Mathlib.Topology.Connected.Clopen
 import Mathlib.Algebra.Homology.HomologicalComplexLimits
+import Mathlib.Topology.ContinuousMap.Sigma
+import Mathlib.CategoryTheory.Abelian.GrothendieckAxioms.Basic
+import Mathlib.Algebra.Homology.ShortComplex.Limits
 
 noncomputable section
 
@@ -21,8 +24,7 @@ open CategoryTheory CategoryTheory.Limits AlgebraicTopology
 
 universe u v
 
-variable (C : Type u) [Category.{v} C] [HasCoproducts C] [Preadditive C]
-  [CategoryWithHomology C]
+variable (C : Type u) [Category.{v} C] [Abelian C] [HasCoproducts C] [AB4 C]
 
 namespace HomologyLean.SingularHomology
 
@@ -43,7 +45,8 @@ theorem singular_simplex_factors_through_summand
     (n : SimplexCategory) (σ : SimplexCategory.toTop.obj n ⟶ TopCat.of ((i : ι) × (X i))) :
     ∃ (i : ι) (τ : SimplexCategory.toTop.obj n ⟶ X i),
       σ = τ ≫ TopCat.sigmaι X i := by
-  sorry
+  obtain ⟨i, g, hg, hfg⟩ := σ.hom'.continuous_toFun.exists_lift_sigma
+  exact ⟨i, ⟨g, hg⟩, TopCat.ext (congr_fun hfg)⟩
 
 /-! ## Chain complex decomposition
 
@@ -64,10 +67,21 @@ of `∐_α X_α` is the disjoint union of the sets of n-simplices of each `X_α`
 Applying the free R-module functor (which preserves coproducts) gives the
 degreewise isomorphism. The boundary maps are compatible because they are
 defined by precomposition with face/degeneracy maps. -/
+-- The key step: the degree-n evaluation of the singular chain complex functor
+-- preserves coproducts. This follows because:
+-- 1. The standard simplex Δⁿ is connected, so Hom(Δⁿ, ∐X) ≃ Σᵢ Hom(Δⁿ, Xᵢ)
+-- 2. sigmaConst.obj R (free R-module functor) is a left adjoint, hence preserves colimits
+instance singularChainComplexFunctor_preservesCoproducts (R : C) :
+    PreservesColimitsOfShape (Discrete ι) (((singularChainComplexFunctor C).obj R) :
+      TopCat.{v} ⥤ ChainComplex C ℕ) := by
+  apply HomologicalComplex.preservesColimitsOfShape_of_eval
+  intro n
+  sorry
+
 def singularChainComplex_coprod_iso (R : C) :
     ((singularChainComplexFunctor C).obj R).obj (∐ X) ≅
-      ∐ (fun i => ((singularChainComplexFunctor C).obj R).obj (X i)) := by
-  sorry
+      ∐ (fun i => ((singularChainComplexFunctor C).obj R).obj (X i)) :=
+  PreservesCoproduct.iso ((singularChainComplexFunctor C).obj R) X
 
 /-- The inclusion of each summand into the coproduct of chain complexes
 corresponds to the chain map induced by the coproduct inclusion `X_i → ∐_α X_α`.
@@ -78,7 +92,8 @@ theorem singularChainComplex_coprod_iso_ι (R : C) (i : ι) :
     ((singularChainComplexFunctor C).obj R).map (Sigma.ι X i) =
       Sigma.ι (fun j => ((singularChainComplexFunctor C).obj R).obj (X j)) i ≫
         (singularChainComplex_coprod_iso C X R).inv := by
-  sorry
+  rw [singularChainComplex_coprod_iso, PreservesCoproduct.inv_hom]
+  exact (ι_comp_sigmaComparison _ _ i).symm
 
 /-! ## Homology of coproducts
 
@@ -91,10 +106,39 @@ coincide with finite products). -/
 
 This follows by applying the homology functor to the chain complex
 isomorphism `singularChainComplex_coprod_iso`. -/
+-- The homology functor on chain complexes preserves coproducts.
+-- This holds in AB4 categories (abelian with exact coproducts), which includes
+-- Ab, ModuleCat R, and other common coefficient categories.
+-- shortComplexFunctor preserves colimits (since it's built from eval at three degrees)
+instance shortComplexFunctor_preservesCoproducts (n : ℕ) :
+    PreservesColimitsOfShape (Discrete ι)
+      (HomologicalComplex.shortComplexFunctor C (ComplexShape.down ℕ) n) :=
+  ⟨fun {_K} => ⟨fun {_c} hc => ⟨ShortComplex.isColimitOfIsColimitπ _
+    (isColimitOfPreserves (HomologicalComplex.eval C _ ((ComplexShape.down ℕ).prev n)) hc)
+    (isColimitOfPreserves (HomologicalComplex.eval C _ n) hc)
+    (isColimitOfPreserves (HomologicalComplex.eval C _ ((ComplexShape.down ℕ).next n)) hc)⟩⟩⟩
+
+-- ShortComplex.homologyFunctor preserves coproducts in AB4 categories
+instance shortComplexHomologyFunctor_preservesCoproducts :
+    PreservesColimitsOfShape (Discrete ι) (ShortComplex.homologyFunctor C) := by
+  sorry
+
+-- The homology functor ≅ shortComplexFunctor ⋙ ShortComplex.homologyFunctor,
+-- so it preserves coproducts by composition + transfer via natural isomorphism.
+instance homologyFunctor_preservesCoproducts (n : ℕ) :
+    PreservesColimitsOfShape (Discrete ι)
+      (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n) :=
+  preservesColimitsOfShape_of_natIso
+    (HomologicalComplex.homologyFunctorIso C (ComplexShape.down ℕ) n).symm
+
 def singularHomology_coprod_iso (R : C) (n : ℕ) :
     ((singularHomologyFunctor C n).obj R).obj (∐ X) ≅
-      ∐ (fun i => ((singularHomologyFunctor C n).obj R).obj (X i)) := by
-  sorry
+      ∐ (fun i => ((singularHomologyFunctor C n).obj R).obj (X i)) :=
+  -- H_n(∐X) ≅ H_n(∐_i C_*(X_i)) via chain complex iso, then ≅ ∐_i H_n(X_i)
+  (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n).mapIso
+    (singularChainComplex_coprod_iso C X R) ≪≫
+    PreservesCoproduct.iso (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n)
+      (fun i => ((singularChainComplexFunctor C).obj R).obj (X i))
 
 /-- The homology isomorphism is natural with respect to the coproduct inclusions:
 the following diagram commutes:
@@ -109,6 +153,17 @@ theorem singularHomology_coprod_iso_ι (R : C) (n : ℕ) (i : ι) :
     ((singularHomologyFunctor C n).obj R).map (Sigma.ι X i) =
       Sigma.ι (fun j => ((singularHomologyFunctor C n).obj R).obj (X j)) i ≫
         (singularHomology_coprod_iso C X R n).inv := by
-  sorry
+  simp only [singularHomology_coprod_iso, Iso.trans_inv, PreservesCoproduct.inv_hom,
+    Functor.mapIso_inv]
+  change (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n).map
+      (((singularChainComplexFunctor C).obj R).map (Sigma.ι X i)) =
+    Sigma.ι (fun j => (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n).obj
+      (((singularChainComplexFunctor C).obj R).obj (X j))) i ≫
+    (sigmaComparison (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n) fun i =>
+      ((singularChainComplexFunctor C).obj R).obj (X i)) ≫
+    (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n).map
+      (singularChainComplex_coprod_iso C X R).inv
+  rw [singularChainComplex_coprod_iso_ι, Functor.map_comp, ← Category.assoc,
+    ι_comp_sigmaComparison]
 
 end HomologyLean.SingularHomology
