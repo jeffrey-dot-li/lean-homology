@@ -33,6 +33,29 @@ def myDef (n : ℕ) := (myAux n).1
 - Use `simp only [myProp] at h` to reduce the property at concrete indices
 - Structure projections (e.g. `.g` of a `ShortComplex`) may not reduce for `exact` — use `simp` or `dsimp` first
 
+## `obtain ⟨a, b⟩ := ...` can't eliminate `∃` into `Type`
+
+`Exists.casesOn` can only produce `Prop`, not data. If your `desc` function needs the
+witness from an existence theorem, you need `PSigma` (`Σ'`) not `∃`.
+
+**Symptom**: "type mismatch ... expected type must be a sort" or the `obtain` hangs/fails.
+
+**Fix**: Write a `PSigma`-returning wrapper:
+```lean
+def foo_psigma (...) : Σ' (i : ι) (τ : ...), σ = τ ≫ sigmaι X i := by
+  classical
+  have h := foo_exists ...  -- the ∃ version
+  exact ⟨h.choose, h.choose_spec.choose, h.choose_spec.choose_spec⟩
+```
+Then `obtain ⟨i, t, ht⟩ := foo_psigma ...` works in any context.
+
+## `F.map` for `TopCat.toSSet ⋙ eval (op [n])` is NOT definitional
+
+`(F.map g y).down` does NOT reduce by `rfl`/`dsimp` to `y.down ≫ g`.
+
+**Fix**: `simp only [F, Functor.comp_map, evaluation_obj_map]` then `change _ = t ≫ sigmaι f i`.
+Or in the reverse direction, `simpa using ht` when the hypothesis already has the concrete form.
+
 ## `have ⟨a, b⟩ := ...` parsing with Unicode subscripts
 
 Pattern-matching `have` can fail with "unexpected token '⟨'" when variable names contain

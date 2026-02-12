@@ -36,6 +36,33 @@ For composed isos (e.g., `mapIso chain_iso ≪≫ PreservesCoproduct.iso homFunc
 
 Key insight: when `F = G ⋙ H` definitionally but Lean shows them differently in `Sigma.ι` types, use `change` to rewrite to the explicit composition form so that `ι_comp_sigmaComparison` matches.
 
+## Colimit in Type via concrete sigma factoring
+
+When showing `F : TopCat ⥤ Type v` preserves coproducts (`PreservesColimitsOfShape (Discrete ι)`):
+
+**Reduction pattern:**
+```lean
+constructor; intro K
+let f := K.obj ∘ Discrete.mk
+haveI : PreservesColimit (Discrete.functor f) F := by
+  apply preservesColimit_of_preserves_colimit_cocone (TopCat.sigmaCofanIsColimit f)
+  refine ⟨desc, fac, uniq⟩
+exact preservesColimit_of_iso_diagram F Discrete.natIsoFunctor.symm
+```
+
+**desc**: Use PSigma (`Σ'`) not `∃` — `obtain` can't eliminate `∃` into `Type`.
+**fac**: Evaluate `σ ≫ sigmaι f i` at a point, use `Sigma.mk.inj_iff.mp` for index equality, `eq_of_heq` for the second component.
+**uniq**: Factor `p` through summand, `conv_lhs => rw [hp]`, then `congr_fun (hm ⟨i⟩) ⟨t⟩`.
+
+**Sigma injection from TopCat morphism equality:**
+```lean
+-- From ht' : y.down ≫ sigmaι f j.as = t ≫ sigmaι f i, evaluate at point p:
+have := congrArg
+  (fun (φ : A ⟶ TopCat.of (Σ k, f k)) => (TopCat.Hom.hom φ) p) ht'
+simpa using this  -- gives ⟨j.as, y.down p⟩ = ⟨i, t p⟩
+-- Then: Sigma.mk.inj_iff.mp for fst/snd, eq_of_heq for Eq from HEq
+```
+
 ## Covering Maps
 
 ```lean

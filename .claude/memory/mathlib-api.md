@@ -41,3 +41,12 @@ Record the declaration name, its type signature, and when/why it's useful.
 - `Continuous.exists_lift_sigma` — a continuous map `f : X → Σ_i Y_i` from a connected space factors: `∃ i g, Continuous g ∧ f = Sigma.mk i ∘ g`.
 - Access via `σ.hom'.continuous_toFun.exists_lift_sigma` for TopCat morphisms.
 - Close the equality with `TopCat.ext (congr_fun hfg)`.
+
+## Discrete diagram normalization
+- `Discrete.natIsoFunctor : K ≅ Discrete.functor (K.obj ∘ Discrete.mk)` — canonical iso for any `K : Discrete ι ⥤ C`.
+- `preservesColimit_of_iso_diagram F Discrete.natIsoFunctor.symm` — transfer `PreservesColimit (Discrete.functor f) F` to `PreservesColimit K F`.
+
+## Sigma type injection
+- `Sigma.mk.inj_iff.mp h` — from `⟨i, x⟩ = ⟨j, y⟩` get `.1 : i = j` and `.2 : HEq x y`.
+- `eq_of_heq` — convert `HEq` to `Eq` (after indices match).
+- Custom `@[simp] TopCat.sigmaι_apply k x : (sigmaι f k) x = ⟨k, x⟩` — defined in Additivity.lean.
