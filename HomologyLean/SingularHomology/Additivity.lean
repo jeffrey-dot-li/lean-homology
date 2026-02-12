@@ -126,20 +126,40 @@ instance colim_preservesHomology :
   have : HasExactColimitsOfShape (Discrete ι) C := AB4OfSize.ofShape ι
   apply Functor.preservesHomology_of_preservesEpis_and_kernels
 
-instance shortComplexHomologyFunctor_preservesCoproducts :
-    PreservesColimitsOfShape (Discrete ι) (ShortComplex.homologyFunctor C) := by
+omit [HasCoproducts C] [AB4 C] in
+/-- `ShortComplex.homologyFunctor` preserves colimits of any shape `J`
+for which `colim : (J ⥤ C) ⥤ C` preserves homology.
+In AB4 categories this applies to all coproducts
+(via `colim_preservesHomology`). -/
+instance shortComplexHomologyFunctor_preservesColimitsOfShape
+    {J : Type v} [SmallCategory J] [HasColimitsOfShape J C]
+    [(colim (J := J) (C := C)).PreservesHomology] :
+    PreservesColimitsOfShape J
+      (ShortComplex.homologyFunctor C) := by
   constructor; intro K
   apply preservesColimit_of_preserves_colimit_cocone
     (ShortComplex.isColimitColimitCocone K)
-  let S := (ShortComplex.functorEquivalence (Discrete ι) C).inverse.obj K
-  let h := S.mapHomologyIso (colim (J := Discrete ι) (C := C))
+  let S := (ShortComplex.functorEquivalence J C).inverse.obj K
+  let h := S.mapHomologyIso (colim (J := J) (C := C))
+  -- η : S.homology ≅ K ⋙ homologyFunctor C (pointwise)
+  -- Build forward direction first for clean naturality proof
   let η : S.homology ≅ K ⋙ ShortComplex.homologyFunctor C :=
-    NatIso.ofComponents
-      (fun j => ((ShortComplex.homologyFunctorIso
-        ((evaluation (Discrete ι) C).obj j)).app S).symm)
+    (NatIso.ofComponents
+      (fun j => (ShortComplex.homologyFunctorIso
+        ((evaluation J C).obj j)).app S)
       (fun {j₁ j₂} f => by
-        have hf : j₁ = j₂ := Discrete.ext (Discrete.eq_of_hom f)
-        subst hf; simp)
+        change ShortComplex.homologyMap (K.map f) ≫
+          (S.mapHomologyIso ((evaluation J C).obj j₂)).hom =
+          (S.mapHomologyIso ((evaluation J C).obj j₁)).hom ≫
+            S.homology.map f
+        have hmapNat :
+            S.mapNatTrans ((evaluation J C).map f) =
+              K.map f := by
+          ext <;> simp [S, ShortComplex.functorEquivalence]
+        rw [← hmapNat,
+          ShortComplex.homologyMap_mapNatTrans,
+          Category.assoc, Category.assoc,
+          Iso.inv_hom_id, Category.comp_id]; rfl)).symm
   let ptIso : (ShortComplex.colimitCocone K).pt.homology ≅
       colimit (K ⋙ ShortComplex.homologyFunctor C) :=
     h ≪≫ colim.mapIso η
@@ -155,16 +175,18 @@ instance shortComplexHomologyFunctor_preservesCoproducts :
     ← Category.assoc, colimit.ι_map, Category.assoc]
   rw [← cancel_mono h.hom, Category.assoc, Category.assoc,
     Iso.inv_hom_id, Category.comp_id]
-  let α : (evaluation (Discrete ι) C).obj j ⟶ colim :=
+  let α : (evaluation J C).obj j ⟶ colim :=
     { app := fun F => colimit.ι F j
-      naturality := fun _ _ φ => (colimit.ι_map φ (j := j)).symm }
+      naturality := fun _ _ φ =>
+        (colimit.ι_map φ (j := j)).symm }
   have key := NatTrans.app_homology α S
   rw [show colimit.ι S.homology j = α.app S.homology from rfl,
     key, ← Category.assoc, ← Category.assoc]
   have h1 : η.inv.app j =
       (S.mapHomologyIso
-        ((evaluation (Discrete ι) C).obj j)).hom := by
-    simp [η, NatIso.ofComponents, ShortComplex.homologyFunctorIso]
+        ((evaluation J C).obj j)).hom := by
+    simp [η, NatIso.ofComponents,
+      ShortComplex.homologyFunctorIso]
   rw [h1, Category.assoc, Category.assoc, Iso.hom_inv_id_assoc]
   have h2 : S.mapNatTrans α =
       (ShortComplex.colimitCocone K).ι.app j := by
