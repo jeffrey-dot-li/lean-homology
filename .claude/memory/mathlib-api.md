@@ -28,6 +28,15 @@ Record the declaration name, its type signature, and when/why it's useful.
 - `HomologicalComplex.preservesColimitsOfShape_of_eval` — to show `G : D ⥤ HomologicalComplex C c` preserves colimits of shape J, suffice to show `G ⋙ eval n` preserves for each n.
 - `comp_preservesColimitsOfShape` — composition of colimit-preserving functors preserves colimits (instance).
 
+## ShortComplex homology functor and AB4
+- `AB4OfSize.ofShape ι` — gives `HasExactColimitsOfShape (Discrete ι) C` from `[AB4 C]`. Takes `ι : Type w`, NOT `Discrete ι`.
+- `Functor.preservesHomology_of_preservesEpis_and_kernels` — proves `F.PreservesHomology` when `F` preserves epis and kernels (colim has both from AB4).
+- `NatTrans.app_homology τ S` — KEY LEMMA. For `τ : F ⟶ G` where both preserve homology, and `S : ShortComplex (J ⥤ C)`: `τ.app S.homology = (S.mapHomologyIso F).inv ≫ homologyMap (S.mapNatTrans τ) ≫ (S.mapHomologyIso G).hom`. Found at `.lake/packages/mathlib/Mathlib/Algebra/Homology/ShortComplex/PreservesHomology.lean:871`.
+- `ShortComplex.homologyFunctorIso F` — nat iso: `F.mapShortComplex ⋙ homologyFunctor D ≅ homologyFunctor C ⋙ F` when `F.PreservesHomology`.
+- `ShortComplex.functorEquivalence J C` — equivalence `ShortComplex (J ⥤ C) ≌ J ⥤ ShortComplex C`.
+- `ShortComplex.colimitCocone K` / `isColimitColimitCocone K` — degreewise colimit cocone for `K : J ⥤ ShortComplex C`.
+- `preservesColimitsOfShape_of_natIso` — transfer `PreservesColimitsOfShape` along natural iso.
+
 ## Connectivity and sigma types
 - `Continuous.exists_lift_sigma` — a continuous map `f : X → Σ_i Y_i` from a connected space factors: `∃ i g, Continuous g ∧ f = Sigma.mk i ∘ g`.
 - Access via `σ.hom'.continuous_toFun.exists_lift_sigma` for TopCat morphisms.

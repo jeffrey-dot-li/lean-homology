@@ -177,10 +177,12 @@ After writing each file:
 - `singularChainComplexFunctor_preservesCoproducts` — sorry'd instance. Needs: (1) `TopCat.toSSet ⋙ eval [n]` preserves coproducts (from connectivity of Δⁿ), (2) `sigmaConst.obj R` preserves colimits (left adjoint via `sigmaConstAdj`).
 - `singularChainComplex_coprod_iso` — definition using sorry'd instance, no sorry in the def itself.
 - `singularChainComplex_coprod_iso_ι` — ✅ PROVEN via `PreservesCoproduct.inv_hom` + `ι_comp_sigmaComparison`.
-- `homologyFunctor_preservesCoproducts` — sorry'd instance. Needs: homology functor on chain complexes preserves coproducts (AB4 property). No existing Mathlib instance.
-- `singularHomology_coprod_iso` — definition using sorry'd instances, no sorry in the def itself.
+- `colim_preservesHomology` — ✅ PROVEN via `AB4OfSize.ofShape ι` + `preservesHomology_of_preservesEpis_and_kernels`.
+- `shortComplexHomologyFunctor_preservesCoproducts` — ✅ PROVEN. Key insight: use `NatTrans.app_homology` to relate `mapHomologyIso` for `eval j` and `colim` functors. Transport via `IsColimit.ofIsoColimit` with point iso `mapHomologyIso S colim ≪≫ colim.mapIso η`.
+- `homologyFunctor_preservesCoproducts` — ✅ PROVEN via `preservesColimitsOfShape_of_natIso` + `homologyFunctorIso`.
+- `singularHomology_coprod_iso` — definition using sorry'd instance, no sorry in the def itself.
 - `singularHomology_coprod_iso_ι` — ✅ PROVEN via `change` to resolve definitional mismatch, then `singularChainComplex_coprod_iso_ι` + `ι_comp_sigmaComparison`.
-- **2 sorry's remaining** (down from original 5). Both are `PreservesColimitsOfShape` instances requiring non-trivial infrastructure.
+- **1 sorry remaining** (down from original 5). The `singularChainComplexFunctor_preservesCoproducts` instance needs geometric/categorical work.
 
 ### 5. `HomologyLean/SingularHomology/HomotopyInvariance.lean` ✅
 - `singularChain_chainHomotopy_of_homotopy` — chain homotopy from `ContinuousMap.Homotopy` via prism operator
@@ -205,10 +207,10 @@ After writing each file:
 | DimensionAxiom | 0 | Done | — |
 | Relative | 0 | Done | — |
 | LongExactSequence | 0 | Done | — |
-| Additivity | 2 | Medium | `PreservesColimitsOfShape` for chain/homology functors |
+| Additivity | 1 | Medium | `singularChainComplexFunctor_preservesCoproducts` |
 | HomotopyInvariance | 3 | Hard | prism operator, boundary formula |
 | Excision | 7 | Very hard | barycentric subdivision, smallness |
-| **Total** | **12** | | |
+| **Total** | **11** | | |
 
 ## Key Lessons Learned
 
@@ -249,6 +251,6 @@ Only LongExactSequence and Excision depend on Relative. The other files are inde
 
 1. ~~**LongExactSequence: `connectingMorphism_natural`**~~ ✅ Done
 2. ~~**Relative: `singularChainMap_mono`**~~ ✅ Done
-3. ~~**Additivity**~~ Partially done: 2 sorry's remain (PreservesColimitsOfShape instances)
+3. ~~**Additivity**~~ Partially done: 1 sorry remains (`singularChainComplexFunctor_preservesCoproducts`)
 4. **HomotopyInvariance** — Hard, 3 sorry's, prism operator is the crux
 5. **Excision** — Very hard, 7 sorry's, barycentric subdivision + smallness theorem

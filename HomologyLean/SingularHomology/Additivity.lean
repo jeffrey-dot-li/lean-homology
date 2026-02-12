@@ -17,6 +17,8 @@ import Mathlib.Algebra.Homology.HomologicalComplexLimits
 import Mathlib.Topology.ContinuousMap.Sigma
 import Mathlib.CategoryTheory.Abelian.GrothendieckAxioms.Basic
 import Mathlib.Algebra.Homology.ShortComplex.Limits
+import Mathlib.Algebra.Homology.ShortComplex.FunctorEquivalence
+import Mathlib.Algebra.Homology.ShortComplex.PreservesHomology
 
 noncomputable section
 
@@ -118,10 +120,57 @@ instance shortComplexFunctor_preservesCoproducts (n : ℕ) :
     (isColimitOfPreserves (HomologicalComplex.eval C _ n) hc)
     (isColimitOfPreserves (HomologicalComplex.eval C _ ((ComplexShape.down ℕ).next n)) hc)⟩⟩⟩
 
--- ShortComplex.homologyFunctor preserves coproducts in AB4 categories
+-- AB4 gives colim preserves finite limits, hence preserves homology
+instance colim_preservesHomology :
+    (colim (J := Discrete ι) (C := C)).PreservesHomology := by
+  have : HasExactColimitsOfShape (Discrete ι) C := AB4OfSize.ofShape ι
+  apply Functor.preservesHomology_of_preservesEpis_and_kernels
+
 instance shortComplexHomologyFunctor_preservesCoproducts :
     PreservesColimitsOfShape (Discrete ι) (ShortComplex.homologyFunctor C) := by
-  sorry
+  constructor; intro K
+  apply preservesColimit_of_preserves_colimit_cocone
+    (ShortComplex.isColimitColimitCocone K)
+  let S := (ShortComplex.functorEquivalence (Discrete ι) C).inverse.obj K
+  let h := S.mapHomologyIso (colim (J := Discrete ι) (C := C))
+  let η : S.homology ≅ K ⋙ ShortComplex.homologyFunctor C :=
+    NatIso.ofComponents
+      (fun j => ((ShortComplex.homologyFunctorIso
+        ((evaluation (Discrete ι) C).obj j)).app S).symm)
+      (fun {j₁ j₂} f => by
+        have hf : j₁ = j₂ := Discrete.ext (Discrete.eq_of_hom f)
+        subst hf; simp)
+  let ptIso : (ShortComplex.colimitCocone K).pt.homology ≅
+      colimit (K ⋙ ShortComplex.homologyFunctor C) :=
+    h ≪≫ colim.mapIso η
+  refine IsColimit.ofIsoColimit
+    (colimit.isColimit (K ⋙ ShortComplex.homologyFunctor C))
+    (Cocones.ext ptIso.symm (fun j => ?_))
+  simp only [Functor.mapCocone_ι_app]
+  change colimit.ι (K ⋙ ShortComplex.homologyFunctor C) j ≫
+    (h ≪≫ colim.mapIso η).inv =
+    (ShortComplex.homologyFunctor C).map
+      ((ShortComplex.colimitCocone K).ι.app j)
+  rw [Iso.trans_inv, Functor.mapIso_inv,
+    ← Category.assoc, colimit.ι_map, Category.assoc]
+  rw [← cancel_mono h.hom, Category.assoc, Category.assoc,
+    Iso.inv_hom_id, Category.comp_id]
+  let α : (evaluation (Discrete ι) C).obj j ⟶ colim :=
+    { app := fun F => colimit.ι F j
+      naturality := fun _ _ φ => (colimit.ι_map φ (j := j)).symm }
+  have key := NatTrans.app_homology α S
+  rw [show colimit.ι S.homology j = α.app S.homology from rfl,
+    key, ← Category.assoc, ← Category.assoc]
+  have h1 : η.inv.app j =
+      (S.mapHomologyIso
+        ((evaluation (Discrete ι) C).obj j)).hom := by
+    simp [η, NatIso.ofComponents, ShortComplex.homologyFunctorIso]
+  rw [h1, Category.assoc, Category.assoc, Iso.hom_inv_id_assoc]
+  have h2 : S.mapNatTrans α =
+      (ShortComplex.colimitCocone K).ι.app j := by
+    ext <;> simp [S, α, ShortComplex.colimitCocone,
+      ShortComplex.functorEquivalence]
+  rw [h2]; simp only [ShortComplex.homologyFunctor_map]; rfl
 
 -- The homology functor ≅ shortComplexFunctor ⋙ ShortComplex.homologyFunctor,
 -- so it preserves coproducts by composition + transfer via natural isomorphism.
