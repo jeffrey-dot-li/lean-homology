@@ -60,25 +60,44 @@ This follows from the geometric decomposition: since each singular simplex
 lands in exactly one summand, the free module on the set of singular simplices
 decomposes accordingly. -/
 
-/-- The singular chain complex of a coproduct is isomorphic to the coproduct
-of the singular chain complexes.
+-- sigmaConst.obj R (the free R-module functor) is a left adjoint,
+-- hence preserves all colimits.
+noncomputable instance sigmaConst_isLeftAdjoint (R : C) :
+    (sigmaConst.obj R : Type v ⥤ C).IsLeftAdjoint :=
+  ⟨_, ⟨sigmaConstAdj R⟩⟩
 
-**Proof sketch** (sorry'd): The geometric decomposition
-`singular_simplex_factors_through_summand` shows that the set of n-simplices
-of `∐_α X_α` is the disjoint union of the sets of n-simplices of each `X_α`.
-Applying the free R-module functor (which preserves coproducts) gives the
-degreewise isomorphism. The boundary maps are compatible because they are
-defined by precomposition with face/degeneracy maps. -/
--- The key step: the degree-n evaluation of the singular chain complex functor
--- preserves coproducts. This follows because:
--- 1. The standard simplex Δⁿ is connected, so Hom(Δⁿ, ∐X) ≃ Σᵢ Hom(Δⁿ, Xᵢ)
--- 2. sigmaConst.obj R (free R-module functor) is a left adjoint, hence preserves colimits
-instance singularChainComplexFunctor_preservesCoproducts (R : C) :
-    PreservesColimitsOfShape (Discrete ι) (((singularChainComplexFunctor C).obj R) :
-      TopCat.{v} ⥤ ChainComplex C ℕ) := by
+-- The singular simplicial set functor evaluated at degree n
+-- preserves coproducts because Δⁿ is connected:
+-- Hom(Δⁿ, ∐X) ≃ Σᵢ Hom(Δⁿ, Xᵢ).
+instance toSSet_eval_preservesCoproducts (n : ℕ) :
+    PreservesColimitsOfShape (Discrete ι)
+      (TopCat.toSSet.{v} ⋙ (evaluation SimplexCategoryᵒᵖ
+        (Type v)).obj (Opposite.op
+          (SimplexCategory.mk n))) := by
+  sorry
+
+-- The degree-n evaluation of the singular chain complex functor
+-- is definitionally equal to:
+--   TopCat.toSSet ⋙ SSet.eval [n] ⋙ sigmaConst.obj R
+-- Both factors preserve coproducts:
+--   SSet evaluation at [n]: from toSSet_eval_preservesCoproducts
+--   sigmaConst.obj R: left adjoint (sigmaConstAdj)
+instance singularChainComplexFunctor_preservesCoproducts
+    (R : C) :
+    PreservesColimitsOfShape (Discrete ι)
+      (((singularChainComplexFunctor C).obj R) :
+        TopCat.{v} ⥤ ChainComplex C ℕ) := by
   apply HomologicalComplex.preservesColimitsOfShape_of_eval
   intro n
-  sorry
+  -- (singularChainComplexFunctor C).obj R ⋙ eval n
+  --   = TopCat.toSSet ⋙ SSet.eval [n] ⋙ sigmaConst.obj R
+  -- definitionally (rfl). Rewrite goal for instance resolution:
+  change PreservesColimitsOfShape (Discrete ι)
+    ((TopCat.toSSet ⋙ (evaluation SimplexCategoryᵒᵖ
+        (Type v)).obj (Opposite.op
+          (SimplexCategory.mk n))) ⋙
+      (sigmaConst.obj R : Type v ⥤ C))
+  exact comp_preservesColimitsOfShape _ _
 
 def singularChainComplex_coprod_iso (R : C) :
     ((singularChainComplexFunctor C).obj R).obj (∐ X) ≅
@@ -194,13 +213,24 @@ instance shortComplexHomologyFunctor_preservesColimitsOfShape
       ShortComplex.functorEquivalence]
   rw [h2]; simp only [ShortComplex.homologyFunctor_map]; rfl
 
--- The homology functor ≅ shortComplexFunctor ⋙ ShortComplex.homologyFunctor,
--- so it preserves coproducts by composition + transfer via natural isomorphism.
+-- homologyFunctor ≅ shortComplexFunctor ⋙ ShortComplex.homologyFunctor.
+-- Both factors preserve coproducts:
+--   shortComplexFunctor: from shortComplexFunctor_preservesCoproducts
+--   ShortComplex.homologyFunctor: from
+--     shortComplexHomologyFunctor_preservesColimitsOfShape
+-- Transfer preservation along the natural isomorphism.
 instance homologyFunctor_preservesCoproducts (n : ℕ) :
     PreservesColimitsOfShape (Discrete ι)
-      (HomologicalComplex.homologyFunctor C (ComplexShape.down ℕ) n) :=
-  preservesColimitsOfShape_of_natIso
-    (HomologicalComplex.homologyFunctorIso C (ComplexShape.down ℕ) n).symm
+      (HomologicalComplex.homologyFunctor C
+        (ComplexShape.down ℕ) n) := by
+  have : PreservesColimitsOfShape (Discrete ι)
+      (HomologicalComplex.shortComplexFunctor C
+          (ComplexShape.down ℕ) n ⋙
+        ShortComplex.homologyFunctor C) :=
+    comp_preservesColimitsOfShape _ _
+  exact preservesColimitsOfShape_of_natIso
+    (HomologicalComplex.homologyFunctorIso C
+      (ComplexShape.down ℕ) n).symm
 
 def singularHomology_coprod_iso (R : C) (n : ℕ) :
     ((singularHomologyFunctor C n).obj R).obj (∐ X) ≅
