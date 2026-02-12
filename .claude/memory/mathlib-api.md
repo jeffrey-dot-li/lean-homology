@@ -49,4 +49,5 @@ Record the declaration name, its type signature, and when/why it's useful.
 ## Sigma type injection
 - `Sigma.mk.inj_iff.mp h` — from `⟨i, x⟩ = ⟨j, y⟩` get `.1 : i = j` and `.2 : HEq x y`.
 - `eq_of_heq` — convert `HEq` to `Eq` (after indices match).
-- Custom `@[simp] TopCat.sigmaι_apply k x : (sigmaι f k) x = ⟨k, x⟩` — defined in Additivity.lean.
+- `TopCat.sigmaι_comp_fst_eq` — if `σ ≫ sigmaι X i = τ ≫ sigmaι X j` and domain nonempty, then `i = j`. Defined in Additivity.lean.
+- `TopCat.sigmaι_cancel` — if `σ ≫ sigmaι X i = τ ≫ sigmaι X i`, then `σ = τ` (mono). Defined in Additivity.lean.
