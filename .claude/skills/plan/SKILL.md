@@ -18,6 +18,12 @@ Topic / proof sketch: $ARGUMENTS
 5. Verify each `sorry`'d statement compiles with `lean_diagnostic_messages` before moving on.
 6. Present the full dependency structure: which lemmas feed into which.
 
+## Decomposition principle
+
+The top-level theorem should read like a proof outline — each step composing named lemmas with simple plumbing (`rw`, `exact`, `simp`, `apply`). If the top-level proof still needs >10 lines of non-trivial tactics at any step, a lemma might be missing from the decomposition.
+
+Prefer **general, reusable lemma statements** over proof-specific helpers. A good decomposition builds tools (e.g., `sigmaι_cancel`, `sigmaι_comp_fst_eq`) that apply beyond the current theorem.
+
 ## Output
 
 A compilable file (or section) of `sorry`'d declarations with clear names and docstrings. Iterate with the user until the decomposition is right.

@@ -23,6 +23,20 @@ Target: $ARGUMENTS
 7. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
 8. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
 
+## Core principle: EXTRACT, don't inline
+
+When a subgoal looks like a standalone mathematical statement — general types, no proof-specific local variables — **extract it as a sorry'd lemma above the current proof**. Then:
+1. Finish the main proof assuming the new lemma (it should become simple plumbing).
+2. Go back and fill the extracted lemma separately.
+
+Signs you should extract:
+- The subgoal involves only types from the lemma signature (not local `let`/`have` bindings)
+- You'd need >5 lines of non-trivial tactics to close it
+- The statement would make sense out of context (e.g., "sigma inclusions are mono")
+- You find yourself wanting to search Mathlib for it — it's probably a lemma-shaped gap
+
+The main proof should read like an outline: named lemmas composed with `rw`, `exact`, `simp`.
+
 ## Core principle: TRY THINGS, don't search
 
 **Bias toward editing the file and checking goals, not toward searching Mathlib.** The LSP feedback loop (edit → `lean_goal` → adjust) is faster and more reliable than trying to find the perfect abstract lemma. Concretely:

@@ -127,6 +127,15 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 
 ## Lean Conventions
 
+### Proof philosophy: decompose, then compose
+
+Complex proofs should be structured as **compositions of obvious, standalone lemmas** that can each be proved independently. Concretely:
+
+- **Extract general subgoals as lemmas.** If a subgoal involves only general types (no proof-specific local context), it should be a standalone lemma with a clear name — not proved inline. Sorry it first, finish the main proof assuming it, then fill it separately.
+- **Main proofs should be plumbing.** The top-level proof of a complex theorem should mostly be `rw`, `simp`, `exact`, `apply` — composing named lemmas. If a step needs >5 lines of non-trivial tactics, a lemma is probably missing.
+- **Name things for reuse.** A well-named lemma (e.g., `TopCat.sigmaι_cancel`) is a tool in the toolkit. Inline reasoning is disposable. Prefer building tools over solving problems ad hoc.
+- **This applies in every mode.** `/plan` does the decomposition upfront. `/fill-sorry` should recognize when extraction is needed mid-proof. `/refactor` should extract inline reasoning into named lemmas.
+
 ### `lemma` vs `theorem`
 
 In Lean 4 + Mathlib, `lemma` is a macro that expands to `theorem` — no semantic difference. Use the keyword to signal the result's role:
