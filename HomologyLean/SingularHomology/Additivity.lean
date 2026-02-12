@@ -50,6 +50,26 @@ theorem singular_simplex_factors_through_summand
   obtain ⟨i, g, hg, hfg⟩ := σ.hom'.continuous_toFun.exists_lift_sigma
   exact ⟨i, ⟨g, hg⟩, TopCat.ext (congr_fun hfg)⟩
 
+def singular_simplex_factors_through_summand_psigma
+    (n : SimplexCategory)
+    (σ : SimplexCategory.toTop.obj n ⟶ TopCat.of ((i : ι) × (X i))) :
+    Σ' (i : ι) (τ : SimplexCategory.toTop.obj n ⟶ X i),
+      σ = τ ≫ TopCat.sigmaι X i := by
+  classical
+  -- your original existence proof
+  have hx : ∃ (i : ι) (τ : SimplexCategory.toTop.obj n ⟶ X i),
+      σ = τ ≫ TopCat.sigmaι X i :=
+    singular_simplex_factors_through_summand (X := X) (n := n) σ
+  -- choose i
+  refine ⟨Classical.choose hx, ?_⟩
+  -- now choose τ for that i
+  have hxτ :
+      ∃ (τ : SimplexCategory.toTop.obj n ⟶ X (Classical.choose hx)),
+        σ = τ ≫ TopCat.sigmaι X (Classical.choose hx) :=
+    Classical.choose_spec hx
+  refine ⟨Classical.choose hxτ, ?_⟩
+  -- and the equality
+  exact Classical.choose_spec hxτ
 /-! ## Chain complex decomposition
 
 The singular chain complex of a coproduct decomposes as a coproduct of
@@ -66,6 +86,10 @@ noncomputable instance sigmaConst_isLeftAdjoint (R : C) :
     (sigmaConst.obj R : Type v ⥤ C).IsLeftAdjoint :=
   ⟨_, ⟨sigmaConstAdj R⟩⟩
 
+@[simp] lemma TopCat.sigmaι_apply (k : ι) (x : f k) :
+  (TopCat.sigmaι f k) x = ⟨k, x⟩ := by rfl
+@[simp] lemma TopCat.sigmaι_hom_apply (k : ι) (x : f k) :
+    (TopCat.Hom.hom (TopCat.sigmaι f k)) x = ⟨k, x⟩ := rfl
 -- The singular simplicial set functor evaluated at degree n
 -- preserves coproducts because Δⁿ is connected:
 -- Hom(Δⁿ, ∐X) ≃ Σᵢ Hom(Δⁿ, Xᵢ).
@@ -74,7 +98,94 @@ instance toSSet_eval_preservesCoproducts (n : ℕ) :
       (TopCat.toSSet.{v} ⋙ (evaluation SimplexCategoryᵒᵖ
         (Type v)).obj (Opposite.op
           (SimplexCategory.mk n))) := by
-  sorry
+  let F := TopCat.toSSet.{v} ⋙ (evaluation SimplexCategoryᵒᵖ
+    (Type v)).obj (Opposite.op (SimplexCategory.mk n))
+  constructor; intro K
+  let f : ι → TopCat.{v} := K.obj ∘ Discrete.mk
+  haveI : PreservesColimit (Discrete.functor f) F := by
+    apply preservesColimit_of_preserves_colimit_cocone (TopCat.sigmaCofanIsColimit f)
+    refine ⟨fun s => ?_, fun s j => ?_, fun s m hm => ?_⟩
+    · -- desc: F.obj (TopCat.of (Σ i, f i)) → s.pt
+      intro x
+      classical
+      obtain ⟨i, t, ht⟩ := singular_simplex_factors_through_summand_psigma f
+        (SimplexCategory.mk n) x.down
+      exact s.ι.app ⟨i⟩ (ULift.up t)
+    · -- fac
+      ext y
+      simp only [Functor.comp_obj, Discrete.functor_obj_eq_as, Functor.mapCocone_pt,
+        TopCat.sigmaCofan_pt, Functor.const_obj_obj, Functor.mapCocone_ι_app,
+        TopCat.sigmaCofan_ι_app, SimplexCategory.toTop_obj, SimplexCategory.len_mk,
+        Functor.op_obj, yoneda_obj_obj, types_comp_apply]
+      simp only [] at y
+      obtain ⟨i, t, ht⟩ := singular_simplex_factors_through_summand_psigma f
+        (SimplexCategory.mk n) (F.map (TopCat.sigmaι f j.as) y).down
+      simp only []
+      -- 1) First rewrite `ht` into a pointwise equality in the sigma type.
+      --    Typically you can simp the left side: (F.map (sigmaι ...) y).down = y.down ≫ sigmaι ...
+      have ht' :
+          y.down ≫ TopCat.sigmaι f j.as = t ≫ TopCat.sigmaι f i := by
+        -- this is usually `simpa` from `ht` once you expand `(F.map ... y).down`
+        -- e.g. `simpa` / `simpa [Functor.map]` / `simpa` using ht
+        simpa using ht
+      have hn : Nonempty (SimplexCategory.toTop.obj (SimplexCategory.mk n)) := by
+        infer_instance
+      -- Pick a point in the simplex (the domain is inhabited).
+      let p : SimplexCategory.toTop.obj (SimplexCategory.mk n) := Classical.choice hn
+            -- Turn ht' into an equality of values at p.
+      have hp :
+          (⟨j.as, (TopCat.Hom.hom y.down) p⟩ : (Σ k : ι, (f k))) = ⟨i, (TopCat.Hom.hom t) p⟩ := by
+        -- ht' : y.down ≫ TopCat.sigmaι f j.as = t ≫ TopCat.sigmaι f i
+        have := congrArg
+          (fun (φ :
+            SimplexCategory.toTop.obj (SimplexCategory.mk n) ⟶ TopCat.of (Σ k : ι, f k)) =>
+              (TopCat.Hom.hom φ) p)
+          ht'
+        -- now simp should turn (sigmaι ...) applied to a point into Sigma.mk
+        simpa using this
+      have hij : i = j.as := by
+        -- `Sigma.mk.inj_iff` is handy
+        -- hp : Sigma.mk j.as (...) = Sigma.mk i (...)
+        -- so the first components are equal
+        exact (Sigma.mk.inj_iff.mp hp).1.symm
+      subst hij
+      simp
+      have hty : t = y.down := by
+        -- ext lemma for TopCat morphisms
+        ext q
+        -- build the sigma-equality at q (same construction as hp, but with q)
+        have hSigma :
+            (⟨j.as, (TopCat.Hom.hom y.down) q⟩ : (Σ k : ι, f k))
+              = ⟨j.as, (TopCat.Hom.hom t) q⟩ := by
+          -- exactly your congrArg trick, but evaluating at q
+          have := congrArg
+            (fun (φ :
+              SimplexCategory.toTop.obj (SimplexCategory.mk n) ⟶ TopCat.of (Σ k : ι, f k)) =>
+                (TopCat.Hom.hom φ) q)
+            ht'
+          simpa using this
+        -- peel off second component; it’s HEq, convert to Eq
+        exact eq_of_heq (Sigma.mk.inj_iff.mp hSigma).2.symm
+      subst hty
+      rfl
+    · -- Unique
+      ext p
+      simp only [SimplexCategory.toTop_obj, SimplexCategory.len_mk, TopCat.sigmaCofan_pt,
+        Functor.op_obj, yoneda_obj_obj, Discrete.functor_obj_eq_as]
+      obtain ⟨i, t, ht⟩ := singular_simplex_factors_through_summand_psigma f
+        (SimplexCategory.mk n) p.down
+      -- ht : p.down = t ≫ sigmaι f i
+      -- Goal: m p = s.ι.app ⟨i⟩ ⟨t⟩
+      -- Show p = F.map (sigmaι f i) ⟨t⟩, then use hm
+      have hp : p = F.map (TopCat.sigmaι f i) ⟨t⟩ := by
+        apply ULift.ext
+        simp only [F, Functor.comp_map, evaluation_obj_map]
+        change p.down = t ≫ TopCat.sigmaι f i
+        exact ht
+      conv_lhs => rw [hp]
+      have := congr_fun (hm ⟨i⟩) (⟨t⟩ : ULift _)
+      simpa [types_comp_apply, Functor.mapCocone_ι_app] using this
+  exact preservesColimit_of_iso_diagram F Discrete.natIsoFunctor.symm
 
 -- The degree-n evaluation of the singular chain complex functor
 -- is definitionally equal to:

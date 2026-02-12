@@ -21,6 +21,19 @@ Target: $ARGUMENTS
 6. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
 7. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
 
+
+**Anti-looping protocol** (CRITICAL):
+- **Test, don't theorize.** If you're unsure whether a tactic will work, *edit the file and check diagnostics*. Never spend more than 2-3 sentences reasoning about whether something will work — just try it. Lean's feedback is faster and more reliable than mental simulation.
+- **Track your attempts.** After **3 failed approaches** to the same subgoal, **stop and report** to the user with:
+  1. The current goal state
+  2. What you tried and why each failed
+  3. Your best hypothesis for the root cause
+- **Detect cycles.** If you catch yourself considering an approach you already rejected, you are looping. Stop immediately and report.
+- **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/plan` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/plan`?"
+- **Never silently struggle.** The user prefers a concise "I'm stuck because X" message over 5000 tokens of increasingly desperate attempts.
+- **Narrate your reasoning.** Before each tool call, write a one-line summary of *why* you're making it (e.g., "Checking whether `liftFromProjective_comp` gives the rewrite I need" or "Goal has `biprod` — trying `simp` with biprod lemmas"). This lets the user follow your thought process and interrupt early if you're going down a wrong path.
+
+
 ## After completion
 
 If the proof involved a non-obvious strategy (took multiple attempts, required a surprising lemma, or used an unusual tactic pattern), **proactively save it to memory**:
