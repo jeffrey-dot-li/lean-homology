@@ -148,6 +148,26 @@ def Shuffle.sign {p q : ℕ} (μ : Shuffle p q) : ℤ := by
   exact
     (Equiv.Perm.sign ((finSumFinEquiv : Fin p ⊕ Fin q ≃ Fin (p + q)).symm.trans e) : ℤ)
 
+/-- `Shuffle.sign` depends only on the two embedding functions `left` and `right`. -/
+theorem Shuffle.sign_eq_of_left_right_eq {p q : ℕ} {μ ν : Shuffle p q}
+    (hleft : μ.left = ν.left) (hright : μ.right = ν.right) :
+    μ.sign = ν.sign := by
+  cases μ with
+  | mk left₁ right₁ left_strictMono₁ right_strictMono₁ cover₁ disjoint₁ =>
+    cases ν with
+    | mk left₂ right₂ left_strictMono₂ right_strictMono₂ cover₂ disjoint₂ =>
+      subst hleft
+      subst hright
+      have hleft_strictMono : left_strictMono₁ = left_strictMono₂ := Subsingleton.elim _ _
+      have hright_strictMono : right_strictMono₁ = right_strictMono₂ := Subsingleton.elim _ _
+      have hcover : cover₁ = cover₂ := Subsingleton.elim _ _
+      have hdisjoint : disjoint₁ = disjoint₂ := Subsingleton.elim _ _
+      subst hleft_strictMono
+      subst hright_strictMono
+      subst hcover
+      subst hdisjoint
+      rfl
+
 /-! ### Simplex-level cross product -/
 
 variable {C}
@@ -161,32 +181,31 @@ on the second. -/
 def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
     SingularSimplex (X ⨯ Y) (p + q) := by
+  let countBelow {n : ℕ} (f : Fin n → Fin (p + q)) (k : Fin (p + q + 1)) : ℕ :=
+    (Finset.univ.filter fun i : Fin n => (f i : ℕ) < (k : ℕ)).card
+  have countBelow_mono {n : ℕ} (f : Fin n → Fin (p + q)) :
+      Monotone (countBelow f) := by
+    intro i j hij
+    refine Finset.card_le_card ?_
+    intro a ha
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
+    exact lt_of_lt_of_le ha hij
   let leftIdx : Fin (p + q + 1) → Fin (p + 1) := fun k =>
-    ⟨(Finset.univ.filter fun i : Fin p => (μ.left i : ℕ) < (k : ℕ)).card, by
-      have hle :
-          (Finset.univ.filter fun i : Fin p => (μ.left i : ℕ) < (k : ℕ)).card ≤
-            (Finset.univ : Finset (Fin p)).card := Finset.card_filter_le _ _
-      simpa using hle⟩
+    ⟨countBelow (n := p) μ.left k, by
+      have hle : countBelow (n := p) μ.left k ≤ (Finset.univ : Finset (Fin p)).card :=
+        Finset.card_filter_le _ _
+      simpa [countBelow] using hle⟩
   let rightIdx : Fin (p + q + 1) → Fin (q + 1) := fun k =>
-    ⟨(Finset.univ.filter fun i : Fin q => (μ.right i : ℕ) < (k : ℕ)).card, by
-      have hle :
-          (Finset.univ.filter fun i : Fin q => (μ.right i : ℕ) < (k : ℕ)).card ≤
-            (Finset.univ : Finset (Fin q)).card := Finset.card_filter_le _ _
-      simpa using hle⟩
+    ⟨countBelow (n := q) μ.right k, by
+      have hle : countBelow (n := q) μ.right k ≤ (Finset.univ : Finset (Fin q)).card :=
+        Finset.card_filter_le _ _
+      simpa [countBelow] using hle⟩
   have hleftMono : Monotone leftIdx := by
     intro i j hij
-    refine Fin.mk_le_mk.mpr ?_
-    refine Finset.card_le_card ?_
-    intro a ha
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
-    exact lt_of_lt_of_le ha hij
+    exact Fin.mk_le_mk.mpr ((countBelow_mono (n := p) μ.left) hij)
   have hrightMono : Monotone rightIdx := by
     intro i j hij
-    refine Fin.mk_le_mk.mpr ?_
-    refine Finset.card_le_card ?_
-    intro a ha
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
-    exact lt_of_lt_of_le ha hij
+    exact Fin.mk_le_mk.mpr ((countBelow_mono (n := q) μ.right) hij)
   let leftOH : Fin (p + q + 1) →o Fin (p + 1) := ⟨leftIdx, hleftMono⟩
   let rightOH : Fin (p + q + 1) →o Fin (q + 1) := ⟨rightIdx, hrightMono⟩
   let n : SimplexCategoryᵒᵖ := Opposite.op (SimplexCategory.mk (p + q))
@@ -199,6 +218,38 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
   exact
     (TopCat.toSSetObjEquiv (X ⨯ Y) n).symm
       (((TopCat.prodIsoProd X Y).inv.hom).comp (fsx.prodMk ftx))
+
+/-- Naturality of `shuffleSimplex` under maps on both factors. -/
+theorem shuffleSimplex_natural {X X' Y Y' : TopCat.{v}} {p q : ℕ}
+    (f : X ⟶ X') (g : Y ⟶ Y')
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
+    ((TopCat.toSSet.map (prod.map f g)).app (Opposite.op (SimplexCategory.mk (p + q))))
+      (shuffleSimplex s t μ) =
+    shuffleSimplex
+      (((TopCat.toSSet.map f).app (Opposite.op (SimplexCategory.mk p))) s)
+      (((TopCat.toSSet.map g).app (Opposite.op (SimplexCategory.mk q))) t)
+      μ := by
+  sorry
+
+/-- Normalization at degree `(0,0)`: `shuffleSimplex` agrees with pairing points. -/
+theorem shuffleSimplex_zero_zero {X Y : TopCat.{v}}
+    (s : SingularSimplex X 0) (t : SingularSimplex Y 0) (μ : Shuffle 0 0) :
+    shuffleSimplex s t μ =
+      (TopCat.toSSetObjEquiv (X ⨯ Y) (Opposite.op (SimplexCategory.mk 0))).symm
+        (((TopCat.prodIsoProd X Y).inv.hom).comp
+          ((TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk 0)) s).prodMk
+            (TopCat.toSSetObjEquiv Y (Opposite.op (SimplexCategory.mk 0)) t))) := by
+  sorry
+
+/-- Face decomposition data needed for the Leibniz rule proof. -/
+theorem shuffleSimplex_face_decomposition {X Y : TopCat.{v}} {p q : ℕ}
+    (s : SingularSimplex X (p + 1)) (t : SingularSimplex Y (q + 1))
+    (μ : Shuffle (p + 1) (q + 1)) (i : Fin ((p + 1) + (q + 1))) :
+    (i ∈ Set.range μ.left →
+      ∃ μL : Shuffle p (q + 1), True) ∧
+    (i ∈ Set.range μ.right →
+      ∃ μR : Shuffle (p + 1) q, True) := by
+  sorry
 
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
