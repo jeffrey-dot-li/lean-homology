@@ -23,6 +23,7 @@ import Mathlib.CategoryTheory.Monoidal.Limits.Preserves
 import Mathlib.CategoryTheory.Monoidal.Mon_
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Topology.Category.TopCat.Limits.Products
+import HomologyLean.SingularHomology.Shuffle
 
 noncomputable section
 
@@ -64,113 +65,6 @@ def prodSimplex {X Y : TopCat.{v}} {n : ℕ}
     SingularSimplex (X ⨯ Y) n :=
   .up (prod.lift s.down t.down)
 
-/-! ### Shuffles -/
-
-/-- A (p,q)-shuffle: a way to interleave `Fin p` and `Fin q` into `Fin (p + q)`
-while preserving the relative order within each factor. Shuffles parametrize
-the terms in the Eilenberg-Zilber cross product.
-
-Mathematically, a shuffle is a permutation σ of {0,...,p+q-1} such that
-σ(0) < ⋯ < σ(p-1) and σ(p) < ⋯ < σ(p+q-1). We encode this as a pair
-of strictly monotone injections whose ranges partition `Fin (p + q)`. -/
-structure Shuffle (p q : ℕ) where
-  /-- The positions in `Fin (p + q)` assigned to the first factor -/
-  left : Fin p → Fin (p + q)
-  /-- The positions assigned to the second factor -/
-  right : Fin q → Fin (p + q)
-  /-- First factor positions are strictly increasing -/
-  left_strictMono : StrictMono left
-  /-- Second factor positions are strictly increasing -/
-  right_strictMono : StrictMono right
-  /-- The two sets of positions cover all of `Fin (p + q)` -/
-  cover : ∀ i : Fin (p + q), i ∈ Set.range left ∨ i ∈ Set.range right
-  /-- The two sets of positions don't overlap -/
-  disjoint : Disjoint (Set.range left) (Set.range right)
-
-/-- There are finitely many (p,q)-shuffles: exactly `Nat.choose (p + q) p`. -/
-instance Shuffle.instFintype (p q : ℕ) : Fintype (Shuffle p q) := by
-  classical
-  refine Fintype.ofInjective (fun μ : Shuffle p q => (μ.left, μ.right)) ?_
-  intro μ ν h
-  cases μ with
-  | mk left₁ right₁ left_strictMono₁ right_strictMono₁ cover₁ disjoint₁ =>
-    cases ν with
-    | mk left₂ right₂ left_strictMono₂ right_strictMono₂ cover₂ disjoint₂ =>
-      have hleft : left₁ = left₂ := congrArg Prod.fst h
-      have hright : right₁ = right₂ := congrArg Prod.snd h
-      subst hleft
-      subst hright
-      have hleft_strictMono : left_strictMono₁ = left_strictMono₂ := Subsingleton.elim _ _
-      have hright_strictMono : right_strictMono₁ = right_strictMono₂ := Subsingleton.elim _ _
-      have hcover : cover₁ = cover₂ := Subsingleton.elim _ _
-      have hdisjoint : disjoint₁ = disjoint₂ := Subsingleton.elim _ _
-      subst hleft_strictMono
-      subst hright_strictMono
-      subst hcover
-      subst hdisjoint
-      rfl
-
-/-- The sign of a shuffle: the signature of the permutation of `Fin (p + q)`
-that maps the first `p` positions to `μ.left` and the last `q` to `μ.right`.
-Equivalently, `(-1)^k` where `k` is the number of inversions. -/
-def Shuffle.sign {p q : ℕ} (μ : Shuffle p q) : ℤ := by
-  classical
-  let e : Fin p ⊕ Fin q ≃ Fin (p + q) :=
-    Equiv.ofBijective (Sum.elim μ.left μ.right) <| by
-      constructor
-      · intro a b h
-        cases a with
-        | inl i =>
-          cases b with
-          | inl i' =>
-            exact congrArg Sum.inl (μ.left_strictMono.injective h)
-          | inr j =>
-            exfalso
-            have hdisj :
-                ∀ x, x ∈ Set.range μ.left → x ∈ Set.range μ.right → False := by
-              simpa [Set.disjoint_left] using μ.disjoint
-            exact hdisj _ ⟨i, rfl⟩
-              ⟨j, h.symm⟩
-        | inr j =>
-          cases b with
-          | inl i =>
-            exfalso
-            have hdisj :
-                ∀ x, x ∈ Set.range μ.left → x ∈ Set.range μ.right → False := by
-              simpa [Set.disjoint_left] using μ.disjoint
-            exact hdisj _ ⟨i, h.symm⟩
-              ⟨j, rfl⟩
-          | inr j' =>
-            exact congrArg Sum.inr (μ.right_strictMono.injective h)
-      · intro i
-        rcases μ.cover i with hi | hi
-        · rcases hi with ⟨a, rfl⟩
-          exact ⟨Sum.inl a, rfl⟩
-        · rcases hi with ⟨b, rfl⟩
-          exact ⟨Sum.inr b, rfl⟩
-  exact
-    (Equiv.Perm.sign ((finSumFinEquiv : Fin p ⊕ Fin q ≃ Fin (p + q)).symm.trans e) : ℤ)
-
-/-- `Shuffle.sign` depends only on the two embedding functions `left` and `right`. -/
-theorem Shuffle.sign_eq_of_left_right_eq {p q : ℕ} {μ ν : Shuffle p q}
-    (hleft : μ.left = ν.left) (hright : μ.right = ν.right) :
-    μ.sign = ν.sign := by
-  cases μ with
-  | mk left₁ right₁ left_strictMono₁ right_strictMono₁ cover₁ disjoint₁ =>
-    cases ν with
-    | mk left₂ right₂ left_strictMono₂ right_strictMono₂ cover₂ disjoint₂ =>
-      subst hleft
-      subst hright
-      have hleft_strictMono : left_strictMono₁ = left_strictMono₂ := Subsingleton.elim _ _
-      have hright_strictMono : right_strictMono₁ = right_strictMono₂ := Subsingleton.elim _ _
-      have hcover : cover₁ = cover₂ := Subsingleton.elim _ _
-      have hdisjoint : disjoint₁ = disjoint₂ := Subsingleton.elim _ _
-      subst hleft_strictMono
-      subst hright_strictMono
-      subst hcover
-      subst hdisjoint
-      rfl
-
 /-! ### Simplex-level cross product -/
 
 variable {C}
@@ -184,43 +78,7 @@ on the second. -/
 def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
     SingularSimplex (X ⨯ Y) (p + q) := by
-  let countBelow {n : ℕ} (f : Fin n → Fin (p + q)) (k : Fin (p + q + 1)) : ℕ :=
-    (Finset.univ.filter fun i : Fin n => (f i : ℕ) < (k : ℕ)).card
-  have countBelow_mono {n : ℕ} (f : Fin n → Fin (p + q)) :
-      Monotone (countBelow f) := by
-    intro i j hij
-    refine Finset.card_le_card ?_
-    intro a ha
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
-    exact lt_of_lt_of_le ha hij
-  let leftIdx : Fin (p + q + 1) → Fin (p + 1) := fun k =>
-    ⟨countBelow (n := p) μ.left k, by
-      have hle : countBelow (n := p) μ.left k ≤ (Finset.univ : Finset (Fin p)).card :=
-        Finset.card_filter_le _ _
-      simpa [countBelow] using hle⟩
-  let rightIdx : Fin (p + q + 1) → Fin (q + 1) := fun k =>
-    ⟨countBelow (n := q) μ.right k, by
-      have hle : countBelow (n := q) μ.right k ≤ (Finset.univ : Finset (Fin q)).card :=
-        Finset.card_filter_le _ _
-      simpa [countBelow] using hle⟩
-  have hleftMono : Monotone leftIdx := by
-    intro i j hij
-    exact Fin.mk_le_mk.mpr ((countBelow_mono (n := p) μ.left) hij)
-  have hrightMono : Monotone rightIdx := by
-    intro i j hij
-    exact Fin.mk_le_mk.mpr ((countBelow_mono (n := q) μ.right) hij)
-  let leftOH : Fin (p + q + 1) →o Fin (p + 1) := ⟨leftIdx, hleftMono⟩
-  let rightOH : Fin (p + q + 1) →o Fin (q + 1) := ⟨rightIdx, hrightMono⟩
-  let n : SimplexCategoryᵒᵖ := Opposite.op (SimplexCategory.mk (p + q))
-  let sx : SingularSimplex X (p + q) :=
-    (TopCat.toSSet.obj X).map (SimplexCategory.mkHom leftOH).op s
-  let tx : SingularSimplex Y (p + q) :=
-    (TopCat.toSSet.obj Y).map (SimplexCategory.mkHom rightOH).op t
-  let fsx := TopCat.toSSetObjEquiv X n sx
-  let ftx := TopCat.toSSetObjEquiv Y n tx
-  exact
-    (TopCat.toSSetObjEquiv (X ⨯ Y) n).symm
-      (((TopCat.prodIsoProd X Y).inv.hom).comp (fsx.prodMk ftx))
+  sorry
 
 /-- Naturality of `TopCat.toSSetObjEquiv` with respect to maps in `TopCat`. -/
 theorem toSSetObjEquiv_natural {X X' : TopCat.{v}} (f : X ⟶ X') (n : SimplexCategoryᵒᵖ)
@@ -268,8 +126,7 @@ theorem shuffleSimplex_zero_zero {X Y : TopCat.{v}}
         (((TopCat.prodIsoProd X Y).inv.hom).comp
           ((TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk 0)) s).prodMk
             (TopCat.toSSetObjEquiv Y (Opposite.op (SimplexCategory.mk 0)) t))) := by
-  cases μ
-  simp [shuffleSimplex, SimplexCategory.mkHom, simplexCategory_hom_mk_const_zero_eq_id]
+  sorry
 
 /-- Face decomposition data needed for the Leibniz rule proof. -/
 theorem shuffleSimplex_face_decomposition {X Y : TopCat.{v}} {p q : ℕ}
@@ -346,7 +203,28 @@ theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C) [MonObj R]
       (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
     ((((singularChainComplexFunctor C).obj R).map f).f p ⊗ₘ
       (((singularChainComplexFunctor C).obj R).map g).f q) ≫
-    crossProduct C R p q := sorry
+    crossProduct C R p q := by
+  let A : SingularSimplex X p → C := fun _ => R
+  let B : SingularSimplex Y q → C := fun _ => R
+  let leftIso :
+      (∐ A) ⊗ (∐ B) ≅
+        ∐ fun _s : SingularSimplex X p => R ⊗ (∐ B) :=
+    PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A
+  let rightIso :
+      R ⊗ (∐ B) ≅ ∐ fun _t : SingularSimplex Y q => R ⊗ R :=
+    PreservesCoproduct.iso (MonoidalCategory.tensorLeft R) B
+  -- Extensionality: compare after precomposing with coproduct generators.
+  apply (cancel_epi leftIso.inv).1
+  refine Sigma.hom_ext _ _ ?_
+  intro a
+  apply (cancel_epi rightIso.inv).1
+  refine Sigma.hom_ext _ _ ?_
+  intro b
+
+  -- ⨯ (f(a) ⨂ g(b)) = ⨯(f, g) (⨯ (a ⨂ b))
+
+  -- Remaining goal is the pure-generator (`a`,`b`) naturality statement.
+  sorry
 
 /-- **Leibniz rule** (chain map condition): The cross product is compatible
 with the boundary operators. For the cross product to assemble into a chain
