@@ -68,10 +68,6 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 
 **Anti-looping protocol** (CRITICAL):
 - **Test, don't theorize.** If you're unsure whether a tactic will work, *edit the file and check diagnostics*. Never spend more than 2-3 sentences reasoning about whether something will work — just try it. Lean's feedback is faster and more reliable than mental simulation.
-- **Track your attempts.** After **3 failed approaches** to the same subgoal, **stop and report** to the user with:
-  1. The current goal state
-  2. What you tried and why each failed
-  3. Your best hypothesis for the root cause
 - **Detect cycles.** If you catch yourself considering an approach you already rejected, you are looping. Stop immediately and report.
 - **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/plan` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/plan`?"
 - **Never silently struggle.** The user prefers a concise "I'm stuck because X" message over 5000 tokens of increasingly desperate attempts.

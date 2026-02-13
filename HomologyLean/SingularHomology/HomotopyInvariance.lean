@@ -39,6 +39,16 @@ namespace HomologyLean.SingularHomology
 
 /-! ### Abbreviations -/
 
+/-- The standard topological `p`-simplex. -/
+abbrev stdSimplex (p : ℕ) : TopCat :=
+  SimplexCategory.toTop.obj (SimplexCategory.mk p)
+
+/-!
+Convenience notation for the standard simplex:
+- `Δ[p]` (no whitespace ambiguity).
+-/
+notation "Δ[" p "]" => stdSimplex p
+
 /-- The singular chain complex of X with coefficients in R. -/
 abbrev singChain (R : C) (X : TopCat.{v}) : ChainComplex C ℕ :=
   ((singularChainComplexFunctor C).obj R).obj X
@@ -69,6 +79,25 @@ def prodSimplex {X Y : TopCat.{v}} {n : ℕ}
 
 variable {C}
 
+/-!
+### Shuffles as maps between standard simplices
+
+Given a `(p,q)`-shuffle, we will later build the corresponding continuous map
+\( \Delta^{p+q} \to \Delta^p \times \Delta^q \).
+
+For now we introduce it as a placeholder; we will implement it next.
+-/
+
+/-- The map of standard simplices associated to a shuffle:
+`Δ[p+q] ⟶ Δ[p] × Δ[q]`. -/
+def shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
+    Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) := by
+  sorry
+
+
+
+attribute [simp] CategoryTheory.yoneda
+
 /-- Given a p-simplex σ in X, a q-simplex τ in Y, and a (p,q)-shuffle μ,
 produce a (p+q)-simplex in X × Y by combining σ and τ according to μ.
 
@@ -78,65 +107,12 @@ on the second. -/
 def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
     SingularSimplex (X ⨯ Y) (p + q) := by
-  sorry
-
-/-- Naturality of `TopCat.toSSetObjEquiv` with respect to maps in `TopCat`. -/
-theorem toSSetObjEquiv_natural {X X' : TopCat.{v}} (f : X ⟶ X') (n : SimplexCategoryᵒᵖ)
-    (x : (TopCat.toSSet.obj X).obj n) :
-    TopCat.toSSetObjEquiv X' n ((TopCat.toSSet.map f).app n x) =
-      f.hom.comp (TopCat.toSSetObjEquiv X n x) := by
-  rfl
-
-/-- Compatibility of `prodIsoProd.inv` with `prodMk` under maps on both factors. -/
-theorem prodIsoProd_inv_comp_prodMk_natural
-    {X X' Y Y' : TopCat.{v}} {Z : Type v} [TopologicalSpace Z]
-    (f : X ⟶ X') (g : Y ⟶ Y') (a : C(Z, X)) (b : C(Z, Y)) :
-    ((TopCat.prodIsoProd X' Y').inv.hom).comp ((f.hom.comp a).prodMk (g.hom.comp b)) =
-      (prod.map f g).hom.comp (((TopCat.prodIsoProd X Y).inv.hom).comp (a.prodMk b)) := by
-  sorry
-
-/-- Naturality of `shuffleSimplex` under maps on both factors. -/
-theorem shuffleSimplex_natural {X X' Y Y' : TopCat.{v}} {p q : ℕ}
-    (f : X ⟶ X') (g : Y ⟶ Y')
-    (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
-    ((TopCat.toSSet.map (prod.map f g)).app (Opposite.op (SimplexCategory.mk (p + q))))
-      (shuffleSimplex s t μ) =
-    shuffleSimplex
-      (((TopCat.toSSet.map f).app (Opposite.op (SimplexCategory.mk p))) s)
-      (((TopCat.toSSet.map g).app (Opposite.op (SimplexCategory.mk q))) t)
-      μ := by
-  sorry
-
-/-- The unique endomorphism of `⦋0⦌` is the identity. -/
-private lemma simplexCategory_hom_mk_const_zero_eq_id :
-    (SimplexCategory.Hom.mk (a := SimplexCategory.mk 0) (b := SimplexCategory.mk 0)
-      ({ toFun := fun _ : Fin 1 => (0 : Fin 1)
-         monotone' := by intro i j _; simp } : Fin 1 →o Fin 1)) =
-    𝟙 (SimplexCategory.mk 0) := by
-  apply SimplexCategory.Hom.ext
-  ext i
-  fin_cases i
-  rfl
-
-/-- Normalization at degree `(0,0)`: `shuffleSimplex` agrees with pairing points. -/
-theorem shuffleSimplex_zero_zero {X Y : TopCat.{v}}
-    (s : SingularSimplex X 0) (t : SingularSimplex Y 0) (μ : Shuffle 0 0) :
-    shuffleSimplex s t μ =
-      (TopCat.toSSetObjEquiv (X ⨯ Y) (Opposite.op (SimplexCategory.mk 0))).symm
-        (((TopCat.prodIsoProd X Y).inv.hom).comp
-          ((TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk 0)) s).prodMk
-            (TopCat.toSSetObjEquiv Y (Opposite.op (SimplexCategory.mk 0)) t))) := by
-  sorry
-
-/-- Face decomposition data needed for the Leibniz rule proof. -/
-theorem shuffleSimplex_face_decomposition {X Y : TopCat.{v}} {p q : ℕ}
-    (s : SingularSimplex X (p + 1)) (t : SingularSimplex Y (q + 1))
-    (μ : Shuffle (p + 1) (q + 1)) (i : Fin ((p + 1) + (q + 1))) :
-    (i ∈ Set.range μ.left →
-      ∃ μL : Shuffle p (q + 1), True) ∧
-    (i ∈ Set.range μ.right →
-      ∃ μR : Shuffle (p + 1) q, True) := by
-  sorry
+  unfold SingularSimplex
+  refine .up ?_
+  simp only [yoneda, Functor.op_obj, SimplexCategory.toTop_obj, SimplexCategory.len_mk]
+  change Δ[p + q] ⟶ _
+  refine shuffleStdSimplexMap (p := p) (q := q) μ ≫ ?_
+  apply prod.map s.down t.down
 
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
