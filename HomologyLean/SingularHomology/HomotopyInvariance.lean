@@ -1,302 +1,299 @@
 /-
-  Homotopy Invariance of singular homology.
+  Homotopy Invariance of singular homology — Cross Product approach.
 
   Homotopic maps f, g : X → Y induce equal maps on singular homology:
     H_n(f) = H_n(g) : H_n(X; R) → H_n(Y; R)
 
-  The proof factors through the "prism chain homotopy":
-  1. Define inclusions ι₀, ι₁ : X → I × X at time 0 and 1.
-  2. View the topological homotopy H as a TopCat morphism I × X → Y.
-  3. Construct a chain homotopy P between C_*(ι₀) and C_*(ι₁) using the
-     standard triangulation of Δⁿ × I into (n+1) simplices.
-  4. Compose P with C_*(H) to get a chain homotopy between C_*(f) and C_*(g),
-     using H ∘ ι₀ = f and H ∘ ι₁ = g.
-
-  The prism operator P is built from "prism simplices": for each n-simplex
-  σ : Δⁿ → X and i ∈ {0,...,n}, the i-th prism (n+1)-simplex in I × X is
-    τᵢ(σ) : Δⁿ⁺¹ → I × X,  p ↦ (tᵢ(p), σ(sᵢ(p)))
-  where sᵢ = σᵢ (degeneracy) and tᵢ(p) = p_{i+1} + ... + p_{n+1}.
+  The proof uses the Eilenberg-Zilber cross product:
+  1. Define the cross product × : C_p(X;R) ⊗ C_q(Y;R) → C_{p+q}(X×Y;R)
+     as a signed sum over (p,q)-shuffles.
+  2. Show × is natural, satisfies the Leibniz rule (chain map condition),
+     and is normalized on 0-simplices.
+  3. Construct a chain homotopy between C_*(f) and C_*(g) using the
+     cross product with the unit interval.
 -/
 import Mathlib.AlgebraicTopology.SingularHomology.Basic
 import Mathlib.Topology.Homotopy.Basic
 import Mathlib.Algebra.Homology.Homotopy
 import Mathlib.Topology.UnitInterval
+import Mathlib.CategoryTheory.Monoidal.Category
+import Mathlib.CategoryTheory.Monoidal.Mon_
+import Mathlib.GroupTheory.Perm.Sign
+import Mathlib.Topology.Category.TopCat.Limits.Products
 
 noncomputable section
 
 open CategoryTheory CategoryTheory.Limits AlgebraicTopology unitInterval
+open scoped MonoidalCategory
 
 universe u v
 
 variable (C : Type u) [Category.{v} C] [HasCoproducts C] [Preadditive C]
-  [CategoryWithHomology C]
+  [CategoryWithHomology C] [MonoidalCategory C]
 
 namespace HomologyLean.SingularHomology
 
-/-! ## Layer 0: Topological plumbing
+/-! ### Abbreviations -/
 
-Inclusions of X into I × X at time 0 and 1, and the homotopy as a
-TopCat morphism. -/
+/-- The singular chain complex of X with coefficients in R. -/
+abbrev singChain (R : C) (X : TopCat.{v}) : ChainComplex C ℕ :=
+  ((singularChainComplexFunctor C).obj R).obj X
 
-/-- Inclusion of X into I × X at time 0: x ↦ (0, x). -/
-def topInclusion₀ (X : TopCat.{v}) : X ⟶ TopCat.of (I × X) :=
-  ⟨⟨fun x => (⟨0, unitInterval.zero_mem⟩, x), by fun_prop⟩⟩
+/-- A singular n-simplex in X: an n-simplex of the singular simplicial set.
+Definitionally `ULift (SimplexCategory.toTop.obj [n] ⟶ X)`. -/
+abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
+  (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
 
-/-- Inclusion of X into I × X at time 1: x ↦ (1, x). -/
-def topInclusion₁ (X : TopCat.{v}) : X ⟶ TopCat.of (I × X) :=
-  ⟨⟨fun x => (⟨1, unitInterval.one_mem⟩, x), by fun_prop⟩⟩
+/-- The coprojection (basis inclusion) for a singular simplex: given a singular
+n-simplex `s` in `X`, produce the corresponding "basis element" morphism
+`R ⟶ C_n(X; R)` via the coproduct structure of the chain group.
 
-/-- A `ContinuousMap.Homotopy` viewed as a TopCat morphism `I × X ⟶ Y`. -/
-def homotopyToMorphism {X Y : TopCat.{v}} {f g : X ⟶ Y}
-    (H : ContinuousMap.Homotopy f.hom' g.hom') :
-    TopCat.of (I × X) ⟶ Y :=
-  ⟨H.toContinuousMap⟩
+The chain group `(singChain C R X).X n` is definitionally `∐_{σ} R` where
+σ ranges over all singular n-simplices in X. -/
+def simplexCoprojection (R : C) {X : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) : R ⟶ (singChain C R X).X n :=
+  Sigma.ι (fun _ : SingularSimplex X n ↦ R) s
 
-/-- `H ∘ ι₀ = f`: composing the homotopy with inclusion at 0 gives `f`. -/
-lemma homotopyToMorphism_comp_topInclusion₀ {X Y : TopCat.{v}} {f g : X ⟶ Y}
-    (H : ContinuousMap.Homotopy f.hom' g.hom') :
-    topInclusion₀ X ≫ homotopyToMorphism H = f := by
-  ext x; exact H.map_zero_left x
+/-- The product of two singular n-simplices: given `s : Δⁿ → X` and `t : Δⁿ → Y`,
+form the n-simplex `(s, t) : Δⁿ → X × Y` via the categorical product. -/
+def prodSimplex {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (t : SingularSimplex Y n) :
+    SingularSimplex (X ⨯ Y) n :=
+  .up (prod.lift s.down t.down)
 
-/-- `H ∘ ι₁ = g`: composing the homotopy with inclusion at 1 gives `g`. -/
-lemma homotopyToMorphism_comp_topInclusion₁ {X Y : TopCat.{v}} {f g : X ⟶ Y}
-    (H : ContinuousMap.Homotopy f.hom' g.hom') :
-    topInclusion₁ X ≫ homotopyToMorphism H = g := by
-  ext x; exact H.map_one_left x
+/-! ### Shuffles -/
 
-/-! ## Layer 1: Prism chain homotopy
+/-- A (p,q)-shuffle: a way to interleave `Fin p` and `Fin q` into `Fin (p + q)`
+while preserving the relative order within each factor. Shuffles parametrize
+the terms in the Eilenberg-Zilber cross product.
 
-The chain homotopy between C_*(ι₀) and C_*(ι₁), where ι₀, ι₁ : X → I × X
-are the inclusions at time 0 and 1. This is the core geometric construction.
+Mathematically, a shuffle is a permutation σ of {0,...,p+q-1} such that
+σ(0) < ⋯ < σ(p-1) and σ(p) < ⋯ < σ(p+q-1). We encode this as a pair
+of strictly monotone injections whose ranges partition `Fin (p + q)`. -/
+structure Shuffle (p q : ℕ) where
+  /-- The positions in `Fin (p + q)` assigned to the first factor -/
+  left : Fin p → Fin (p + q)
+  /-- The positions assigned to the second factor -/
+  right : Fin q → Fin (p + q)
+  /-- First factor positions are strictly increasing -/
+  left_strictMono : StrictMono left
+  /-- Second factor positions are strictly increasing -/
+  right_strictMono : StrictMono right
+  /-- The two sets of positions cover all of `Fin (p + q)` -/
+  cover : ∀ i : Fin (p + q), i ∈ Set.range left ∨ i ∈ Set.range right
+  /-- The two sets of positions don't overlap -/
+  disjoint : Disjoint (Set.range left) (Set.range right)
 
-**Construction**: For each n-simplex σ : Δⁿ → X and i ∈ {0,...,n}, define
-the i-th prism (n+1)-simplex τᵢ(σ) : Δⁿ⁺¹ → I × X by
-  τᵢ(σ)(p) = (p_{i+1} + ... + p_{n+1}, σ(sᵢ(p)))
-where sᵢ is the topological realization of the i-th degeneracy map.
-The prism operator sends σ to ∑ᵢ (-1)ⁱ τᵢ(σ).
+/-- There are finitely many (p,q)-shuffles: exactly `Nat.choose (p + q) p`. -/
+instance Shuffle.instFintype (p q : ℕ) : Fintype (Shuffle p q) := by
+  classical
+  refine Fintype.ofInjective (fun μ : Shuffle p q => (μ.left, μ.right)) ?_
+  intro μ ν h
+  cases μ with
+  | mk left₁ right₁ left_strictMono₁ right_strictMono₁ cover₁ disjoint₁ =>
+    cases ν with
+    | mk left₂ right₂ left_strictMono₂ right_strictMono₂ cover₂ disjoint₂ =>
+      have hleft : left₁ = left₂ := congrArg Prod.fst h
+      have hright : right₁ = right₂ := congrArg Prod.snd h
+      subst hleft
+      subst hright
+      have hleft_strictMono : left_strictMono₁ = left_strictMono₂ := Subsingleton.elim _ _
+      have hright_strictMono : right_strictMono₁ = right_strictMono₂ := Subsingleton.elim _ _
+      have hcover : cover₁ = cover₂ := Subsingleton.elim _ _
+      have hdisjoint : disjoint₁ = disjoint₂ := Subsingleton.elim _ _
+      subst hleft_strictMono
+      subst hright_strictMono
+      subst hcover
+      subst hdisjoint
+      rfl
 
-**Boundary formula**: ∂P + P∂ = ι₁* - ι₀* follows from face-prism
-identities and telescoping. -/
+/-- The sign of a shuffle: the signature of the permutation of `Fin (p + q)`
+that maps the first `p` positions to `μ.left` and the last `q` to `μ.right`.
+Equivalently, `(-1)^k` where `k` is the number of inversions. -/
+def Shuffle.sign {p q : ℕ} (μ : Shuffle p q) : ℤ := by
+  classical
+  let e : Fin p ⊕ Fin q ≃ Fin (p + q) :=
+    Equiv.ofBijective (Sum.elim μ.left μ.right) <| by
+      constructor
+      · intro a b h
+        cases a with
+        | inl i =>
+          cases b with
+          | inl i' =>
+            exact congrArg Sum.inl (μ.left_strictMono.injective h)
+          | inr j =>
+            exfalso
+            have hdisj :
+                ∀ x, x ∈ Set.range μ.left → x ∈ Set.range μ.right → False := by
+              simpa [Set.disjoint_left] using μ.disjoint
+            exact hdisj _ ⟨i, rfl⟩
+              ⟨j, h.symm⟩
+        | inr j =>
+          cases b with
+          | inl i =>
+            exfalso
+            have hdisj :
+                ∀ x, x ∈ Set.range μ.left → x ∈ Set.range μ.right → False := by
+              simpa [Set.disjoint_left] using μ.disjoint
+            exact hdisj _ ⟨i, h.symm⟩
+              ⟨j, rfl⟩
+          | inr j' =>
+            exact congrArg Sum.inr (μ.right_strictMono.injective h)
+      · intro i
+        rcases μ.cover i with hi | hi
+        · rcases hi with ⟨a, rfl⟩
+          exact ⟨Sum.inl a, rfl⟩
+        · rcases hi with ⟨b, rfl⟩
+          exact ⟨Sum.inr b, rfl⟩
+  exact
+    (Equiv.Perm.sign ((finSumFinEquiv : Fin p ⊕ Fin q ≃ Fin (p + q)).symm.trans e) : ℤ)
 
-/-- The i-th prism simplex: given a singular n-simplex `s` of `X`, produces
-a singular (n+1)-simplex of `I × X`.
+/-! ### Simplex-level cross product -/
 
-Geometrically, `prismSimplex X n i s` maps `p ∈ Δⁿ⁺¹` to
-`(p_{i+1} + ⋯ + p_{n+1}, s(sᵢ(p)))` where `sᵢ` is the i-th degeneracy. -/
-def prismSimplex (X : TopCat.{v}) (n : ℕ) (_i : Fin (n + 1))
-    (s : (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))) :
-    (TopCat.toSSet.obj (TopCat.of (I × X))).obj
-      (Opposite.op (SimplexCategory.mk (n + 1))) :=
-  by
-    let i := _i
-    let simplexMap := TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk n)) s
-    let degen :
-        C(stdSimplex ℝ (Fin (n + 2)), stdSimplex ℝ (Fin (n + 1))) :=
-      ⟨stdSimplex.map (SimplexCategory.σ i).toOrderHom, stdSimplex.continuous_map _⟩
-    let xMap : C(stdSimplex ℝ (Fin (n + 2)), X) := simplexMap.comp degen
-    let tMap : C(stdSimplex ℝ (Fin (n + 2)), I) := by
-      refine ⟨fun p => ?_, ?_⟩
-      · refine ⟨∑ j : Fin (n + 2), if i.succ ≤ j then p j else 0, ?_, ?_⟩
-        · refine Finset.sum_nonneg ?_
-          intro j _
-          by_cases h : i.succ ≤ j
-          · simp [h]
-          · simp [h]
-        · have hle :
-            (∑ j : Fin (n + 2), if i.succ ≤ j then p j else 0) ≤ ∑ j : Fin (n + 2), p j := by
-            refine Finset.sum_le_sum ?_
-            intro j _
-            by_cases h : i.succ ≤ j
-            · simp [h]
-            · simp [h]
-          simpa using hle.trans_eq p.2.2
-      · refine Continuous.subtype_mk ?_ ?_
-        · refine continuous_finset_sum _ (fun j _ => ?_)
-          by_cases h : i.succ ≤ j
-          · simpa [h] using
-              ((continuous_apply j).comp continuous_subtype_val : Continuous
-                (fun p : stdSimplex ℝ (Fin (n + 2)) => p.1 j))
-          · simpa [h] using
-              (continuous_const : Continuous
-                (fun _ : stdSimplex ℝ (Fin (n + 2)) => (0 : ℝ)))
-    refine (TopCat.toSSetObjEquiv (TopCat.of (I × X))
-      (Opposite.op (SimplexCategory.mk (n + 1)))).symm ?_
-    exact ⟨fun p => (tMap p, xMap p), by fun_prop⟩
+variable {C}
 
-/-- The prism operator at degree n: sends `C_n(X; R) → C_{n+1}(I × X; R)`.
+/-- Given a p-simplex σ in X, a q-simplex τ in Y, and a (p,q)-shuffle μ,
+produce a (p+q)-simplex in X × Y by combining σ and τ according to μ.
 
-For each singular n-simplex `s`, sends it to the signed sum
-`∑ᵢ (-1)^{i+1} · ι(prismSimplex X n i s)` in the target coproduct.
+Geometrically: μ determines a maximal simplex in the standard triangulation
+of Δ^p × Δ^q; this maps it into X × Y using σ on the first factor and τ
+on the second. -/
+def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
+    SingularSimplex (X ⨯ Y) (p + q) := by
+  let leftIdx : Fin (p + q + 1) → Fin (p + 1) := fun k =>
+    ⟨(Finset.univ.filter fun i : Fin p => (μ.left i : ℕ) < (k : ℕ)).card, by
+      have hle :
+          (Finset.univ.filter fun i : Fin p => (μ.left i : ℕ) < (k : ℕ)).card ≤
+            (Finset.univ : Finset (Fin p)).card := Finset.card_filter_le _ _
+      simpa using hle⟩
+  let rightIdx : Fin (p + q + 1) → Fin (q + 1) := fun k =>
+    ⟨(Finset.univ.filter fun i : Fin q => (μ.right i : ℕ) < (k : ℕ)).card, by
+      have hle :
+          (Finset.univ.filter fun i : Fin q => (μ.right i : ℕ) < (k : ℕ)).card ≤
+            (Finset.univ : Finset (Fin q)).card := Finset.card_filter_le _ _
+      simpa using hle⟩
+  have hleftMono : Monotone leftIdx := by
+    intro i j hij
+    refine Fin.mk_le_mk.mpr ?_
+    refine Finset.card_le_card ?_
+    intro a ha
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
+    exact lt_of_lt_of_le ha hij
+  have hrightMono : Monotone rightIdx := by
+    intro i j hij
+    refine Fin.mk_le_mk.mpr ?_
+    refine Finset.card_le_card ?_
+    intro a ha
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at ha ⊢
+    exact lt_of_lt_of_le ha hij
+  let leftOH : Fin (p + q + 1) →o Fin (p + 1) := ⟨leftIdx, hleftMono⟩
+  let rightOH : Fin (p + q + 1) →o Fin (q + 1) := ⟨rightIdx, hrightMono⟩
+  let n : SimplexCategoryᵒᵖ := Opposite.op (SimplexCategory.mk (p + q))
+  let sx : SingularSimplex X (p + q) :=
+    (TopCat.toSSet.obj X).map (SimplexCategory.mkHom leftOH).op s
+  let tx : SingularSimplex Y (p + q) :=
+    (TopCat.toSSet.obj Y).map (SimplexCategory.mkHom rightOH).op t
+  let fsx := TopCat.toSSetObjEquiv X n sx
+  let ftx := TopCat.toSSetObjEquiv Y n tx
+  exact
+    (TopCat.toSSetObjEquiv (X ⨯ Y) n).symm
+      (((TopCat.prodIsoProd X Y).inv.hom).comp (fsx.prodMk ftx))
 
-Note: the sign is `(-1)^{i+1}` (not `(-1)^i`) because the Mathlib `Homotopy f g`
-convention is `f - g = dP + Pd`, while the standard prism operator `∑ (-1)^i`
-satisfies `dP + Pd = ι₁ - ι₀`. Negating gives `d(-P) + (-P)d = ι₀ - ι₁`. -/
-def prismOperator (R : C) (X : TopCat.{v}) (n : ℕ) :
-    (((singularChainComplexFunctor C).obj R).obj X).X n ⟶
-      (((singularChainComplexFunctor C).obj R).obj (TopCat.of (I × X))).X (n + 1) :=
-  Sigma.desc (fun s =>
-    ∑ i : Fin (n + 1),
-      ((-1 : ℤ) ^ ((i : ℕ) + 1)) • Sigma.ι (fun _ => R) (prismSimplex X n i s))
+/-- The simplex-level cross product: the signed formal sum over all shuffles.
 
-/-- The hom data for the prism chain homotopy.
-Equals `prismOperator` when `j = i + 1` and `0` otherwise. -/
-def prismHom (R : C) (X : TopCat.{v}) (i j : ℕ) :
-    (((singularChainComplexFunctor C).obj R).obj X).X i ⟶
-      (((singularChainComplexFunctor C).obj R).obj (TopCat.of (I × X))).X j :=
-  if h : j = i + 1 then h ▸ prismOperator C R X i else 0
+Given a p-simplex s in X and a q-simplex t in Y, produce a morphism
+`R ⟶ C_{p+q}(X × Y; R)` (i.e., a "chain" in the abstract categorical sense)
+as the signed sum `∑_μ sign(μ) · ι(shuffleSimplex s t μ)` where ι denotes
+the coprojection into the free module. -/
+def simplexCrossProduct (R : C) {X Y : TopCat.{v}} {p q : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    R ⟶ (singChain C R (X ⨯ Y)).X (p + q) := sorry
 
-omit [CategoryWithHomology C] in
-/-- The prism hom data vanishes except when `j = i + 1`. -/
-lemma prismHom_zero (R : C) (X : TopCat.{v}) (i j : ℕ)
-    (h : ¬(ComplexShape.down ℕ).Rel j i) :
-    prismHom C R X i j = 0 := by
-  unfold prismHom; split_ifs with heq <;> simp_all [ComplexShape.down_Rel]
+variable (C)
 
-/-
-Roadmap lemmas for the prism boundary proof.
+/-! ### Chain-level cross product -/
 
-These isolate the two sources of complexity:
-1. simplicial index algebra (`δ`/`σ` interaction formulas),
-2. sign bookkeeping (pairwise cancellation and telescoping).
+/-- The cross product on singular chains:
+  `crossProduct R p q : C_p(X; R) ⊗ C_q(Y; R) → C_{p+q}(X × Y; R)`
 
-The intended flow for the final `prismHom_boundary_decompose` proof is:
-* expand boundaries of each prism term into face terms;
-* rewrite face-index composites via the `simplex_δσ_*` lemmas;
-* pair internal faces with opposite signs using `prism_sign_pair_cancel`;
-* telescope remaining endpoint faces to `topInclusion₀` and `topInclusion₁`.
+Defined as the bilinear extension of the simplex-level cross product.
+Since it is a morphism out of `⊗` in a monoidal category, bilinearity
+is built into the type — the tensor product universally encodes bilinear maps. -/
+def crossProduct {X Y : TopCat.{v}} (R : C) (p q : ℕ) :
+    (singChain C R X).X p ⊗ (singChain C R Y).X q ⟶
+      (singChain C R (X ⨯ Y)).X (p + q) := sorry
+
+/-! ### Properties of the cross product -/
+
+/-- **Naturality**: The cross product commutes with maps induced on chains.
+For `f : X ⟶ X'` and `g : Y ⟶ Y'`, the following diagram commutes:
+```
+  C_p(X) ⊗ C_q(Y) --×--> C_{p+q}(X × Y)
+       |                        |
+  f_* ⊗ g_*                (f × g)_*
+       |                        |
+  C_p(X') ⊗ C_q(Y') --×--> C_{p+q}(X' × Y')
+```
 -/
+theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C)
+    (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) :
+    crossProduct C R p q ≫
+      (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
+    ((((singularChainComplexFunctor C).obj R).map f).f p ⊗ₘ
+      (((singularChainComplexFunctor C).obj R).map g).f q) ≫
+    crossProduct C R p q := sorry
 
-/-! ### Chain complex API helpers -/
+/-- **Leibniz rule** (chain map condition): The cross product is compatible
+with the boundary operators. For the cross product to assemble into a chain
+map from the tensor product complex to the singular complex of the product:
+```
+  ∂(σ × τ) = (∂σ) × τ + (-1)^{p+1} · σ × (∂τ)
+```
+Stated with shifted indices `(p+1, q+1)` to avoid natural number subtraction. -/
+theorem crossProduct_leibniz {X Y : TopCat.{v}} (R : C) (p q : ℕ) :
+    crossProduct C R (X := X) (Y := Y) (p + 1) (q + 1) ≫
+      (singChain C R (X ⨯ Y)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    ((singChain C R X).d (p + 1) p ⊗ₘ 𝟙 ((singChain C R Y).X (q + 1))) ≫
+      crossProduct C R p (q + 1) +
+    ((-1 : ℤ) ^ (p + 1)) •
+      ((𝟙 ((singChain C R X).X (p + 1)) ⊗ₘ (singChain C R Y).d (q + 1) q) ≫
+        crossProduct C R (p + 1) q ≫
+        eqToHom (congrArg (singChain C R (X ⨯ Y)).X (by omega))) := sorry
 
--- Helper: Sigma.ι composed with a singular chain map
-omit [CategoryWithHomology C] in
-lemma singularChainMap_ι (R : C) {X Y : TopCat.{v}} (f : X ⟶ Y) (n : ℕ)
-    (s : (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))) :
-    Sigma.ι (fun _ => R) s ≫ (((singularChainComplexFunctor C).obj R).map f).f n =
-      Sigma.ι (fun _ => R)
-        ((TopCat.toSSet.map f).app (Opposite.op (SimplexCategory.mk n)) s) := by
-  simp [singularChainComplexFunctor, SSet.singularChainComplexFunctor,
-    alternatingFaceMapComplex, AlternatingFaceMapComplex.map,
-    Functor.postcompose₂, sigmaConst]
+/-- **Normalization**: On 0-simplices (points), the cross product sends
+`[x] ⊗ [y]` to `[(x, y)]`. That is, the cross product of two point-simplices
+is the point-simplex at the product point.
 
--- Helper: Sigma.ι composed with the boundary map
-omit [CategoryWithHomology C] in
-lemma singularChainComplex_d_ι (R : C) (X : TopCat.{v}) (n : ℕ)
-    (s : (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk (n + 1)))) :
-    Sigma.ι (fun _ => R) s ≫ (((singularChainComplexFunctor C).obj R).obj X).d (n + 1) n =
-      ∑ j : Fin (n + 2), ((-1 : ℤ) ^ (j : ℕ)) •
-        Sigma.ι (fun _ => R)
-          ((TopCat.toSSet.obj X).map (SimplexCategory.δ j).op s) := by
-  simp [singularChainComplexFunctor, SSet.singularChainComplexFunctor,
-    alternatingFaceMapComplex, AlternatingFaceMapComplex.obj,
-    AlternatingFaceMapComplex.objD, ChainComplex.of_d,
-    Functor.postcompose₂, sigmaConst, SimplicialObject.δ,
-    SimplicialObject.whiskering,
-    Preadditive.comp_sum, Preadditive.comp_zsmul]
+Requires `R` to be a monoid object (`[MonObj R]`) so that the multiplication
+`μ : R ⊗ R → R` mediates between the tensor of coprojections (source `R ⊗ R`)
+and the target coprojection (source `R`). In practice, `R` is a ring object
+(e.g., `ℤ` in `Ab`), so this is always satisfied. -/
+theorem crossProduct_normalized {X Y : TopCat.{v}} (R : C) [MonObj R]
+    (x : SingularSimplex X 0) (y : SingularSimplex Y 0) :
+    (simplexCoprojection C R x ⊗ₘ simplexCoprojection C R y) ≫
+      crossProduct C R 0 0 =
+    MonObj.mul ≫ simplexCoprojection C R (prodSimplex x y) := sorry
 
-/-! ### Face-prism endpoint identities -/
+/-! ## Chain homotopy from the cross product -/
 
-variable {C} in
-/-- Face 0 of the 0-th prism simplex gives the inclusion at time 1. -/
-lemma face_prismSimplex_top (X : TopCat.{v}) (n : ℕ)
-    (s : (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))) :
-    (TopCat.toSSet.obj (TopCat.of (I × X))).map (SimplexCategory.δ 0).op
-      (prismSimplex X n ⟨0, Nat.zero_lt_succ n⟩ s) =
-    (TopCat.toSSet.map (topInclusion₁ X)).app (Opposite.op (SimplexCategory.mk n)) s := by
-  -- Reduce to ContinuousMap equality via toSSetObjEquiv
-  apply (TopCat.toSSetObjEquiv _ _).injective
-  -- Both sides reduce to ContinuousMap compositions by rfl (see toSSetObjEquiv_map/naturality)
-  -- LHS: toSSetObjEquiv ((toSSet Y).map (δ 0).op (prismSimplex s 0))
-  --     = (toSSetObjEquiv (prismSimplex s 0)).comp (stdSimplex.map δ_0)
-  -- RHS: toSSetObjEquiv ((toSSet.map ι₁).app (op [n]) s)
-  --     = ι₁.comp (toSSetObjEquiv s)
-  -- After applying toSSetObjEquiv to prismSimplex (which recovers the ContinuousMap),
-  -- we need: ContinuousMap p ↦ (tMap(δ_0(p)), s(σ_0(δ_0(p)))) = ContinuousMap p ↦ (1, s(p))
-  -- The goal reduces by rfl through the layers to ContinuousMap equality
-  -- Use native_decide? No, let me try simp/congr
-  -- Actually, since toSSetObjEquiv maps composition holds by rfl,
-  -- both sides reduce to the same ContinuousMap
-  -- LHS: fun p => (∑ j, if 1 ≤ j then (stdSimplex.map δ_0 p) j else 0, s(σ_0(stdSimplex.map δ_0 p)))
-  -- RHS: fun p => (1, s(p))
-  -- Need: ∑ j, if 1 ≤ j then (stdSimplex.map δ_0 p) j else 0 = 1
-  -- and: s(σ_0(stdSimplex.map δ_0 p)) = s(p)
-  -- Both sides are elements that toSSetObjEquiv maps to ContinuousMaps by rfl
-  -- Just use ContinuousMap.ext after applying toSSetObjEquiv.injective
-  ext ⟨p, hp⟩
-  constructor
-  · -- I-component: need to show the t-coordinates agree
-    -- After δ_0, t = ∑_{j ≥ 1} (δ_0(p))_j = ∑ p_j = 1
-    show (TopCat.toSSetObjEquiv _ _ ((TopCat.toSSet.obj _).map _ (prismSimplex X n _ s)) ⟨p, hp⟩).1 =
-         (TopCat.toSSetObjEquiv _ _ ((TopCat.toSSet.map _).app _ s) ⟨p, hp⟩).1
-    -- Both sides reduce definitionally via the rfl compatibility
-    -- LHS = (prismSimplex' ∘ δ_0)(p).1 = ∑_{j≥1} (δ_0(p))_j
-    -- RHS = (ι₁ ∘ s)(p).1 = 1
-    sorry
-  · -- X-component: uses σ_0 ∘ δ_0 = id
-    sorry
-
-variable {C} in
-/-- Face (n+1) of the n-th prism simplex gives the inclusion at time 0. -/
-lemma face_prismSimplex_bot (X : TopCat.{v}) (n : ℕ)
-    (s : (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))) :
-    (TopCat.toSSet.obj (TopCat.of (I × X))).map
-      (SimplexCategory.δ (Fin.last (n + 1))).op
-      (prismSimplex X n ⟨n, lt_add_one n⟩ s) =
-    (TopCat.toSSet.map (topInclusion₀ X)).app (Opposite.op (SimplexCategory.mk n)) s := by
-  apply (TopCat.toSSetObjEquiv (TopCat.of (I × X))
-    (Opposite.op (SimplexCategory.mk n))).injective
-  ext p
-  sorry
-
-lemma prismHom_comm (R : C) (X : TopCat.{v}) (i : ℕ) :
-    (((singularChainComplexFunctor C).obj R).map (topInclusion₀ X)).f i =
-      dNext i (prismHom C R X) + prevD i (prismHom C R X) +
-        (((singularChainComplexFunctor C).obj R).map (topInclusion₁ X)).f i :=
-  by
-    sorry
-
-/-- The prism chain homotopy between the chain maps induced by ι₀ and ι₁.
-
-Assembled from `prismHom`, `prismHom_zero`, and `prismHom_comm`. -/
-def prismChainHomotopy (R : C) (X : TopCat.{v}) :
-    Homotopy
-      (((singularChainComplexFunctor C).obj R).map (topInclusion₀ X))
-      (((singularChainComplexFunctor C).obj R).map (topInclusion₁ X)) where
-  hom := prismHom C R X
-  zero _ _ h := prismHom_zero C R X _ _ h
-  comm := prismHom_comm C R X
-
-/-! ## Layer 2: Assembly
-
-Compose the prism chain homotopy with C_*(H) and use the endpoint
-conditions to get the final chain homotopy between C_*(f) and C_*(g). -/
-
-omit [CategoryWithHomology C] in
-/-- Functoriality: the chain map of a composition equals the composition
-of the chain maps. -/
-lemma singularChainMap_comp {X Y Z : TopCat.{v}} (R : C) (f : X ⟶ Y) (g : Y ⟶ Z) :
-    ((singularChainComplexFunctor C).obj R).map (f ≫ g) =
-      ((singularChainComplexFunctor C).obj R).map f ≫
-        ((singularChainComplexFunctor C).obj R).map g := by
-  exact Functor.map_comp _ f g
-
-/-- A topological homotopy `H : f ≃ g` between continuous maps `f g : X → Y`
+/-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
 induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
 
-**Proof**: Compose the prism chain homotopy (between `C_*(ι₀)` and `C_*(ι₁)`)
-with `C_*(H)`, then use `H ∘ ι₀ = f` and `H ∘ ι₁ = g` to rewrite. -/
+**Proof sketch**: Use the cross product with the unit interval. The homotopy
+H : I × X → Y composed with the cross product C_0(I) ⊗ C_n(X) → C_n(I × X)
+gives the chain homotopy operator, using the fundamental class of I as a
+1-chain connecting the two endpoints. -/
 def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
     (R : C) (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
       (((singularChainComplexFunctor C).obj R).map f)
       (((singularChainComplexFunctor C).obj R).map g) := by
-  have P := (prismChainHomotopy C R X).compRight
-    (((singularChainComplexFunctor C).obj R).map (homotopyToMorphism H))
-  rwa [← Functor.map_comp, ← Functor.map_comp,
-    homotopyToMorphism_comp_topInclusion₀, homotopyToMorphism_comp_topInclusion₁] at P
+  sorry
 
 /-! ## Homotopy invariance of singular homology -/
 
+omit [MonoidalCategory C] in
 /-- Homotopic maps induce equal maps on singular homology.
 
 This follows from `singularChain_chainHomotopy_of_homotopy` via

@@ -147,70 +147,58 @@ After writing each file:
 3. Confirm no circular dependencies
 
 
-## Status: ALL 6 FILES DONE (sorry'd structure complete)
+## Status
+
+4 of 6 files fully proven. 2 files remain (HomotopyInvariance, Excision).
 
 ## Completed Files
 
-### 1. `HomologyLean/SingularHomology/DimensionAxiom.lean` ✅
-- `singularHomology_point_isZero` — H_n(pt; R) = 0 for n ≠ 0
-- `singularHomology_point_zero_iso` — H_0(pt; R) ≅ R
-- **No sorry's.** Fully proven by specializing Mathlib's `isZero_singularHomologyFunctor_of_totallyDisconnectedSpace` and `coproductUniqueIso`.
+### 1. `DimensionAxiom.lean` ✅ — 0 sorry's
+Fully proven by specializing Mathlib's `isZero_singularHomologyFunctor_of_totallyDisconnectedSpace` and `coproductUniqueIso`.
 
-### 2. `HomologyLean/SingularHomology/Relative.lean` ✅
-- `singularChains` / `singularChainMap` — abbreviations for the Mathlib functors
-- `relativeSingularChainComplex` — `cokernel` of the chain map `C_*(A) → C_*(X)`
-- `relativeSingularHomology` — homology of the relative complex
-- `relativeSingularChainSC` — the short complex `C_*(A) → C_*(X) → C_*(X,A)`
-- `relativeSingularChainSC_exact` — exact via `exact_of_g_is_cokernel`
-- `relativeSingularChainSES_shortExact` — short exact when `i` is mono
-- `relativeSingularChainMap` — functoriality via `cokernel.map`
-- **No sorry's.** `singularChainMap_mono` proven via `mono_of_mono_f` + `MonoCoprod.mono_map'_of_injective` + mono cancellation on ULift-wrapped Yoneda elements.
+### 2. `Relative.lean` ✅ — 0 sorry's
+`singularChainMap_mono` proven via `mono_of_mono_f` + `MonoCoprod.mono_map'_of_injective` + mono cancellation on ULift-wrapped Yoneda elements.
 
-### 3. `HomologyLean/SingularHomology/LongExactSequence.lean` ✅
-- `connectingMorphism` — δ : H_n(X,A) → H_{n-1}(A) via `ShortExact.δ`
-- `singularHomologyLES` — 6-term sequence via `composableArrows₅`
-- `singularHomologyLES_exact` — exact via `composableArrows₅_exact`
-- **No sorry's.** `connectingMorphism_natural` proven via `δ_naturality` with `ShortComplex.homMk`.
+### 3. `LongExactSequence.lean` ✅ — 0 sorry's
+`connectingMorphism_natural` proven via `δ_naturality` with `ShortComplex.homMk`.
 
-### 4. `HomologyLean/SingularHomology/Additivity.lean` ✅
-- `singular_simplex_factors_through_summand` — ✅ PROVEN. Connected Δⁿ lands in one summand via `Continuous.exists_lift_sigma`.
-- `singularChainComplexFunctor_preservesCoproducts` — sorry'd instance. Needs: (1) `TopCat.toSSet ⋙ eval [n]` preserves coproducts (from connectivity of Δⁿ), (2) `sigmaConst.obj R` preserves colimits (left adjoint via `sigmaConstAdj`).
-- `singularChainComplex_coprod_iso` — definition using sorry'd instance, no sorry in the def itself.
-- `singularChainComplex_coprod_iso_ι` — ✅ PROVEN via `PreservesCoproduct.inv_hom` + `ι_comp_sigmaComparison`.
-- `colim_preservesHomology` — ✅ PROVEN via `AB4OfSize.ofShape ι` + `preservesHomology_of_preservesEpis_and_kernels`.
-- `shortComplexHomologyFunctor_preservesCoproducts` — ✅ PROVEN. Key insight: use `NatTrans.app_homology` to relate `mapHomologyIso` for `eval j` and `colim` functors. Transport via `IsColimit.ofIsoColimit` with point iso `mapHomologyIso S colim ≪≫ colim.mapIso η`.
-- `homologyFunctor_preservesCoproducts` — ✅ PROVEN via `preservesColimitsOfShape_of_natIso` + `homologyFunctorIso`.
-- `singularHomology_coprod_iso` — definition using sorry'd instance, no sorry in the def itself.
-- `singularHomology_coprod_iso_ι` — ✅ PROVEN via `change` to resolve definitional mismatch, then `singularChainComplex_coprod_iso_ι` + `ι_comp_sigmaComparison`.
-- **1 sorry remaining** (down from original 5). The `singularChainComplexFunctor_preservesCoproducts` instance needs geometric/categorical work.
+### 4. `Additivity.lean` ✅ — 0 sorry's
+Key constructions:
+- `singular_simplex_factors_through_summand` — connected Δⁿ lands in one summand via `Continuous.exists_lift_sigma`
+- `TopCat.sigmaι_comp_fst_eq` / `TopCat.sigmaι_cancel` — reusable sigma injection lemmas
+- `toSSet_eval_preservesCoproducts` — `TopCat.toSSet ⋙ eval [n]` preserves coproducts (core geometric argument)
+- `shortComplexHomologyFunctor_preservesCoproducts` — via `NatTrans.app_homology` + `IsColimit.ofIsoColimit`
+- `singularHomology_coprod_iso` / `singularHomology_coprod_iso_ι` — the main iso and its naturality
 
-### 5. `HomologyLean/SingularHomology/HomotopyInvariance.lean` ✅
-- `singularChain_chainHomotopy_of_homotopy` — chain homotopy from `ContinuousMap.Homotopy` via prism operator
-- `singularHomology_map_eq_of_homotopy` — homotopic maps ⟹ equal maps on homology
-- `singularHomology_iso_of_homotopyEquiv` — homotopy equivalences ⟹ iso on homology
-- **3 sorry's.** Hard: prism operator construction and boundary formula. Uses `f.hom'` to extract `ContinuousMap` from TopCat morphisms.
+### 5. `HomotopyInvariance.lean` — 3 sorry's
+| Declaration | Difficulty | Notes |
+|---|---|---|
+| `singularChain_chainHomotopy_of_homotopy` | **Hard** | Core: prism operator + boundary formula `∂P + P∂ = (i₁)_* - (i₀)_*` |
+| `singularHomology_map_eq_of_homotopy` | Easy | Corollary via `Homotopy.homologyMap_eq` |
+| `singularHomology_iso_of_homotopyEquiv` | Easy | Corollary via above + functoriality |
 
-### 6. `HomologyLean/SingularHomology/Excision.lean` ✅
-- `subsetInclusion` / `subsetInclusionSub` — subspace inclusions as TopCat morphisms
-- `subsetInclusion_mono` / `subsetInclusionSub_mono` — monomorphism instances
-- `subsetInclusionSub_comp` — composition law for subset inclusions
-- `barycentricSubdivision` — Sd : C_*(X) → C_*(X) chain endomorphism
-- `barycentricSubdivision_homotopic_id` — Sd chain homotopic to identity
-- `barycentricSubdivision_natural` — naturality of Sd
-- `excision` — the excision isomorphism: `H_n(X\U, A\U; R) ≅ H_n(X, A; R)`
-- **7 sorry's.** Very hard: barycentric subdivision, smallness theorem, quasi-iso of small chains. Imports `Relative.lean` for `relativeSingularHomology`.
+### 6. `Excision.lean` — 7 sorry's
+| Declaration | Difficulty | Notes |
+|---|---|---|
+| `subsetInclusion_mono` | Trivial | `Subtype.val` is injective |
+| `subsetInclusionSub_mono` | Trivial | `Set.inclusion` is injective |
+| `subsetInclusionSub_comp` | Trivial | `ext` |
+| `barycentricSubdivision` | **Very hard** | Inductive definition using cone operator |
+| `barycentricSubdivision_homotopic_id` | **Very hard** | Chain homotopy via acyclic models/cone |
+| `barycentricSubdivision_natural` | Medium | Naturality of Sd |
+| `excision` | **Very hard** | Needs additional infrastructure not yet sorry'd: small chains subcomplex, Lebesgue number argument, quasi-iso. Needs `/plan` pass to decompose further. |
 
 ## Sorry Summary
 
-| File | Sorry count | Difficulty | Key blockers |
-|------|------------|------------|-------------|
-| DimensionAxiom | 0 | Done | — |
-| Relative | 0 | Done | — |
-| LongExactSequence | 0 | Done | — |
-| Additivity | 1 | Medium | `singularChainComplexFunctor_preservesCoproducts` |
-| HomotopyInvariance | 3 | Hard | prism operator, boundary formula |
-| Excision | 7 | Very hard | barycentric subdivision, smallness |
-| **Total** | **11** | | |
+| File | Sorry count | Difficulty | Status |
+|------|------------|------------|--------|
+| DimensionAxiom | 0 | — | Done |
+| Relative | 0 | — | Done |
+| LongExactSequence | 0 | — | Done |
+| Additivity | 0 | — | Done |
+| HomotopyInvariance | 3 | Hard | 1 hard core + 2 easy corollaries |
+| Excision | 7 | Very hard | 3 trivial + 4 hard, needs replanning |
+| **Total** | **10** | | |
 
 ## Key Lessons Learned
 
@@ -247,10 +235,11 @@ DimensionAxiom.lean   HomotopyInvariance.lean   Additivity.lean   Excision.lean
 
 Only LongExactSequence and Excision depend on Relative. The other files are independent.
 
-## Suggested Fill-Sorry Order
+## Next Steps
 
-1. ~~**LongExactSequence: `connectingMorphism_natural`**~~ ✅ Done
-2. ~~**Relative: `singularChainMap_mono`**~~ ✅ Done
-3. ~~**Additivity**~~ Partially done: 1 sorry remains (`singularChainComplexFunctor_preservesCoproducts`)
-4. **HomotopyInvariance** — Hard, 3 sorry's, prism operator is the crux
-5. **Excision** — Very hard, 7 sorry's, barycentric subdivision + smallness theorem
+1. ~~DimensionAxiom~~ ✅
+2. ~~Relative~~ ✅
+3. ~~LongExactSequence~~ ✅
+4. ~~Additivity~~ ✅
+5. **HomotopyInvariance** — Recommended next. One hard core (prism operator) + 2 corollaries. More self-contained than excision. Needs `/plan` to decompose the prism operator into extractable lemmas before `/fill-sorry`.
+6. **Excision** — Needs `/plan` pass first: current sorry'd structure is too coarse. Must decompose into small chains subcomplex, iterated subdivision lemma, quasi-iso argument, then the final excision theorem.
