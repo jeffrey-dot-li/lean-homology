@@ -17,6 +17,9 @@ import Mathlib.Topology.Homotopy.Basic
 import Mathlib.Algebra.Homology.Homotopy
 import Mathlib.Topology.UnitInterval
 import Mathlib.CategoryTheory.Monoidal.Category
+import Mathlib.CategoryTheory.Monoidal.Preadditive
+import Mathlib.CategoryTheory.Monoidal.Closed.Basic
+import Mathlib.CategoryTheory.Monoidal.Limits.Preserves
 import Mathlib.CategoryTheory.Monoidal.Mon_
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Topology.Category.TopCat.Limits.Products
@@ -29,7 +32,7 @@ open scoped MonoidalCategory
 universe u v
 
 variable (C : Type u) [Category.{v} C] [HasCoproducts C] [Preadditive C]
-  [CategoryWithHomology C] [MonoidalCategory C]
+  [CategoryWithHomology C] [MonoidalCategory C] [SymmetricCategory C]
 
 namespace HomologyLean.SingularHomology
 
@@ -293,15 +296,37 @@ variable (C)
 
 /-! ### Chain-level cross product -/
 
+variable [MonoidalPreadditive C] [MonoidalClosed C]
+
 /-- The cross product on singular chains:
   `crossProduct R p q : C_p(X; R) ⊗ C_q(Y; R) → C_{p+q}(X × Y; R)`
 
 Defined as the bilinear extension of the simplex-level cross product.
 Since it is a morphism out of `⊗` in a monoidal category, bilinearity
 is built into the type — the tensor product universally encodes bilinear maps. -/
-def crossProduct {X Y : TopCat.{v}} (R : C) (p q : ℕ) :
+def crossProduct {X Y : TopCat.{v}} (R : C) [MonObj R] (p q : ℕ) :
     (singChain C R X).X p ⊗ (singChain C R Y).X q ⟶
-      (singChain C R (X ⨯ Y)).X (p + q) := sorry
+      (singChain C R (X ⨯ Y)).X (p + q) := by
+  let A : SingularSimplex X p → C := fun _ => R
+  let B : SingularSimplex Y q → C := fun _ => R
+  let leftIso :
+      (∐ A) ⊗ (∐ B) ≅
+        ∐ fun _s : SingularSimplex X p => R ⊗ (∐ B) :=
+    PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A
+  let rightIso :
+        R ⊗ (∐ B) ≅ ∐ fun _t : SingularSimplex Y q => R ⊗ R :=
+    PreservesCoproduct.iso (MonoidalCategory.tensorLeft R) B
+  exact
+    leftIso.hom ≫
+      Sigma.desc (fun s =>
+        rightIso.hom ≫
+          Sigma.desc (fun t => by
+          -- R ⊗ R ⟶ (singChain C R (X ⨯ Y)).X (p + q)
+            refine MonObj.mul ≫ ?_
+            apply simplexCrossProduct (C := C)
+              (R := R) (X := X) (Y := Y) (p := p) (q := q) s t
+          )
+      )
 
 /-! ### Properties of the cross product -/
 
@@ -315,7 +340,7 @@ For `f : X ⟶ X'` and `g : Y ⟶ Y'`, the following diagram commutes:
   C_p(X') ⊗ C_q(Y') --×--> C_{p+q}(X' × Y')
 ```
 -/
-theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C)
+theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C) [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) :
     crossProduct C R p q ≫
       (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
@@ -330,7 +355,7 @@ map from the tensor product complex to the singular complex of the product:
   ∂(σ × τ) = (∂σ) × τ + (-1)^{p+1} · σ × (∂τ)
 ```
 Stated with shifted indices `(p+1, q+1)` to avoid natural number subtraction. -/
-theorem crossProduct_leibniz {X Y : TopCat.{v}} (R : C) (p q : ℕ) :
+theorem crossProduct_leibniz {X Y : TopCat.{v}} (R : C) [MonObj R] (p q : ℕ) :
     crossProduct C R (X := X) (Y := Y) (p + 1) (q + 1) ≫
       (singChain C R (X ⨯ Y)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
     ((singChain C R X).d (p + 1) p ⊗ₘ 𝟙 ((singChain C R Y).X (q + 1))) ≫
@@ -364,7 +389,7 @@ H : I × X → Y composed with the cross product C_0(I) ⊗ C_n(X) → C_n(I × 
 gives the chain homotopy operator, using the fundamental class of I as a
 1-chain connecting the two endpoints. -/
 def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
-    (R : C) (H : ContinuousMap.Homotopy f.hom' g.hom') :
+    (R : C) [MonObj R] (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
       (((singularChainComplexFunctor C).obj R).map f)
       (((singularChainComplexFunctor C).obj R).map g) := by
@@ -372,13 +397,12 @@ def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
 
 /-! ## Homotopy invariance of singular homology -/
 
-omit [MonoidalCategory C] in
 /-- Homotopic maps induce equal maps on singular homology.
 
 This follows from `singularChain_chainHomotopy_of_homotopy` via
 `Homotopy.homologyMap_eq`. -/
 theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
-    (R : C) (H : ContinuousMap.Homotopy f.hom' g.hom') (n : ℕ) :
+    (R : C) [MonObj R] (H : ContinuousMap.Homotopy f.hom' g.hom') (n : ℕ) :
     ((singularHomologyFunctor C n).obj R).map f =
       ((singularHomologyFunctor C n).obj R).map g := by
   exact (singularChain_chainHomotopy_of_homotopy C R H).homologyMap_eq n
@@ -389,7 +413,7 @@ theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
 
 **Proof sketch**: `H_n(f) ∘ H_n(g) = H_n(g ≫ f) = H_n(𝟙 Y) = 𝟙` by
 homotopy invariance and functoriality, and similarly for the other composite. -/
-def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}} (R : C)
+def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}} (R : C) [MonObj R]
     (f : X ⟶ Y) (g : Y ⟶ X)
     (hfg : ContinuousMap.Homotopy (f ≫ g : X ⟶ X).hom' (𝟙 X : X ⟶ X).hom')
     (hgf : ContinuousMap.Homotopy (g ≫ f : Y ⟶ Y).hom' (𝟙 Y : Y ⟶ Y).hom')
