@@ -219,6 +219,21 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
     (TopCat.toSSetObjEquiv (X ⨯ Y) n).symm
       (((TopCat.prodIsoProd X Y).inv.hom).comp (fsx.prodMk ftx))
 
+/-- Naturality of `TopCat.toSSetObjEquiv` with respect to maps in `TopCat`. -/
+theorem toSSetObjEquiv_natural {X X' : TopCat.{v}} (f : X ⟶ X') (n : SimplexCategoryᵒᵖ)
+    (x : (TopCat.toSSet.obj X).obj n) :
+    TopCat.toSSetObjEquiv X' n ((TopCat.toSSet.map f).app n x) =
+      f.hom.comp (TopCat.toSSetObjEquiv X n x) := by
+  rfl
+
+/-- Compatibility of `prodIsoProd.inv` with `prodMk` under maps on both factors. -/
+theorem prodIsoProd_inv_comp_prodMk_natural
+    {X X' Y Y' : TopCat.{v}} {Z : Type v} [TopologicalSpace Z]
+    (f : X ⟶ X') (g : Y ⟶ Y') (a : C(Z, X)) (b : C(Z, Y)) :
+    ((TopCat.prodIsoProd X' Y').inv.hom).comp ((f.hom.comp a).prodMk (g.hom.comp b)) =
+      (prod.map f g).hom.comp (((TopCat.prodIsoProd X Y).inv.hom).comp (a.prodMk b)) := by
+  sorry
+
 /-- Naturality of `shuffleSimplex` under maps on both factors. -/
 theorem shuffleSimplex_natural {X X' Y Y' : TopCat.{v}} {p q : ℕ}
     (f : X ⟶ X') (g : Y ⟶ Y')
@@ -231,6 +246,17 @@ theorem shuffleSimplex_natural {X X' Y Y' : TopCat.{v}} {p q : ℕ}
       μ := by
   sorry
 
+/-- The unique endomorphism of `⦋0⦌` is the identity. -/
+private lemma simplexCategory_hom_mk_const_zero_eq_id :
+    (SimplexCategory.Hom.mk (a := SimplexCategory.mk 0) (b := SimplexCategory.mk 0)
+      ({ toFun := fun _ : Fin 1 => (0 : Fin 1)
+         monotone' := by intro i j _; simp } : Fin 1 →o Fin 1)) =
+    𝟙 (SimplexCategory.mk 0) := by
+  apply SimplexCategory.Hom.ext
+  ext i
+  fin_cases i
+  rfl
+
 /-- Normalization at degree `(0,0)`: `shuffleSimplex` agrees with pairing points. -/
 theorem shuffleSimplex_zero_zero {X Y : TopCat.{v}}
     (s : SingularSimplex X 0) (t : SingularSimplex Y 0) (μ : Shuffle 0 0) :
@@ -239,7 +265,8 @@ theorem shuffleSimplex_zero_zero {X Y : TopCat.{v}}
         (((TopCat.prodIsoProd X Y).inv.hom).comp
           ((TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk 0)) s).prodMk
             (TopCat.toSSetObjEquiv Y (Opposite.op (SimplexCategory.mk 0)) t))) := by
-  sorry
+  cases μ
+  simp [shuffleSimplex, SimplexCategory.mkHom, simplexCategory_hom_mk_const_zero_eq_id]
 
 /-- Face decomposition data needed for the Leibniz rule proof. -/
 theorem shuffleSimplex_face_decomposition {X Y : TopCat.{v}} {p q : ℕ}
@@ -259,7 +286,8 @@ as the signed sum `∑_μ sign(μ) · ι(shuffleSimplex s t μ)` where ι denote
 the coprojection into the free module. -/
 def simplexCrossProduct (R : C) {X Y : TopCat.{v}} {p q : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q) :
-    R ⟶ (singChain C R (X ⨯ Y)).X (p + q) := sorry
+    R ⟶ (singChain C R (X ⨯ Y)).X (p + q) :=
+  ∑ μ : Shuffle p q, μ.sign • simplexCoprojection C R (shuffleSimplex s t μ)
 
 variable (C)
 
