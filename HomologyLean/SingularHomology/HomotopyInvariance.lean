@@ -40,7 +40,7 @@ namespace HomologyLean.SingularHomology
 /-! ### Abbreviations -/
 
 /-- The standard topological `p`-simplex. -/
-abbrev stdSimplex (p : ℕ) : TopCat :=
+abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
   SimplexCategory.toTop.obj (SimplexCategory.mk p)
 
 /-!
@@ -57,6 +57,60 @@ abbrev singChain (R : C) (X : TopCat.{v}) : ChainComplex C ℕ :=
 Definitionally `ULift (SimplexCategory.toTop.obj [n] ⟶ X)`. -/
 abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
   (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
+
+/-- The underlying *topological* `n`-simplex as a type. -/
+abbrev Δₜ (n : ℕ) : Type :=
+  ↑(_root_.stdSimplex ℝ (Fin (n + 1)))
+
+/-- A singular `n`-simplex viewed as an actual continuous map `Δₜ(n) → X`. -/
+abbrev SingularSimplexMap (X : TopCat.{v}) (n : ℕ) : Type _ :=
+  C(Δₜ n, X)
+
+/-- **Natural equivalence** between singular `n`-simplices in `X` and continuous maps
+`Δₜ(n) → X`. This is `TopCat.toSSetObjEquiv` specialized to `n`. -/
+noncomputable abbrev singularSimplexEquiv (X : TopCat.{v}) (n : ℕ) :
+    SingularSimplex X n ≃ SingularSimplexMap (X := X) n :=
+  TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk n))
+
+@[simp]
+theorem singularSimplexEquiv_natural {X X' : TopCat.{v}} (f : X ⟶ X') (n : ℕ)
+    (s : SingularSimplex X n) :
+    (singularSimplexEquiv (X := X') n) (((TopCat.toSSet.map f).app
+        (Opposite.op (SimplexCategory.mk n))) s) =
+      f.hom.comp ((singularSimplexEquiv (X := X) n) s) := by
+  -- This is exactly `TopCat.toSSetObjEquiv` naturality.
+  rfl
+
+/-- Equivalence between singular `n`-simplices in `X` and morphisms `Δ[n] ⟶ X`.
+
+This is essentially just removing the `ULift` wrapper in the definition of `TopCat.toSSet`. -/
+noncomputable abbrev singularSimplexEquivΔ (X : TopCat.{v}) (n : ℕ) :
+    SingularSimplex X n ≃ (Δ[n] ⟶ X) := by
+  classical
+  -- `TopCat.toSSet` is a restricted (ULift-)Yoneda construction, so the `n`-simplices are
+  -- definitionally `ULift (Δ[n] ⟶ X)`.
+  simpa [SingularSimplex, TopCat.toSSet, stdSimplex] using
+    (Equiv.ulift : ULift (Δ[n] ⟶ X) ≃ (Δ[n] ⟶ X))
+
+@[simp] lemma singularSimplexEquivΔ_apply {X : TopCat.{v}} {n : ℕ} (s : SingularSimplex X n) :
+    (singularSimplexEquivΔ (X := X) n) s = s.down := by
+  rfl
+
+@[simp] lemma singularSimplexEquivΔ_symm_apply {X : TopCat.{v}} {n : ℕ} (f : Δ[n] ⟶ X) :
+    (singularSimplexEquivΔ (X := X) n).symm f = ULift.up f := by
+  rfl
+
+/-- Convenience constructor: turn a map `Δ[n] ⟶ X` into the corresponding `SingularSimplex X n`. -/
+noncomputable abbrev SingularSimplex.ofΔ {X : TopCat.{v}} {n : ℕ} (f : Δ[n] ⟶ X) :
+    SingularSimplex X n :=
+  (singularSimplexEquivΔ (X := X) n).symm f
+
+@[simp] lemma SingularSimplex.ofΔ_down {X : TopCat.{v}} {n : ℕ} (f : Δ[n] ⟶ X) :
+    (SingularSimplex.ofΔ (X := X) (n := n) f).down = f := by
+  -- `SingularSimplex.ofΔ` is definitionally `ULift.up f`.
+  rfl
+
+notation "⟪" f "⟫ₛ" => SingularSimplex.ofΔ f
 
 /-- The coprojection (basis inclusion) for a singular simplex: given a singular
 n-simplex `s` in `X`, produce the corresponding "basis element" morphism
@@ -114,6 +168,13 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
   refine shuffleStdSimplexMap (p := p) (q := q) μ ≫ ?_
   apply prod.map s.down t.down
 
+def universalSimplexCrossProduct (R : C) (p q : ℕ)
+  : R ⟶ (singChain C R (Δ[p] ⨯ Δ[q])).X (p + q) := by
+  -- simp [singularSimplexEquivΔ]
+  have id_p  := ⟪𝟙 stdSimplex.{v} p ⟫ₛ
+  have id_q :=  ⟪𝟙 stdSimplex.{v} q⟫ₛ
+  exact ∑ μ : Shuffle p q, μ.sign • simplexCoprojection C R (shuffleSimplex id_p id_q μ)
+
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
 Given a p-simplex s in X and a q-simplex t in Y, produce a morphism
@@ -122,8 +183,13 @@ as the signed sum `∑_μ sign(μ) · ι(shuffleSimplex s t μ)` where ι denote
 the coprojection into the free module. -/
 def simplexCrossProduct (R : C) {X Y : TopCat.{v}} {p q : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q) :
-    R ⟶ (singChain C R (X ⨯ Y)).X (p + q) :=
-  ∑ μ : Shuffle p q, μ.sign • simplexCoprojection C R (shuffleSimplex s t μ)
+    R ⟶ (singChain C R (X ⨯ Y)).X (p + q) := by
+  -- simp [singularSimplexEquivΔ]
+  refine universalSimplexCrossProduct R p q ≫ ?_
+  -- Push the chain on `Δ[p] ⨯ Δ[q]` forward along the map induced by `s` and `t`.
+  -- The map `Δ[p] ⨯ Δ[q] ⟶ X ⨯ Y` is `prod.map s.down t.down`.
+  exact (((singularChainComplexFunctor C).obj R).map (prod.map s.down t.down)).f (p + q)
+
 
 variable (C)
 
@@ -133,7 +199,6 @@ variable [MonoidalPreadditive C] [MonoidalClosed C]
 
 /-- The cross product on singular chains:
   `crossProduct R p q : C_p(X; R) ⊗ C_q(Y; R) → C_{p+q}(X × Y; R)`
-
 Defined as the bilinear extension of the simplex-level cross product.
 Since it is a morphism out of `⊗` in a monoidal category, bilinearity
 is built into the type — the tensor product universally encodes bilinear maps. -/
@@ -173,6 +238,36 @@ For `f : X ⟶ X'` and `g : Y ⟶ Y'`, the following diagram commutes:
   C_p(X') ⊗ C_q(Y') --×--> C_{p+q}(X' × Y')
 ```
 -/
+lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} (R : C) [MonObj R]
+    (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
+    simplexCrossProduct (C := C) (R := R)  (p := p) (q := q)
+        ⟪s⟫ₛ ⟪t⟫ₛ ≫
+      (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
+    simplexCrossProduct (C := C) (R := R) (X := X') (Y := Y') (p := p) (q := q)
+      ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ := by
+  classical
+  unfold simplexCrossProduct
+  -- Reduce to functoriality of the induced map on chains.
+  simp [Category.assoc]
+  -- The composite map on products is `prod.map (s ≫ f) (t ≫ g)`.
+  have hprod :
+      (prod.map s t) ≫ (prod.map f g) = prod.map (s ≫ f) (t ≫ g) := by
+    ext <;> simp
+  -- Convert componentwise composition into the component of a composite chain map.
+  have hmap :
+      (((singularChainComplexFunctor C).obj R).map (prod.map s t)).f (p + q) ≫
+        (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
+      (((singularChainComplexFunctor C).obj R).map ((prod.map s t) ≫ (prod.map f g))).f (p + q) := by
+    have := congrArg (fun φ => φ.f (p + q))
+      (Functor.map_comp ((singularChainComplexFunctor C).obj R) (prod.map s t) (prod.map f g)).symm
+    simpa [HomologicalComplex.comp_f] using this
+
+  -- Finish by rewriting the LHS using `hmap` and `hprod`.
+  simp [hmap, hprod]
+
+
+
+
 theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C) [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) :
     crossProduct C R p q ≫
@@ -180,27 +275,27 @@ theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} (R : C) [MonObj R]
     ((((singularChainComplexFunctor C).obj R).map f).f p ⊗ₘ
       (((singularChainComplexFunctor C).obj R).map g).f q) ≫
     crossProduct C R p q := by
+  -- Reduce to pure tensors: both sides are morphisms from (∐ A) ⊗ (∐ B).
+  -- We distribute ⊗ over ∐ (twice) to reduce to checking on generators ι(a) ⊗ₘ ι(b).
   let A : SingularSimplex X p → C := fun _ => R
   let B : SingularSimplex Y q → C := fun _ => R
-  let leftIso :
-      (∐ A) ⊗ (∐ B) ≅
-        ∐ fun _s : SingularSimplex X p => R ⊗ (∐ B) :=
-    PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A
-  let rightIso :
-      R ⊗ (∐ B) ≅ ∐ fun _t : SingularSimplex Y q => R ⊗ R :=
-    PreservesCoproduct.iso (MonoidalCategory.tensorLeft R) B
-  -- Extensionality: compare after precomposing with coproduct generators.
-  apply (cancel_epi leftIso.inv).1
-  refine Sigma.hom_ext _ _ ?_
-  intro a
-  apply (cancel_epi rightIso.inv).1
-  refine Sigma.hom_ext _ _ ?_
-  intro b
-
-  -- ⨯ (f(a) ⨂ g(b)) = ⨯(f, g) (⨯ (a ⨂ b))
-
-  -- Remaining goal is the pure-generator (`a`,`b`) naturality statement.
-  sorry
+  -- Step 1: distribute ⊗ over left coproduct: (∐ A) ⊗ (∐ B) ≅ ∐_a (R ⊗ (∐ B))
+  apply (cancel_epi (PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A).inv).mp
+  ext a
+  -- Step 2: distribute ⊗ over right coproduct: R ⊗ (∐ B) ≅ ∐_b (R ⊗ R)
+  apply (cancel_epi (PreservesCoproduct.iso (MonoidalCategory.tensorLeft R) B).inv).mp
+  ext b
+  -- Now the goal is the pure-tensor naturality:
+  -- ⨯ (f(a) ⨂ g(b)) = (f × g)_* (⨯ (a ⨂ b))
+  simp only [PreservesCoproduct.inv_hom]
+  -- Evaluate both sides on the coproduct generators and simplify the coproduct/tensor plumbing.
+  -- (We need the `reassoc` simp lemma for `sigmaComparison` explicitly.)
+  simp [crossProduct, simplexCrossProduct, Category.assoc,
+    CategoryTheory.Limits.ι_comp_sigmaComparison_assoc]
+  -- Now it's exactly the simplex-level naturality statement for `a.down` and `b.down`.
+  simpa using
+    (crossProduct_natural_pure_tensor (C := C) (R := R) (f := f) (g := g)
+      (p := p) (q := q) (s := a.down) (t := b.down))
 
 /-- **Leibniz rule** (chain map condition): The cross product is compatible
 with the boundary operators. For the cross product to assemble into a chain
