@@ -32,8 +32,8 @@ open scoped MonoidalCategory
 
 universe u v
 
-variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C]
-  [CategoryWithHomology C] [MonoidalCategory C] [SymmetricCategory C]
+variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [CategoryWithHomology C]
+   [MonoidalCategory C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
 
 namespace HomologyLean.SingularHomology
 
@@ -50,6 +50,8 @@ Convenience notation for the standard simplex:
 - `Δ[p]` (no whitespace ambiguity).
 -/
 notation "Δ[" p "]" => stdSimplex p
+abbrev SCF (R : C) : TopCat ⥤ ChainComplex C ℕ :=
+  (singularChainComplexFunctor C).obj R
 
 /-- The singular chain complex of X with coefficients in R. -/
 abbrev singChain (X : TopCat.{v}) : ChainComplex C ℕ :=
@@ -60,28 +62,6 @@ Definitionally `ULift (SimplexCategory.toTop.obj [n] ⟶ X)`. -/
 abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
   (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
 
-/-- The underlying *topological* `n`-simplex as a type. -/
-abbrev Δₜ (n : ℕ) : Type :=
-  ↑(_root_.stdSimplex ℝ (Fin (n + 1)))
-
-/-- A singular `n`-simplex viewed as an actual continuous map `Δₜ(n) → X`. -/
-abbrev SingularSimplexMap (X : TopCat.{v}) (n : ℕ) : Type _ :=
-  C(Δₜ n, X)
-
-/-- **Natural equivalence** between singular `n`-simplices in `X` and continuous maps
-`Δₜ(n) → X`. This is `TopCat.toSSetObjEquiv` specialized to `n`. -/
-noncomputable abbrev singularSimplexEquiv (X : TopCat.{v}) (n : ℕ) :
-    SingularSimplex X n ≃ SingularSimplexMap (X := X) n :=
-  TopCat.toSSetObjEquiv X (Opposite.op (SimplexCategory.mk n))
-
-@[simp]
-theorem singularSimplexEquiv_natural {X X' : TopCat.{v}} (f : X ⟶ X') (n : ℕ)
-    (s : SingularSimplex X n) :
-    (singularSimplexEquiv (X := X') n) (((TopCat.toSSet.map f).app
-        (Opposite.op (SimplexCategory.mk n))) s) =
-      f.hom.comp ((singularSimplexEquiv (X := X) n) s) := by
-  -- This is exactly `TopCat.toSSetObjEquiv` naturality.
-  rfl
 
 /-- Equivalence between singular `n`-simplices in `X` and morphisms `Δ[n] ⟶ X`.
 
@@ -113,6 +93,20 @@ noncomputable abbrev SingularSimplex.ofΔ {X : TopCat.{v}} {n : ℕ} (f : Δ[n] 
   rfl
 
 notation "⟪" f "⟫ₛ" => SingularSimplex.ofΔ f
+
+/-- The `n`-chains of `X` are the coproduct of copies of `R` indexed by maps `Δ[n] ⟶ X`. -/
+noncomputable def singChain_X_iso_sigma (X : TopCat.{v}) (n : ℕ) :
+    (singChain (C := C) (R := R) X).X n ≅ (∐ fun _f : (Δ[n] ⟶ X) => R) := by
+  classical
+  -- The chain group is definitionally a coproduct indexed by `SingularSimplex X n`;
+  -- we reindex it using `singularSimplexEquivΔ`.
+  change (∐ fun _s : SingularSimplex X n => R) ≅ (∐ fun _f : (Δ[n] ⟶ X) => R)
+  exact
+    Sigma.whiskerEquiv (C := C)
+      (f := fun _s : SingularSimplex X n => R)
+      (g := fun _f : (Δ[n] ⟶ X) => R)
+      (singularSimplexEquivΔ (X := X) n)
+      (fun _ => Iso.refl R)
 
 /-- The coprojection (basis inclusion) for a singular simplex: given a singular
 n-simplex `s` in `X`, produce the corresponding "basis element" morphism
@@ -189,12 +183,11 @@ def simplexCrossProduct {X Y : TopCat.{v}} {p q : ℕ}
   refine universalSimplexCrossProduct p q ≫ ?_
   -- Push the chain on `Δ[p] ⨯ Δ[q]` forward along the map induced by `s` and `t`.
   -- The map `Δ[p] ⨯ Δ[q] ⟶ X ⨯ Y` is `prod.map s.down t.down`.
-  exact (((singularChainComplexFunctor C).obj R).map (prod.map s.down t.down)).f (p + q)
+  exact ((SCF R).map (prod.map s.down t.down)).f (p + q)
 
 
 /-! ### Chain-level cross product -/
-
-variable [MonoidalPreadditive C] [MonoidalClosed C]
+variable {X Y Z : C}
 
 /-- The cross product on singular chains:
   `crossProduct R p q : C_p(X; R) ⊗ C_q(Y; R) → C_{p+q}(X × Y; R)`
@@ -204,6 +197,10 @@ is built into the type — the tensor product universally encodes bilinear maps.
 def crossProduct {X Y : TopCat.{v}} [MonObj R] (p q : ℕ) :
     (singChain (R := R) X).X p ⊗ (singChain (R := R) Y).X q ⟶
       (singChain (R := R) (X ⨯ Y)).X (p + q) := by
+
+  -- apply MonoidalClosed.uncurry
+
+
   let A : SingularSimplex X p → C := fun _ => R
   let B : SingularSimplex Y q → C := fun _ => R
   let leftIso :
@@ -240,7 +237,7 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
     simplexCrossProduct (R := R) (p := p) (q := q)
         ⟪s⟫ₛ ⟪t⟫ₛ ≫
-      (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
+      ((SCF R).map (prod.map f g)).f (p + q) =
     simplexCrossProduct (R := R) (X := X') (Y := Y') (p := p) (q := q)
       ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ := by
   classical
@@ -253,30 +250,61 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
     ext <;> simp
   -- Convert componentwise composition into the component of a composite chain map.
   have hmap :
-      (((singularChainComplexFunctor C).obj R).map (prod.map s t)).f (p + q) ≫
-        (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
-      (((singularChainComplexFunctor C).obj R).map ((prod.map s t) ≫ (prod.map f g))).f (p + q) := by
+      ((SCF R).map (prod.map s t)).f (p + q) ≫
+        ((SCF R).map (prod.map f g)).f (p + q) =
+      ((SCF R).map ((prod.map s t) ≫ (prod.map f g))).f (p + q) := by
     have := congrArg (fun φ => φ.f (p + q))
-      (Functor.map_comp ((singularChainComplexFunctor C).obj R) (prod.map s t) (prod.map f g)).symm
+      (Functor.map_comp (SCF R) (prod.map s t) (prod.map f g)).symm
     simpa [HomologicalComplex.comp_f] using this
-
   -- Finish by rewriting the LHS using `hmap` and `hprod`.
   simp [hmap, hprod]
 
 
 
 
-theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} [MonObj R]
+theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} [MonObj R] [Limits.HasCoproducts.{v} C]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) :
     crossProduct (R := R) (X := X) (Y := Y) p q ≫
-      (((singularChainComplexFunctor C).obj R).map (prod.map f g)).f (p + q) =
-    ((((singularChainComplexFunctor C).obj R).map f).f p ⊗ₘ
-      (((singularChainComplexFunctor C).obj R).map g).f q) ≫
+      ((SCF R).map (prod.map f g)).f (p + q) =
+    (((SCF R).map f).f p ⊗ₘ
+      ((SCF R).map g).f q) ≫
     crossProduct (R := R) (X := X') (Y := Y') p q := by
+  simp [singChain,  SCF, crossProduct]  -- adjust names
+  set L :=
+    (PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ fun _ : SingularSimplex X p => R))
+        (fun _ : SingularSimplex X p => R)).hom
+    with hL
+  set Riso :=
+    (PreservesCoproduct.iso (MonoidalCategory.tensorLeft R)
+        (fun _ : SingularSimplex Y q => R)).hom
+    with hRiso
+  letI :
+    Limits.HasCoproduct (fun _ : SingularSimplex X p =>
+      R ⊗ (∐ fun _ : SingularSimplex Y q => R)) := by
+    infer_instance
+  let ι₁ := SingularSimplex X p
+  let A₁ : ι₁ → C := fun _ => R ⊗ (∐ fun _ : SingularSimplex Y q => R)
+
+  -- refine (Limits.Sigma.hom_ext (f := A₁) ?_)  -- if this lemma has (A := ...)
+
+  -- refine Limits.Sigma.hom_ext
+  --   (A := fun _ : SingularSimplex X p =>
+  --     R ⊗ (∐ fun _ : SingularSimplex Y q => R))
+  --   ?_
+  -- intro s
+
+
+  refine (Limits.Sigma.hom_ext ?_)  -- goal: ∀ s, ...
+
+
+
+
+
   -- Reduce to pure tensors: both sides are morphisms from (∐ A) ⊗ (∐ B).
   -- We distribute ⊗ over ∐ (twice) to reduce to checking on generators ι(a) ⊗ₘ ι(b).
   let A : SingularSimplex X p → C := fun _ => R
   let B : SingularSimplex Y q → C := fun _ => R
+
   -- Step 1: distribute ⊗ over left coproduct: (∐ A) ⊗ (∐ B) ≅ ∐_a (R ⊗ (∐ B))
   apply (cancel_epi (PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A).inv).mp
   ext a
@@ -290,7 +318,9 @@ theorem crossProduct_natural {X X' Y Y' : TopCat.{v}} [MonObj R]
   -- (We need the `reassoc` simp lemma for `sigmaComparison` explicitly.)
   simp [crossProduct, simplexCrossProduct, Category.assoc,
     CategoryTheory.Limits.ι_comp_sigmaComparison_assoc]
+
   -- Now it's exactly the simplex-level naturality statement for `a.down` and `b.down`.
+
   sorry
   -- simpa using
   --   (crossProduct_natural_pure_tensor (C := C) (R := R) (f := f) (g := g)
@@ -339,8 +369,8 @@ gives the chain homotopy operator, using the fundamental class of I as a
 def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
     [MonObj R] (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
-      (((singularChainComplexFunctor C).obj R).map f)
-      (((singularChainComplexFunctor C).obj R).map g) := by
+      ((SCF R).map f)
+      ((SCF R).map g) := by
   sorry
 
 /-! ## Homotopy invariance of singular homology -/
