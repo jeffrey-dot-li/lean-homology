@@ -186,7 +186,7 @@ Key constructions:
 | `barycentricSubdivision` | **Very hard** | Inductive definition using cone operator |
 | `barycentricSubdivision_homotopic_id` | **Very hard** | Chain homotopy via acyclic models/cone |
 | `barycentricSubdivision_natural` | Medium | Naturality of Sd |
-| `excision` | **Very hard** | Needs additional infrastructure not yet sorry'd: small chains subcomplex, Lebesgue number argument, quasi-iso. Needs `/plan` pass to decompose further. |
+| `excision` | **Very hard** | Needs additional infrastructure not yet sorry'd: small chains subcomplex, Lebesgue number argument, quasi-iso. Needs `/draft` pass to decompose further. |
 
 ## Sorry Summary
 
@@ -241,5 +241,5 @@ Only LongExactSequence and Excision depend on Relative. The other files are inde
 2. ~~Relative~~ ✅
 3. ~~LongExactSequence~~ ✅
 4. ~~Additivity~~ ✅
-5. **HomotopyInvariance** — Recommended next. One hard core (prism operator) + 2 corollaries. More self-contained than excision. Needs `/plan` to decompose the prism operator into extractable lemmas before `/fill-sorry`.
-6. **Excision** — Needs `/plan` pass first: current sorry'd structure is too coarse. Must decompose into small chains subcomplex, iterated subdivision lemma, quasi-iso argument, then the final excision theorem.
+5. **HomotopyInvariance** — Recommended next. One hard core (prism operator) + 2 corollaries. More self-contained than excision. Needs `/draft` to decompose the prism operator into extractable lemmas before `/fill-sorry`.
+6. **Excision** — Needs `/draft` pass first: current sorry'd structure is too coarse. Must decompose into small chains subcomplex, iterated subdivision lemma, quasi-iso argument, then the final excision theorem.

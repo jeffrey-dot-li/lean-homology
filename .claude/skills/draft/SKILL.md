@@ -1,11 +1,13 @@
 ---
-name: plan
+name: draft
 description: Draft sorry'd theorem/lemma structure for a larger result from a proof sketch.
 ---
 
-# Plan Mode
+# Draft Mode
 
 Draft the theorem/lemma structure needed to prove a larger result.
+
+**This is NOT the builtin `/plan` command.** The builtin `/plan` enters a read-only planning mode that produces a markdown plan for user approval before any code is written. `/draft` writes actual Lean code — sorry'd declarations that compile — directly in the source files.
 
 Topic / proof sketch: $ARGUMENTS
 

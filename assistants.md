@@ -34,9 +34,11 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 
 **Output**: A structured summary with clickable references. No code edits.
 
-### Mode 2: Plan (`/plan`)
+### Mode 2: Draft (`/draft`)
 
 **Goal**: Draft the theorem/lemma structure needed to prove a larger result, given a proof sketch or mathematical reference (e.g., from Hatcher).
+
+**Important**: `/draft` is a **custom skill**, not the builtin `/plan`. The builtin `/plan` enters a read-only mode that writes a markdown plan for approval before any code is written. `/draft` writes **actual Lean code** — sorry'd declarations that compile — directly in source files.
 
 **Procedure**:
 1. **Research first** — run Mode 1 to understand what Mathlib already provides.
@@ -69,11 +71,29 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 **Anti-looping protocol** (CRITICAL):
 - **Test, don't theorize.** If you're unsure whether a tactic will work, *edit the file and check diagnostics*. Never spend more than 2-3 sentences reasoning about whether something will work — just try it. Lean's feedback is faster and more reliable than mental simulation.
 - **Detect cycles.** If you catch yourself considering an approach you already rejected, you are looping. Stop immediately and report.
-- **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/plan` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/plan`?"
+- **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/draft` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/draft`?"
 - **Never silently struggle.** The user prefers a concise "I'm stuck because X" message over 5000 tokens of increasingly desperate attempts.
 - **Narrate your reasoning.** Before each tool call, write a one-line summary of *why* you're making it (e.g., "Checking whether `liftFromProjective_comp` gives the rewrite I need" or "Goal has `biprod` — trying `simp` with biprod lemmas"). This lets the user follow your thought process and interrupt early if you're going down a wrong path.
 
-### Mode 4: Refactor (`/refactor`)
+### Mode 4: Interactive (`/interactive`)
+
+**Goal**: Work through a proof one step at a time, with the user directing each move.
+
+**How this differs from `/fill-sorry`**: `/fill-sorry` is autonomous — the agent drives the proof to completion. `/interactive` is **user-driven** — execute exactly what the user asks, show the goal state, and wait.
+
+**Procedure**:
+1. Read the target and show the initial goal state at the `sorry`.
+2. Wait for the user's instruction (e.g., "apply X", "rewrite with h", "simplify").
+3. Convert to clean Lean, edit the file, show the new goal state.
+4. Stop and wait. Do not attempt more steps.
+
+**Key rules**:
+- One step per turn. No speculative next steps.
+- Show goal state after every edit.
+- No autonomous Mathlib searching unless asked.
+- Revert on failure — don't try alternatives unless asked.
+
+### Mode 5: Refactor (`/refactor`)
 
 **Goal**: Improve an existing working proof for brevity, clarity, or documentation.
 
@@ -90,7 +110,7 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 - Prefer `simp only [...]` over `simp` for stability.
 - If adding documentation, use Lean doc comments (`/-- ... -/`).
 
-### Mode 5: Discuss (`/discuss`)
+### Mode 6: Discuss (`/discuss`)
 
 **Goal**: Read and discuss proofs, strategies, or math concepts without making any edits.
 
@@ -105,7 +125,7 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 2. Give a clear, direct analysis or answer.
 3. **Do not edit any files.** If the discussion leads to a concrete action, ask the user if they want to switch modes.
 
-### Mode 6: Improve Workflow (`/improve-workflow`)
+### Mode 7: Improve Workflow (`/improve-workflow`)
 
 **Goal**: Improve the Claude Code setup — instructions, skills, memory, and conventions.
 
@@ -130,7 +150,7 @@ Complex proofs should be structured as **compositions of obvious, standalone lem
 - **Extract general subgoals as lemmas.** If a subgoal involves only general types (no proof-specific local context), it should be a standalone lemma with a clear name — not proved inline. Sorry it first, finish the main proof assuming it, then fill it separately.
 - **Main proofs should be plumbing.** The top-level proof of a complex theorem should mostly be `rw`, `simp`, `exact`, `apply` — composing named lemmas. If a step needs >5 lines of non-trivial tactics, a lemma is probably missing.
 - **Name things for reuse.** A well-named lemma (e.g., `TopCat.sigmaι_cancel`) is a tool in the toolkit. Inline reasoning is disposable. Prefer building tools over solving problems ad hoc.
-- **This applies in every mode.** `/plan` does the decomposition upfront. `/fill-sorry` should recognize when extraction is needed mid-proof. `/refactor` should extract inline reasoning into named lemmas.
+- **This applies in every mode.** `/draft` does the decomposition upfront. `/fill-sorry` should recognize when extraction is needed mid-proof. `/refactor` should extract inline reasoning into named lemmas.
 
 ### `lemma` vs `theorem`
 
