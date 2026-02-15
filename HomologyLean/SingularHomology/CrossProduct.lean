@@ -21,6 +21,10 @@ import Mathlib.Algebra.Category.ModuleCat.Monoidal.Symmetric
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
 import Mathlib.Algebra.Category.ModuleCat.Abelian
 import Mathlib.Algebra.Category.ModuleCat.Colimits
+import Mathlib.Algebra.Category.ModuleCat.Products
+import Mathlib.LinearAlgebra.DirectSum.TensorProduct
+import Mathlib.Algebra.Module.Equiv.Basic
+
 
 noncomputable section
 
@@ -49,45 +53,86 @@ abbrev mSingChain (X : TopCat.{u}) : ChainComplex (ModuleCat.{u} R) ℕ :=
 
 variable {R}
 
+/-! ### The canonical equivalence `R[A] ⊗ R[B] ≃ R[A × B]` -/
+
+/-- The canonical `R`-linear equivalence between the tensor product of two free `R`-modules
+(`∐ fun _ : A => R`) and the free module on the product (`∐ fun _ : A × B => R`).
+
+This is `R[A] ⊗₍R₎ R[B] ≃ₗ[R] R[A × B]`, implemented by converting coproducts in `ModuleCat R`
+to direct sums and using `TensorProduct.directSum`. -/
+noncomputable def tensorCoprodEquiv (R : Type u) [CommRing R]
+    (A B : Type u) [DecidableEq A] [DecidableEq B] :
+    TensorProduct R (↑(∐ fun _ : A => (Rmod R))) (↑(∐ fun _ : B => (Rmod R))) ≃ₗ[R]
+      ↑(∐ fun _ : A × B => (Rmod R)) := by
+  classical
+  let Z₁ : A → ModuleCat.{u} R := fun _ => Rmod R
+  let Z₂ : B → ModuleCat.{u} R := fun _ => Rmod R
+  let Z₁₂ : (A × B) → ModuleCat.{u} R := fun _ => Rmod R
+  -- Work in direct sums of the underlying modules and then return to coproducts.
+  refine (_root_.TensorProduct.congr
+      (ModuleCat.coprodIsoDirectSum (Z := Z₁)).toLinearEquiv
+      (ModuleCat.coprodIsoDirectSum (Z := Z₂)).toLinearEquiv) ≪≫ₗ ?_
+  refine (TensorProduct.directSum (R := R) (S := R)
+      (M₁ := fun _ : A => R) (M₂ := fun _ : B => R)) ≪≫ₗ ?_
+  refine (DFinsupp.mapRange.linearEquiv (fun _ : A × B => (TensorProduct.lid R R))) ≪≫ₗ ?_
+  exact (ModuleCat.coprodIsoDirectSum (Z := Z₁₂)).symm.toLinearEquiv
+
 /-! ### Chain-level cross product -/
 
 /-- The cross product on singular chains, specialized to `ModuleCat R`:
   `crossProduct p q : C_p(X; R) ⊗ C_q(Y; R) → C_{p+q}(X × Y; R)`
 
-Defined by distributing the tensor product over the coproducts (free module bases)
-and applying the simplex-level cross product on each pair of generators.
-
-In `ModuleCat R`, the coefficient module `Rmod R` is the monoidal unit `𝟙_ (ModuleCat R)`,
-so `Rmod R ⊗ Rmod R ≅ Rmod R` via the left unitor — no separate `MonObj` instance is needed. -/
+Defined via `TensorProduct.lift`: we construct the curried bilinear map
+`C_p(X) →ₗ[R] (C_q(Y) →ₗ[R] C_{p+q}(X×Y))` using the coproduct (free module)
+structure of the chain groups and the simplex-level cross product. -/
 def crossProduct {X Y : TopCat.{u}} (p q : ℕ) :
     (mSingChain R X).X p ⊗ (mSingChain R Y).X q ⟶
       (mSingChain R (X ⨯ Y)).X (p + q) := by
-  let A : SingularSimplex X p → ModuleCat.{u} R := fun _ => Rmod R
-  let B : SingularSimplex Y q → ModuleCat.{u} R := fun _ => Rmod R
-  -- Step 1: distribute ⊗ over left coproduct: (∐ A) ⊗ (∐ B) ≅ ∐_s (R ⊗ (∐ B))
-  let leftIso :
-      (∐ A) ⊗ (∐ B) ≅
-        ∐ fun _s : SingularSimplex X p => (Rmod R) ⊗ (∐ B) :=
-    PreservesCoproduct.iso (MonoidalCategory.tensorRight (∐ B)) A
-  -- Step 2: distribute ⊗ over right coproduct: R ⊗ (∐ B) ≅ ∐_t (R ⊗ R)
-  let rightIso :
-        (Rmod R) ⊗ (∐ B) ≅
-          ∐ fun _t : SingularSimplex Y q => (Rmod R) ⊗ (Rmod R) :=
-    PreservesCoproduct.iso (MonoidalCategory.tensorLeft (Rmod R)) B
-  exact
-    leftIso.hom ≫
-      Sigma.desc (fun s =>
-        rightIso.hom ≫
-          Sigma.desc (fun t =>
-            -- Rmod R ⊗ Rmod R ⟶ chain group
-            -- Since Rmod R = 𝟙_ (ModuleCat R), the left unitor gives R ⊗ R ≅ R
-            (λ_ (Rmod R)).hom ≫
-              simplexCrossProduct (R := Rmod R) s t
-          )
-      )
+
+  unfold mSingChain
+  let αX := singChain_X_iso_sigma (C := ModuleCat.{u} R) (R := Rmod R) X p
+  let αY := singChain_X_iso_sigma (C := ModuleCat.{u} R) (R := Rmod R) Y q
+  let αXY := singChain_X_iso_sigma (C := ModuleCat.{u} R) (R := Rmod R) (X ⨯ Y) (p + q)
+  refine ( (MonoidalCategory.tensorHom αX.hom αY.hom) ≫ ?_ ≫ αXY.inv)
+  refine ModuleCat.ofHom ?_
+  simp
+  classical
+  -- At this point the goal is a linear map out of a tensor product of two coproducts:
+  -- `R[A] ⊗ R[B] →ₗ[R] R[...]`. We use the canonical linear equivalence
+  -- `R[A] ⊗ R[B] ≃ₗ[R] R[A × B]` (free module on the product) to turn it into a map
+  -- `R[A × B] →ₗ[R] ...`.
+  let A : Type u := (stdSimplex.{u} p ⟶ X)
+  let B : Type u := (stdSimplex.{u} q ⟶ Y)
+  letI : DecidableEq A := Classical.decEq _
+  letI : DecidableEq B := Classical.decEq _
+  have e := tensorCoprodEquiv (R := R) A B
+  -- Reduce the goal to a linear map `R[A × B] →ₗ[R] ...`.
+  refine (?_ : (↑(∐ fun _ : A × B => Rmod R)) →ₗ[R] _).comp e.toLinearMap
+  -- Now use the universal property of the free module:
+  -- `R[A × B] →ₗ[R] M` is the same as `A × B → (the underlying type of M)`.
+  letI : DecidableEq (A × B) := Classical.decEq _
+  let isoDom :=
+      (ModuleCat.coprodIsoDirectSum (Z := fun _ : A × B => Rmod R)).toLinearEquiv
+  -- We don't introduce a separate `ab`; we define the generator map directly by uncurrying.
+  -- For `s : A` and `t : B`, `simplexCrossProduct ⟪s⟫ₛ ⟪t⟫ₛ : R ⟶ C_{p+q}(X×Y)`; we then
+  -- transport along `αXY.hom` to land in the reindexed coproduct.
+  let onSimplices : A → B → _ :=
+    fun s t =>
+        ((simplexCrossProduct (R := Rmod R) (X := X) (Y := Y) (p := p) (q := q)
+              ⟪s⟫ₛ ⟪t⟫ₛ))
+  refine
+      (DirectSum.toModule (R := R) (ι := A × B) (M := fun _ : A × B => R) (N := _)
+            (fun ab =>
+              -- A linear map `R →ₗ[R] M` is the same as a point of `M` (send `1` to that point).
+              (LinearMap.ringLmapEquivSelf (R := R) (S := R) (M := _)).symm
+                (αXY.hom ((onSimplices ab.1 ab.2) (1 : R))))).comp
+        isoDom.toLinearMap
+
+
 
 /-! ### Properties of the cross product -/
 
+-- Naturality proof requires unfolding crossProduct and evaluating Sigma.desc on coprojections.
 /-- **Naturality**: The cross product commutes with maps induced on chains.
 For `f : X ⟶ X'` and `g : Y ⟶ Y'`, the following diagram commutes:
 ```
@@ -105,7 +150,26 @@ theorem crossProduct_natural {X X' Y Y' : TopCat.{u}}
     (((mSCF R).map f).f p ⊗ₘ
       ((mSCF R).map g).f q) ≫
     crossProduct (R := R) (X := X') (Y := Y') p q := by
-  sorry
+  ext aprodb
+  refine TensorProduct.induction_on aprodb ?hz ?ht ?ha
+  · -- f 0 = g 0
+    simp
+  · -- f (a ⨂ b) = g ( a ⨂ b)
+    intro x y
+
+
+
+    simp
+
+
+  · -- goal: f (u + v) = g (u + v)
+    intro u v hu hv
+    simp
+
+
+
+
+
 
 /-- **Leibniz rule** (chain map condition): The cross product is compatible
 with the boundary operators.
