@@ -29,4 +29,6 @@ Target: $ARGUMENTS
 - **No autonomous searching.** Don't search Mathlib or try `lean_state_search` unless the user asks (e.g., "search for a lemma about X" or "what closes this?").
 - **Keep edits minimal.** If the user says "destruct h", write `obtain ⟨a, b⟩ := h` — don't also rename variables, reorder goals, or add annotations.
 - **Revert on failure.** If a tactic fails, undo the edit and report the error. Don't try alternatives unless asked.
+- **Always verify before responding.** After every edit, check `lean_diagnostic_messages` and `lean_goal` before returning to the user. Never assume a tactic worked — confirm it compiles and show the actual resulting goal state, not what you think it should be.
+- **Ask immediately when unclear.** If the instruction is ambiguous or would require structural changes (definition update, missing lemma, goal mismatch), ask a short clarifying question right away. Don't deliberate internally — a one-line question is cheaper than 1000 tokens of reasoning about what the user might have meant.
 - It's fine to ask a brief clarifying question if the user's instruction is ambiguous (e.g., "there are two hypotheses named `h` — which one?"), but don't over-ask.
