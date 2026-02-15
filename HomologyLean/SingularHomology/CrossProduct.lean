@@ -26,6 +26,7 @@ import Mathlib.LinearAlgebra.DirectSum.TensorProduct
 import Mathlib.Algebra.Module.Equiv.Basic
 import Mathlib.CategoryTheory.Limits.Shapes.BinaryProducts
 import Mathlib.Algebra.Category.ModuleCat.Adjunctions
+import Mathlib.CategoryTheory.Whiskering
 
 
 noncomputable section
@@ -57,6 +58,7 @@ variable {R}
 
 /-! ### Bridge between coproduct-based and Finsupp-based free modules -/
 
+
 /-- The canonical isomorphism `∐ (fun _ : A => R) ≅ Free(A)` in `ModuleCat R`,
 bridging the coproduct-based free module with the Finsupp-based one (`ModuleCat.free R`).
 
@@ -68,62 +70,25 @@ noncomputable def coprodIsoFree (R : Type u) [CommRing R] (A : Type u) :
   exact ModuleCat.coprodIsoDirectSum (fun _ : A => Rmod R) ≪≫
     LinearEquiv.toModuleIso (finsuppLEquivDirectSum R R A).symm
 
-/-! ### The canonical isomorphism `R[A] ⊗ R[B] ≅ R[A × B]` -/
+/-- The natural isomorphism between the coproduct-based free module functor and
+Mathlib's Finsupp-based `ModuleCat.free R`. Each component is `coprodIsoFree`. -/
+noncomputable def coprodIsoFreeNat (R : Type u) [CommRing R] :
+    coprodFreeFunctor (R := Rmod R) ≅ ModuleCat.free R :=
+  NatIso.ofComponents
+    (fun A => coprodIsoFree R A)
+    (fun {A B} f => by sorry)
 
-/-- The canonical isomorphism in `ModuleCat R` between the tensor product of two free `R`-modules
-(`∐ fun _ : A => Rmod R`) and the free module on the product (`∐ fun _ : A × B => Rmod R`).
+/-! ### The canonical isomorphism `Free(A) ⊗ Free(B) ≅ Free(A × B)` -/
 
-Implemented by converting coproducts in `ModuleCat R` to direct sums and using
-`TensorProduct.directSum`. -/
-noncomputable def tensorCoprodIso (R : Type u) [CommRing R]
-    (A B : Type u) [DecidableEq A] [DecidableEq B] :
-    (ModuleCat.of R (TensorProduct R (↑(∐ fun _ : A => (Rmod R))) (↑(∐ fun _ : B => (Rmod R))))) ≅
-      (∐ fun _ : A × B => (Rmod R)) := by
-  classical
-  let Z₁ : A → ModuleCat.{u} R := fun _ => Rmod R
-  let Z₂ : B → ModuleCat.{u} R := fun _ => Rmod R
-  let Z₁₂ : (A × B) → ModuleCat.{u} R := fun _ => Rmod R
-  -- Build a linear equivalence and convert it to an isomorphism in `ModuleCat R`.
-  refine (LinearEquiv.toModuleIso ?_ )
-  -- Work in direct sums of the underlying modules and then return to coproducts.
-  refine (_root_.TensorProduct.congr
-      (ModuleCat.coprodIsoDirectSum (Z := Z₁)).toLinearEquiv
-      (ModuleCat.coprodIsoDirectSum (Z := Z₂)).toLinearEquiv) ≪≫ₗ ?_
-  refine (TensorProduct.directSum (R := R) (S := R)
-      (M₁ := fun _ : A => R) (M₂ := fun _ : B => R)) ≪≫ₗ ?_
-  refine (DFinsupp.mapRange.linearEquiv (fun _ : A × B => (TensorProduct.lid R R))) ≪≫ₗ ?_
-  exact (ModuleCat.coprodIsoDirectSum (Z := Z₁₂)).symm.toLinearEquiv
+/-- The isomorphism `Free(A) ⊗ Free(B) ≅ Free(A × B)` in `ModuleCat R`, expressing
+that the free module functor is monoidal w.r.t. `(Type, ×)` and `(ModuleCat R, ⊗)`.
 
-@[simp]
-lemma tensorCoprodIso_hom_tmul (R : Type u) [CommRing R]
-    (A B : Type u) [DecidableEq A] [DecidableEq B]
-    (a : A) (b : B) :
-    (tensorCoprodIso (R := R) A B).hom
-        (((Sigma.ι (fun _ : A => Rmod R) a) (1 : R)) ⊗ₜ[R] ((Sigma.ι (fun _ : B => Rmod R) b) (1 : R))) =
-      (Sigma.ι (fun _ : A × B => Rmod R) (a, b)) (1 : R) := by
-  sorry
-
-@[simp]
-lemma tensorCoprodIso_inv_ι (R : Type u) [CommRing R]
-    (A B : Type u) [DecidableEq A] [DecidableEq B]
-    (a : A) (b : B) :
-    (tensorCoprodIso (R := R) A B).inv ((Sigma.ι (fun _ : A × B => Rmod R) (a, b)) (1 : R)) =
-      ((Sigma.ι (fun _ : A => Rmod R) a) (1 : R)) ⊗ₜ[R] ((Sigma.ι (fun _ : B => Rmod R) b) (1 : R)) := by
-  sorry
-
--- A bridging lemma: how the generator `(s,t)` is transported through
--- `tensorCoprodIso.inv ≫ (FA ⊗ FB) ≫ tensorCoprodIso.hom`.
-lemma tensorCoprodIso_natural_pair (R : Type u) [CommRing R]
-    {A A' B B' : Type u}
-    [DecidableEq A] [DecidableEq A'] [DecidableEq B] [DecidableEq B']
-    (fA : A → A') (fB : B → B')
-    (FA : (∐ fun _ : A => Rmod R) ⟶ (∐ fun _ : A' => Rmod R))
-    (FB : (∐ fun _ : B => Rmod R) ⟶ (∐ fun _ : B' => Rmod R))
-    (a : A) (b : B) :
-    Sigma.ι (fun _ : A × B => Rmod R) (a, b) ≫
-        (tensorCoprodIso (R := R) A B).inv ≫ (FA ⊗ₘ FB) ≫ (tensorCoprodIso (R := R) A' B').hom =
-      Sigma.ι (fun _ : A' × B' => Rmod R) (fA a, fB b) := by
-  sorry
+Built from `finsuppTensorFinsupp'` which gives `(A →₀ R) ⊗ (B →₀ R) ≃ₗ (A × B →₀ R)`. -/
+noncomputable def freeTensorProductIso (R : Type u) [CommRing R]
+    (A B : Type u) :
+    ((ModuleCat.free R).obj A ⊗ (ModuleCat.free R).obj B) ≅
+      (ModuleCat.free R).obj (A × B) :=
+  LinearEquiv.toModuleIso (finsuppTensorFinsupp' R A B)
 
 /-! ### Naturality of `simplexCrossProduct` (specialized to `ModuleCat R`) -/
 
@@ -162,19 +127,18 @@ lemma simplexCrossProductElem_natural {X X' Y Y' : TopCat.{u}}
 
 /-! ### `NatTrans` packaging of simplex-level naturality -/
 
-/-- Functor `TopCat ⥤ Type` sending `X` to its `p`-simplices (`SingularSimplex X p`). -/
-noncomputable def singularSimplexFunctor (p : ℕ) : TopCat.{u} ⥤ Type u where
-  obj X := SingularSimplex X p
-  map {X X'} f s := ⟪s.down ≫ f⟫ₛ
-  map_id X := by
-    funext s
-    cases s
-    rfl
-  map_comp {X Y Z} f g := by
-    funext s
-    cases s
-    -- `ULift` makes this definitional up to associativity.
-    simp [Category.assoc]
+
+
+/-- The degreewise chain group functor `mSCF R ⋙ eval p` is naturally isomorphic to
+`singularSimplexFunctor p ⋙ ModuleCat.free R` (Finsupp-based free modules).
+
+Composed from `chainGroupIsoCoprodFree` (coproduct = coproduct) and
+`coprodIsoFreeNat` (coproduct ≅ Finsupp). -/
+noncomputable def chainGroupIsoFree (p : ℕ) :
+    mSCF R ⋙ HomologicalComplex.eval (ModuleCat.{u} R) (ComplexShape.down ℕ) p ≅
+      singularSimplexFunctor p ⋙ ModuleCat.free R :=
+  chainGroupIsoCoprodFree (R := Rmod R) p ≪≫
+    Functor.isoWhiskerLeft (singularSimplexFunctor p) (coprodIsoFreeNat R)
 
 /-- Functor `(TopCat × TopCat) ⥤ Type` sending `(X,Y)` to pairs of simplices
 `SingularSimplex X p × SingularSimplex Y q`. -/
@@ -235,10 +199,6 @@ noncomputable def simplexCrossProductNat (p q : ℕ) :
 
 /-! ### Chain-level cross product -/
 
-/-! ### Properties of the cross product -/
-
-/- **Naturality**: The cross product commutes with maps induced on chains.
-We package this as a `NatTrans` below rather than a standalone theorem. -/
 /-- Source functor for the chain-level cross product (degreewise): `(X,Y) ↦ C_p(X) ⊗ C_q(Y)`. -/
 noncomputable abbrev crossProductSrcFunctor (p q : ℕ) :
     (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
@@ -259,20 +219,54 @@ i.e., the free `R`-module on simplex pairs, implemented via `ModuleCat.free R`. 
 noncomputable abbrev freePairFunctor (p q : ℕ) : (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
   singularSimplexPairFunctor (p := p) (q := q) ⋙ ModuleCat.free R
 
+/-- Combine two NatIsos into one for `Functor.prod'`. -/
+private noncomputable def natIsoProd'
+    {J : Type*} [Category J]
+    {D E : Type*} [Category D] [Category E]
+    {F F' : J ⥤ D} {G G' : J ⥤ E}
+    (α : F ≅ F') (β : G ≅ G') : F.prod' G ≅ F'.prod' G' where
+  hom := NatTrans.prod' α.hom β.hom
+  inv := NatTrans.prod' α.inv β.inv
+  hom_inv_id := by ext X <;> simp [NatTrans.prod', Functor.prod']
+  inv_hom_id := by ext X <;> simp [NatTrans.prod', Functor.prod']
+
+/-- The intermediate functor `(X,Y) ↦ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`. -/
+private noncomputable abbrev freeTensorPairFunctor (p q : ℕ) :
+    (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
+  (CategoryTheory.Prod.fst _ _ ⋙ singularSimplexFunctor p ⋙ ModuleCat.free R).prod'
+    (CategoryTheory.Prod.snd _ _ ⋙ singularSimplexFunctor q ⋙ ModuleCat.free R) ⋙
+    MonoidalCategory.tensor (C := ModuleCat.{u} R)
+
+/-- Step 1: Apply `chainGroupIsoFree` on each tensor factor.
+`C_p(X) ⊗ C_q(Y) ≅ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`.
+Naturality is automatic from `chainGroupIsoFree`, whiskering, and `prod'`. -/
+private noncomputable def tensorChainGroupIsoFree (p q : ℕ) :
+    crossProductSrcFunctor (R := R) p q ≅ freeTensorPairFunctor (R := R) p q :=
+  Functor.isoWhiskerRight
+    (natIsoProd'
+      (Functor.isoWhiskerLeft (CategoryTheory.Prod.fst _ _) (chainGroupIsoFree (R := R) p))
+      (Functor.isoWhiskerLeft (CategoryTheory.Prod.snd _ _) (chainGroupIsoFree (R := R) q)))
+    (MonoidalCategory.tensor (C := ModuleCat.{u} R))
+
+/-- Step 2: `Free(A) ⊗ Free(B) ≅ Free(A × B)` as a natural isomorphism.
+Naturality of `finsuppTensorFinsupp'` in the type arguments. -/
+private noncomputable def freeTensorProductNatIso (p q : ℕ) :
+    freeTensorPairFunctor (R := R) p q ≅ freePairFunctor (R := R) p q :=
+  NatIso.ofComponents
+    (fun XY => freeTensorProductIso R (SingularSimplex XY.1 p) (SingularSimplex XY.2 q))
+    (fun {XY XY'} fg => by
+      ext
+      sorry)
+
 /-- Natural isomorphism `C_p(X) ⊗ C_q(Y) ≅ Free(SingularSimplex X p × SingularSimplex Y q)`,
 bridging the coproduct-based chain groups with the Finsupp-based free module.
 
-Each component is `tensorCoprodIso ≪≫ coprodIsoFree`: first collapse the tensor of coproducts
-into a single coproduct on pairs, then convert that coproduct to the Finsupp-based free module. -/
+Composed from two NatIsos:
+1. `tensorChainGroupIsoFree`: applies `chainGroupIsoFree` on each tensor factor
+2. `freeTensorProductNatIso`: `Free(A) ⊗ Free(B) ≅ Free(A × B)` naturally -/
 noncomputable def tensorCoprodNatIso (p q : ℕ) :
     crossProductSrcFunctor (R := R) p q ≅ freePairFunctor (R := R) p q :=
-  NatIso.ofComponents
-    (fun XY => by
-      classical
-      exact tensorCoprodIso R (SingularSimplex XY.1 p) (SingularSimplex XY.2 q) ≪≫
-        coprodIsoFree R (SingularSimplex XY.1 p × SingularSimplex XY.2 q))
-    (fun {XY XY'} fg => by
-      sorry)
+  tensorChainGroupIsoFree (R := R) p q ≪≫ freeTensorProductNatIso (R := R) p q
 
 /-- The lift of `simplexCrossProductNat` through the free/forgetful adjunction:
 `Free(SingularSimplex X p × SingularSimplex Y q) ⟶ C_{p+q}(X×Y;R)`,

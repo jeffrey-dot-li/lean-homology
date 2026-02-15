@@ -108,6 +108,34 @@ noncomputable def singChain_X_iso_sigma (X : TopCat.{v}) (n : ℕ) :
       (singularSimplexEquivΔ (X := X) n)
       (fun _ => Iso.refl R)
 
+/-- Functor `TopCat ⥤ Type` sending `X` to its `p`-simplices (`SingularSimplex X p`). -/
+noncomputable def singularSimplexFunctor (p : ℕ) : TopCat.{v} ⥤ Type v where
+  obj X := SingularSimplex X p
+  map {X X'} f s := ⟪s.down ≫ f⟫ₛ
+  map_id X := by funext s; cases s; rfl
+  map_comp {X Y Z} f g := by funext s; cases s; simp [Category.assoc]
+
+/-- The "coproduct-based free" functor `Type v ⥤ C`, sending `A ↦ ∐ (fun _ : A => R)`.
+Functorial action sends `f : A → B` to the map induced by `Sigma.desc`/`Sigma.ι`. -/
+noncomputable def coprodFreeFunctor : Type v ⥤ C where
+  obj A := ∐ fun _ : A => R
+  map {A B} f := Sigma.desc (fun a => Sigma.ι (fun _ : B => R) (f a))
+  map_id A := by ext a : 1; simp
+  map_comp {A B D} f g := by ext a : 1; simp
+
+/-- The degreewise chain group functor `SCF R ⋙ eval p` is naturally isomorphic to
+`singularSimplexFunctor p ⋙ coprodFreeFunctor`.
+
+Both send `X` to `∐ (fun _ : SingularSimplex X p => R)` and push forward simplices
+along continuous maps, but are constructed through different code paths
+(`singularChainComplexFunctor` vs direct `Sigma.desc`/`Sigma.ι`). -/
+noncomputable def chainGroupIsoCoprodFree (p : ℕ) :
+    SCF R ⋙ HomologicalComplex.eval C (ComplexShape.down ℕ) p ≅
+      singularSimplexFunctor p ⋙ coprodFreeFunctor (R := R) :=
+  NatIso.ofComponents
+    (fun X => Iso.refl _)
+    (fun {X Y} f => by sorry)
+
 /-- The coprojection (basis inclusion) for a singular simplex: given a singular
 n-simplex `s` in `X`, produce the corresponding "basis element" morphism
 `R ⟶ C_n(X; R)` via the coproduct structure of the chain group.
