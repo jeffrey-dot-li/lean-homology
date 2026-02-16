@@ -56,6 +56,21 @@ abbrev mSingChain (X : TopCat.{u}) : ChainComplex (ModuleCat.{u} R) ℕ :=
 
 variable {R}
 
+/-- The coprojection (basis inclusion) for a singular simplex, specialized to `ModuleCat R`. -/
+abbrev mι {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
+    Rmod R ⟶ (mSingChain R X).X n :=
+  simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) s
+
+/-- Extensionality for morphisms out of a tensor of chain groups: two morphisms
+`f g : C_p(X) ⊗ C_q(Y) ⟶ M` are equal if they agree when precomposed with
+`mι s ⊗ₘ mι t` for all singular simplices `s` and `t`. -/
+lemma mι_tensor_ext {X Y : TopCat.{u}} {p q : ℕ} {M : ModuleCat.{u} R}
+    {f g : (mSingChain R X).X p ⊗ (mSingChain R Y).X q ⟶ M}
+    (h : ∀ (s : SingularSimplex X p) (t : SingularSimplex Y q),
+      (mι s ⊗ₘ mι t) ≫ f = (mι s ⊗ₘ mι t) ≫ g) :
+    f = g := by
+  sorry
+
 /-! ### Bridge between coproduct-based and Finsupp-based free modules -/
 
 
@@ -301,6 +316,50 @@ noncomputable abbrev crossProduct {X Y : TopCat.{u}} (p q : ℕ) :
   (crossProductNat (R := R) p q).app (X, Y)
 
 
+@[simp] lemma mι_tensor_comp_crossProduct {X Y : TopCat.{u}} {p q : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    (mι s ⊗ₘ mι t) ≫ crossProduct p q =
+    (λ_ (Rmod R)).hom ≫ simplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) s t := by
+  sorry
+
+/-- On identity simplices, `simplexCrossProduct` reduces to `universalSimplexCrossProduct`. -/
+@[simp] lemma simplexCrossProduct_id (p q : ℕ) :
+    simplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) ⟪𝟙 Δ[p]⟫ₛ ⟪𝟙 Δ[q]⟫ₛ =
+    universalSimplexCrossProduct p q := by
+  simp only [simplexCrossProduct, SingularSimplex.ofΔ_down]
+  erw [prod.map_id_id, CategoryTheory.Functor.map_id, Category.comp_id]
+
+/-- **Element-level Leibniz rule**: The cross product is compatible
+with the boundary operators, stated for the universal simplices.
+```
+  ∂(s × t) = (∂s) × t + (-1)^{p+1} · s × (∂t)
+```
+Stated with shifted indices `(p+1, q+1)` to avoid natural number subtraction. -/
+theorem simplexCrossProduct_leibniz (p q : ℕ) :
+    (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
+      crossProduct (p + 1) (q + 1) ≫
+      (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
+      (((mSingChain R Δ[p + 1]).d (p + 1) p ⊗ₘ
+          𝟙 ((mSingChain R Δ[q + 1]).X (q + 1))) ≫
+        crossProduct p (q + 1)) +
+    ((-1 : ℤ) ^ (p + 1)) •
+      ((mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
+        (𝟙 ((mSingChain R Δ[p + 1]).X (p + 1)) ⊗ₘ
+            (mSingChain R Δ[q + 1]).d (q + 1) q) ≫
+          crossProduct (p + 1) q ≫
+          eqToHom (congrArg (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).X (by omega))) := by
+  rw [← Category.assoc, mι_tensor_comp_crossProduct, Category.assoc]
+  simp only [simplexCrossProduct_id]
+  conv_rhs =>
+    lhs -- first summand
+    rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  conv_rhs =>
+    rhs; rhs -- second summand inside smul
+    rw [← Category.assoc (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ),
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  sorry
+
 /-- **Leibniz rule** (chain map condition): The cross product is compatible
 with the boundary operators.
 ```
@@ -312,11 +371,11 @@ theorem crossProduct_leibniz {X Y : TopCat.{u}} (p q : ℕ) :
       (mSingChain R (X ⨯ Y)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
     (((mSingChain R X).d (p + 1) p ⊗ₘ
         𝟙 ((mSingChain R Y).X (q + 1))) ≫
-      crossProduct (R := R) (X := X) (Y := Y) p (q + 1)) +
+      crossProduct p (q + 1)) +
     ((-1 : ℤ) ^ (p + 1)) •
       ((𝟙 ((mSingChain R X).X (p + 1)) ⊗ₘ
           (mSingChain R Y).d (q + 1) q) ≫
-        crossProduct (R := R) (X := X) (Y := Y) (p + 1) q ≫
+        crossProduct (p + 1) q ≫
         eqToHom (congrArg (mSingChain R (X ⨯ Y)).X (by omega))) := by
   sorry
 
@@ -328,11 +387,8 @@ In `ModuleCat R`, the multiplication `R ⊗ R → R` is the left unitor
 (since `Rmod R = 𝟙_ (ModuleCat R)`). -/
 theorem crossProduct_normalized {X Y : TopCat.{u}}
     (x : SingularSimplex X 0) (y : SingularSimplex Y 0) :
-    (simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) x ⊗ₘ
-      simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) y) ≫
-      crossProduct (R := R) (X := X) (Y := Y) 0 0 =
-    (λ_ (Rmod R)).hom ≫
-      simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) (prodSimplex x y) := by
+    (mι x ⊗ₘ mι y) ≫ crossProduct 0 0 =
+    (λ_ (Rmod R)).hom ≫ mι (prodSimplex x y) := by
   sorry
 
 /-! ## Chain homotopy from the cross product -/
