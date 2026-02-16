@@ -92,6 +92,8 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 - Show goal state after every edit.
 - No autonomous Mathlib searching unless asked.
 - Revert on failure — don't try alternatives unless asked.
+- Always verify with `lean_diagnostic_messages` and `lean_goal` before responding. Never assume a tactic compiled.
+- Flag structural issues before editing — if the step needs changes elsewhere (definition update, missing lemma), don't deliberate for hundreds of tokens. A short clarifying question is always cheaper.
 
 ### Mode 5: Refactor (`/refactor`)
 
