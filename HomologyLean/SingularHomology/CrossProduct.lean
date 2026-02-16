@@ -28,9 +28,10 @@ import Mathlib.CategoryTheory.Limits.Shapes.BinaryProducts
 import Mathlib.Algebra.Category.ModuleCat.Adjunctions
 import Mathlib.CategoryTheory.Whiskering
 import Mathlib.CategoryTheory.Adjunction.Whiskering
+import Mathlib.CategoryTheory.Limits.Shapes.FunctorToTypes
 
 
-noncomputable section
+section
 
 open CategoryTheory CategoryTheory.Limits AlgebraicTopology unitInterval
 open scoped MonoidalCategory
@@ -41,32 +42,13 @@ namespace HomologyLean.SingularHomology
 
 variable (R : Type u) [CommRing R]
 
-/-! ### Abbreviations for ModuleCat R -/
+noncomputable section ModuleCatLemmas
+
+/-! ### Pure `ModuleCat R` facts (no singular chains / simplices) -/
 
 /-- The coefficient module: `R` viewed as an `R`-module.
 In `ModuleCat R`, this is the monoidal unit `𝟙_ (ModuleCat R)`. -/
 abbrev Rmod : ModuleCat.{u} R := ModuleCat.of R R
-
-/-- The singular chain functor with `R`-module coefficients. -/
-abbrev mSCF : TopCat.{u} ⥤ ChainComplex (ModuleCat.{u} R) ℕ :=
-  SCF (C := ModuleCat.{u} R) (Rmod R)
-
-/-- The singular chain complex of `X` with `R`-module coefficients. -/
-abbrev mSingChain (X : TopCat.{u}) : ChainComplex (ModuleCat.{u} R) ℕ :=
-  singChain (C := ModuleCat.{u} R) (R := Rmod R) X
-
-variable {R}
-
-/-- The coprojection (basis inclusion) for a singular simplex, specialized to `ModuleCat R`. -/
-abbrev mι {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
-    Rmod R ⟶ (mSingChain R X).X n :=
-  simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) s
-
-/-- Factoring a coprojection through the identity simplex: `mι s` equals
-`mι ⟪𝟙 Δ[n]⟫ₛ` composed with the chain map induced by `s.down`. -/
-lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
-    mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((mSCF R).map s.down).f n := by
-  sorry
 
 /-- Extensionality for morphisms out of a tensor of free `R`-modules: two morphisms
 `f g : (∐_A R) ⊗ (∐_B R) ⟶ M` are equal if they agree when precomposed with
@@ -80,7 +62,6 @@ lemma coprod_tensor_ext {A B : Type u} {M : ModuleCat.{u} R}
   sorry
 
 /-! ### Bridge between coproduct-based and Finsupp-based free modules -/
-
 
 /-- The canonical isomorphism `∐ (fun _ : A => R) ≅ Free(A)` in `ModuleCat R`,
 bridging the coproduct-based free module with the Finsupp-based one (`ModuleCat.free R`).
@@ -112,6 +93,31 @@ noncomputable def freeTensorProductIso (R : Type u) [CommRing R]
     ((ModuleCat.free R).obj A ⊗ (ModuleCat.free R).obj B) ≅
       (ModuleCat.free R).obj (A × B) :=
   LinearEquiv.toModuleIso (finsuppTensorFinsupp' R A B)
+
+end ModuleCatLemmas
+
+/-! ### Singular chains and simplices in `ModuleCat R` -/
+
+/-- The singular chain functor with `R`-module coefficients. -/
+noncomputable abbrev mSCF : TopCat.{u} ⥤ ChainComplex (ModuleCat.{u} R) ℕ :=
+  SCF (C := ModuleCat.{u} R) (Rmod R)
+
+/-- The singular chain complex of `X` with `R`-module coefficients. -/
+noncomputable abbrev mSingChain (X : TopCat.{u}) : ChainComplex (ModuleCat.{u} R) ℕ :=
+  singChain (C := ModuleCat.{u} R) (R := Rmod R) X
+
+variable {R}
+
+/-- The coprojection (basis inclusion) for a singular simplex, specialized to `ModuleCat R`. -/
+noncomputable abbrev mι {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
+    Rmod R ⟶ (mSingChain R X).X n :=
+  simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) s
+
+/-- Factoring a coprojection through the identity simplex: `mι s` equals
+`mι ⟪𝟙 Δ[n]⟫ₛ` composed with the chain map induced by `s.down`. -/
+lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
+    mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((mSCF R).map s.down).f n := by
+  sorry
 
 /-! ### Naturality of `simplexCrossProduct` (specialized to `ModuleCat R`) -/
 
@@ -165,22 +171,9 @@ noncomputable def chainGroupIsoFree (p : ℕ) :
 
 /-- Functor `(TopCat × TopCat) ⥤ Type` sending `(X,Y)` to pairs of simplices
 `SingularSimplex X p × SingularSimplex Y q`. -/
-noncomputable def singularSimplexPairFunctor (p q : ℕ) : (TopCat.{u} × TopCat.{u}) ⥤ Type u where
-  obj XY := (SingularSimplex XY.1 p) × (SingularSimplex XY.2 q)
-  map {XY XY'} fg st :=
-    (⟪st.1.down ≫ fg.1⟫ₛ, ⟪st.2.down ≫ fg.2⟫ₛ)
-  map_id XY := by
-    funext st
-    cases st with
-    | mk s t =>
-      cases s; cases t
-      rfl
-  map_comp {X Y Z} f g := by
-    funext st
-    cases st with
-    | mk s t =>
-      cases s; cases t
-      simp [Category.assoc]
+noncomputable def singularSimplexPairFunctor (p q : ℕ) : (TopCat.{u} × TopCat.{u}) ⥤ Type u :=
+  (singularSimplexFunctor p).prod (singularSimplexFunctor q) ⋙
+    Functor.uncurry.obj Types.binaryProductFunctor
 
 /-- Target functor for the chain-level cross product (degreewise): `(X,Y) ↦ C_n(X×Y)`.
 
@@ -256,8 +249,8 @@ private noncomputable def natIsoProd'
 /-- The intermediate functor `(X,Y) ↦ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`. -/
 private noncomputable abbrev freeTensorPairFunctor (p q : ℕ) :
     (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
-  (CategoryTheory.Prod.fst _ _ ⋙ singularSimplexFunctor p ⋙ ModuleCat.free R).prod'
-    (CategoryTheory.Prod.snd _ _ ⋙ singularSimplexFunctor q ⋙ ModuleCat.free R) ⋙
+  (singularSimplexFunctor p).prod (singularSimplexFunctor q) ⋙
+    (ModuleCat.free R).prod (ModuleCat.free R) ⋙
     MonoidalCategory.tensor (C := ModuleCat.{u} R)
 
 /-- Step 1: Apply `chainGroupIsoFree` on each tensor factor.
@@ -272,14 +265,20 @@ private noncomputable def tensorChainGroupIsoFree (p q : ℕ) :
     (MonoidalCategory.tensor (C := ModuleCat.{u} R))
 
 /-- Step 2: `Free(A) ⊗ Free(B) ≅ Free(A × B)` as a natural isomorphism.
-Naturality of `finsuppTensorFinsupp'` in the type arguments. -/
+From the monoidal structure of `ModuleCat.free R`, via `Functor.Monoidal.μNatIso`. -/
 private noncomputable def freeTensorProductNatIso (p q : ℕ) :
     freeTensorPairFunctor (R := R) p q ≅ freePairFunctor (R := R) p q :=
-  NatIso.ofComponents
-    (fun XY => freeTensorProductIso R (SingularSimplex XY.1 p) (SingularSimplex XY.2 q))
-    (fun {XY XY'} fg => by
-      ext
-      sorry)
+  Functor.associator
+    ((singularSimplexFunctor p).prod (singularSimplexFunctor q))
+    ((ModuleCat.free R).prod (ModuleCat.free R))
+    (MonoidalCategory.tensor (C := ModuleCat.{u} R)) ≪≫
+  Functor.isoWhiskerLeft
+    ((singularSimplexFunctor p).prod (singularSimplexFunctor q))
+    (Functor.Monoidal.μNatIso (ModuleCat.free R)) ≪≫
+  (Functor.associator
+    ((singularSimplexFunctor p).prod (singularSimplexFunctor q))
+    (Functor.uncurry.obj Types.binaryProductFunctor)
+    (ModuleCat.free R)).symm
 
 /-- Natural isomorphism `C_p(X) ⊗ C_q(Y) ≅ Free(SingularSimplex X p × SingularSimplex Y q)`,
 bridging the coproduct-based chain groups with the Finsupp-based free module.
@@ -589,7 +588,7 @@ theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{u}} {f g : X ⟶ Y}
 
 **Proof sketch**: `H_n(f) ∘ H_n(g) = H_n(g ≫ f) = H_n(𝟙 Y) = 𝟙` by
 homotopy invariance and functoriality, and similarly for the other composite. -/
-def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{u}}
+noncomputable def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{u}}
     (f : X ⟶ Y) (g : Y ⟶ X)
     (hfg : ContinuousMap.Homotopy (f ≫ g : X ⟶ X).hom' (𝟙 X : X ⟶ X).hom')
     (hgf : ContinuousMap.Homotopy (g ≫ f : Y ⟶ Y).hom' (𝟙 Y : Y ⟶ Y).hom')
@@ -606,3 +605,5 @@ def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{u}}
         singularHomology_map_eq_of_homotopy (R := R) hgf n]; simp
 
 end HomologyLean.SingularHomology
+
+end
