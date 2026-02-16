@@ -218,33 +218,15 @@ noncomputable def simplexCrossProductNat (p q : ℕ) :
 /-- Source functor for the chain-level cross product (degreewise): `(X,Y) ↦ C_p(X) ⊗ C_q(Y)`. -/
 noncomputable abbrev crossProductSrcFunctor (p q : ℕ) :
     (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
-  let evalP : ChainComplex (ModuleCat.{u} R) ℕ ⥤ ModuleCat.{u} R :=
-    HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) p
-  let evalQ : ChainComplex (ModuleCat.{u} R) ℕ ⥤ ModuleCat.{u} R :=
-    HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) q
-  let F : (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
-    CategoryTheory.Prod.fst _ _ ⋙ mSCF R ⋙ evalP
-  let G : (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
-    CategoryTheory.Prod.snd _ _ ⋙ mSCF R ⋙ evalQ
-  let tensorFG : (ModuleCat.{u} R × ModuleCat.{u} R) ⥤ ModuleCat.{u} R :=
-    (MonoidalCategory.tensor (C := ModuleCat.{u} R))
-  (F.prod' G) ⋙ tensorFG
+  (mSCF R ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) p).prod
+    (mSCF R ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) q) ⋙
+    MonoidalCategory.tensor (C := ModuleCat.{u} R)
 
 /-- Intermediate functor: `(X,Y) ↦ Free(SingularSimplex X p × SingularSimplex Y q)`,
 i.e., the free `R`-module on simplex pairs, implemented via `ModuleCat.free R`. -/
 noncomputable abbrev freePairFunctor (p q : ℕ) : (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
   singularSimplexPairFunctor (p := p) (q := q) ⋙ ModuleCat.free R
 
-/-- Combine two NatIsos into one for `Functor.prod'`. -/
-private noncomputable def natIsoProd'
-    {J : Type*} [Category J]
-    {D E : Type*} [Category D] [Category E]
-    {F F' : J ⥤ D} {G G' : J ⥤ E}
-    (α : F ≅ F') (β : G ≅ G') : F.prod' G ≅ F'.prod' G' where
-  hom := NatTrans.prod' α.hom β.hom
-  inv := NatTrans.prod' α.inv β.inv
-  hom_inv_id := by ext X <;> simp [NatTrans.prod', Functor.prod']
-  inv_hom_id := by ext X <;> simp [NatTrans.prod', Functor.prod']
 
 /-- The intermediate functor `(X,Y) ↦ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`. -/
 private noncomputable abbrev freeTensorPairFunctor (p q : ℕ) :
@@ -254,14 +236,11 @@ private noncomputable abbrev freeTensorPairFunctor (p q : ℕ) :
     MonoidalCategory.tensor (C := ModuleCat.{u} R)
 
 /-- Step 1: Apply `chainGroupIsoFree` on each tensor factor.
-`C_p(X) ⊗ C_q(Y) ≅ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`.
-Naturality is automatic from `chainGroupIsoFree`, whiskering, and `prod'`. -/
+`C_p(X) ⊗ C_q(Y) ≅ Free(SingularSimplex X p) ⊗ Free(SingularSimplex Y q)`. -/
 private noncomputable def tensorChainGroupIsoFree (p q : ℕ) :
     crossProductSrcFunctor (R := R) p q ≅ freeTensorPairFunctor (R := R) p q :=
   Functor.isoWhiskerRight
-    (natIsoProd'
-      (Functor.isoWhiskerLeft (CategoryTheory.Prod.fst _ _) (chainGroupIsoFree (R := R) p))
-      (Functor.isoWhiskerLeft (CategoryTheory.Prod.snd _ _) (chainGroupIsoFree (R := R) q)))
+    (NatIso.prod (chainGroupIsoFree (R := R) p) (chainGroupIsoFree (R := R) q))
     (MonoidalCategory.tensor (C := ModuleCat.{u} R))
 
 /-- Step 2: `Free(A) ⊗ Free(B) ≅ Free(A × B)` as a natural isomorphism.
