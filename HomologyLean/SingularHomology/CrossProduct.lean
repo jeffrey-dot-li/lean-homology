@@ -354,6 +354,17 @@ lemma crossProductNat_unit (p q : ℕ) (X : TopCat.{u}) (Y : TopCat.{u}) :
 
 
 
+/-- The pure tensor `ι_s(1) ⊗ ι_t(1)` in `C_p(X) ⊗ C_q(Y)`, when mapped through
+`tensorCoprodNatIso` to `Free(SingularSimplex X p × SingularSimplex Y q)`,
+equals the basis element `freeMk (s, t) = η(s, t)`. -/
+lemma mι_tensor_tensorCoprodNatIso {X Y : TopCat.{u}} {p q : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    (ModuleCat.Hom.hom ((tensorCoprodNatIso (R := R) p q).hom.app (X, Y)))
+      ((ModuleCat.Hom.hom (mι s ⊗ₘ mι t))
+        ((ModuleCat.Hom.hom (λ_ (Rmod R)).inv) (1 : R))) =
+    (ModuleCat.adj R).unit.app (SingularSimplex X p × SingularSimplex Y q) (s, t) := by
+  sorry
+
 /-- Applying `crossProduct` to a pure tensor of basis elements gives `simplexCrossProduct`.
 ```
   R ⊗ R ──── mι s ⊗ₘ mι t ────▶ Cₚ(X) ⊗ Cᵧ(Y)
@@ -377,8 +388,21 @@ It then suffices to show the bottom-right triangle commutes:
     by rw [← Category.assoc, Iso.hom_inv_id, Category.id_comp]]
   rw [Category.assoc]
   congr 1
-  -- Step 2: Bottom-right triangle
-  sorry
+  -- Step 2: Bottom-right triangle — suffices to compare underlying linear maps
+  apply ModuleCat.hom_ext
+  -- Both sides are linear maps R →ₗ[R] C_{p+q}(X×Y); suffices to check at 1 : R
+  ext
+  -- LHS: ((λ_ R).inv ≫ (mι s ⊗ₘ mι t) ≫ crossProduct)(x)
+  -- Unfold crossProduct = tensorCoprodNatIso.hom ≫ liftedCrossProductNat
+  simp only [crossProduct, crossProductNat, NatTrans.comp_app,
+    ModuleCat.hom_comp, LinearMap.coe_comp, Function.comp_apply]
+  -- After tensorCoprodNatIso.hom, use the bridge lemma + crossProductNat_unit
+  erw [mι_tensor_tensorCoprodNatIso (R := R) s t]
+  -- Now LHS is U(liftedCrossProductNat)(η(s,t)); use crossProductNat_unit
+  have h := congrFun (crossProductNat_unit (R := R) p q X Y) (s, t)
+  simp only [crossProduct, crossProductNat, NatTrans.comp_app,
+    Iso.inv_hom_id_app_assoc, types_comp_apply] at h
+  exact h
 
 /-- On identity simplices, `simplexCrossProduct` reduces to `universalSimplexCrossProduct`. -/
 @[simp] lemma simplexCrossProduct_id (p q : ℕ) :
