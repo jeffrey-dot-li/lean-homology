@@ -192,6 +192,10 @@ lake clean
 
 The Lean LSP MCP server provides powerful tools for interactive theorem proving. Use them in this order:
 
+### 0. First step in any Lean task: verify Lean MCP is available (MANDATORY)
+
+First, make a trivial Lean MCP call (e.g. `lean_diagnostic_messages` on the target file) to confirm `lean-lsp` is reachable. If it fails, **say so explicitly** and suggest checking `.mcp.json` / restarting MCP or the editor; **do not** fall back to `lake env lean`/`lake build` unless the user explicitly asks.
+
 ### 1. Understanding Proof States
 
 **`lean_goal`**: View proof goals at a specific position
