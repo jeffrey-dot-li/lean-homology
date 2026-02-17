@@ -580,7 +580,63 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
     (x : SingularSimplex X 0) (y : SingularSimplex Y 0) :
     (mι x ⊗ₘ mι y) ≫ crossProduct 0 0 =
     (λ_ (Rmod R)).hom ≫ mι (prodSimplex x y) := by
-  sorry
+  rw [mι_tensor_comp_crossProduct]
+  congr 1
+  simp only [simplexCrossProduct, universalSimplexCrossProduct, mι, simplexCoprojection, prodSimplex]
+  -- All elements of Fin 1 are equal to 0
+  have huniq : ∀ (μ : Shuffle 0 0), μ.1 = ⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩ := by
+    intro μ; ext x
+    · simp [Fin.eq_zero (μ.1 x).1]
+    · simp [Fin.eq_zero (μ.1 x).2]
+  -- All (0,0)-shuffles are equal
+  have hsub : Subsingleton (Shuffle 0 0) :=
+    ⟨fun μ ν => Subtype.ext (by rw [huniq μ, huniq ν])⟩
+  -- Pick the canonical shuffle
+  let μ₀ : Shuffle 0 0 := ⟨⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩,
+    fun _ _ _ => Fin.ext (by simp [Fin.eq_zero])⟩
+  rw [Fintype.sum_subsingleton _ μ₀]
+  -- sign of μ₀ is 1
+  have hsign : μ₀.sign = 1 := by
+    simp [Shuffle.sign, Shuffle.invCount]
+  rw [hsign, one_smul]
+  -- Need: shuffleSimplex ⟪𝟙⟫ ⟪𝟙⟫ μ₀ pushed forward = prodSimplex x y
+  -- First, understand what ι ≫ f_* does on simplices
+  -- ι(s) ≫ f_* = ι(f(s)) since chain maps act by reindexing on coproduct components
+  simp only [SCF, singChain]
+  erw [colimit.ι_desc]
+  simp only [Cofan.mk_ι_app, Category.id_comp]
+  congr 1
+  simp [yoneda]
+
+  -- Use mι_factor to express as ι(𝟙) ≫ chain map, then use functoriality
+  -- Actually, let's just show the two singular simplices are equal directly
+  -- by showing they agree as morphisms Δ[0] ⟶ X ⨯ Y
+  -- LHS: (singularSimplexFunctor.map (prod.map x.down y.down))(shuffleSimplex ⟪𝟙⟫ ⟪𝟙⟫ μ₀)
+  -- RHS: {down := prod.lift x.down y.down}
+  -- shuffleSimplex ⟪𝟙⟫ ⟪𝟙⟫ μ₀ has .down = shuffleStdSimplexMap μ₀ ≫ prod.map 𝟙 𝟙
+  -- singularSimplexFunctor.map f composes .down with f
+  -- So LHS.down = (shuffleStdSimplexMap μ₀ ≫ prod.map 𝟙 𝟙) ≫ prod.map x.down y.down
+  --            = shuffleStdSimplexMap μ₀ ≫ prod.map x.down y.down
+  --            = prod.lift (toTop.map(fst ∘ μ₀) ≫ x.down) (toTop.map(snd ∘ μ₀) ≫ y.down)
+  -- Both toTop.map components are toTop.map(𝟙) = 𝟙 since [0]→[0] is unique.
+  -- Use a helper: any SimplexCategory endomorphism of [0] is 𝟙
+  -- Direct approach: unfold shuffleStdSimplexMap in shuffleSimplex, show it equals prod.lift 𝟙 𝟙
+  have hshuf : shuffleStdSimplexMap (p := 0) (q := 0) μ₀ = prod.lift (𝟙 _) (𝟙 _) := by
+    simp only [shuffleStdSimplexMap]
+    congr 1 <;> {
+      rw [SimplexCategory.hom_zero_zero
+        (SimplexCategory.Hom.mk _), SimplexCategory.toTop.map_id]
+    }
+  -- Reduce to .down equality
+  have hext : ∀ (a b : SingularSimplex (X ⨯ Y) (0 + 0)), a.down = b.down → a = b := by
+    intro a b h; cases a; cases b; congr
+  apply hext
+  -- Unfold LHS to expose the .down composition
+  simp only [shuffleSimplex, SingularSimplex.ofΔ_down]
+  dsimp [TopCat.toSSet, Presheaf.restrictedULiftYoneda]
+  simp
+  -- Now goal: (shuffleStdSimplexMap μ₀ ≫ prod.map 𝟙 𝟙 ≫ prod.map x.down y.down) = prod.lift x.down y.down
+  rw [hshuf, prod.map_id_id, Category.comp_id, prod.lift_map, Category.id_comp, Category.id_comp]
 
 /-! ## Chain homotopy from the cross product -/
 

@@ -168,8 +168,10 @@ For now we introduce it as a placeholder; we will implement it next.
 /-- The map of standard simplices associated to a shuffle:
 `Δ[p+q] ⟶ Δ[p] × Δ[q]`. -/
 def shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
-    Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) := by
-  sorry
+    Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) :=
+  prod.lift
+    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.fst.comp μ.1)))
+    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.snd.comp μ.1)))
 
 
 
