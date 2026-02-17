@@ -46,6 +46,13 @@ Record the declaration name, its type signature, and when/why it's useful.
 - `Discrete.natIsoFunctor : K ≅ Discrete.functor (K.obj ∘ Discrete.mk)` — canonical iso for any `K : Discrete ι ⥤ C`.
 - `preservesColimit_of_iso_diagram F Discrete.natIsoFunctor.symm` — transfer `PreservesColimit (Discrete.functor f) F` to `PreservesColimit K F`.
 
+## Monoidal functor / tensor product
+- `MonoidalCategory.tensorHom_comp_tensorHom f₁ f₂ g₁ g₂` — `(f₁ ⊗ₘ f₂) ≫ (g₁ ⊗ₘ g₂) = (f₁ ≫ g₁) ⊗ₘ (f₂ ≫ g₂)`. In `MonoidalCategory` namespace (need `open MonoidalCategory` or qualify).
+- `Functor.Monoidal.μNatIso F` — natural iso `(F.prod F ⋙ tensor D) ≅ (tensor C ⋙ F)` for monoidal functor `F`. Naturality gives `(F.map f ⊗ₘ F.map g) ≫ μ = μ ≫ F.map (tensor.map (f, g))`.
+- `Functor.Monoidal.μNatIso_hom_app F (X, Y)` — `μNatIso.hom.app (X, Y) = μ X Y`.
+- `ModuleCat.instMonoidalFree R` — `(ModuleCat.free R).Monoidal` instance. Makes `μ` available.
+- `freeTensorProductIso.hom = Functor.LaxMonoidal.μ (ModuleCat.free R) A B` by `rfl`.
+
 ## Sigma type injection
 - `Sigma.mk.inj_iff.mp h` — from `⟨i, x⟩ = ⟨j, y⟩` get `.1 : i = j` and `.2 : HEq x y`.
 - `eq_of_heq` — convert `HEq` to `Eq` (after indices match).

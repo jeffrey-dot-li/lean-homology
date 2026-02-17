@@ -63,6 +63,36 @@ simpa using this  -- gives ⟨j.as, y.down p⟩ = ⟨i, t p⟩
 -- Then: Sigma.mk.inj_iff.mp for fst/snd, eq_of_heq for Eq from HEq
 ```
 
+## NatIso.ofComponents naturality for tensor/free-module isos
+
+When proving naturality for `NatIso.ofComponents` whose components are compositions like
+`(α.app X ⊗ₘ β.app Y) ≫ freeTensorProductIso.hom`:
+
+1. Unfold functor maps: `dsimp only [myFunctor, Functor.comp_map, Functor.prod_map]`
+2. Convert to tensor notation: `simp only [MonoidalCategory.tensor_map]`
+3. Combine tensors: `rw [← Category.assoc ..., MonoidalCategory.tensorHom_comp_tensorHom]`
+4. Apply component naturality: `erw [nat_iso.hom.naturality f, ...]`
+   - Use `erw` (not `rw`) when `.hom.app X` vs `.app X).hom` causes syntactic mismatch
+5. Split tensor back: `rw [← MonoidalCategory.tensorHom_comp_tensorHom, Category.assoc, ...]`
+6. Use `congr 1` to reduce to the `freeTensorProductIso` naturality piece
+
+Key lemma: `MonoidalCategory.tensorHom_comp_tensorHom` (in `MonoidalCategory` namespace):
+`(f₁ ⊗ₘ f₂) ≫ (g₁ ⊗ₘ g₂) = (f₁ ≫ g₁) ⊗ₘ (f₂ ≫ g₂)`
+
+## freeTensorProductIso naturality via monoidal functor
+
+`freeTensorProductIso.hom` is definitionally equal to `Functor.LaxMonoidal.μ (ModuleCat.free R)`.
+So naturality comes from:
+```lean
+have := (Functor.Monoidal.μNatIso (ModuleCat.free R)).hom.naturality
+  (show (A, B) ⟶ (A', B') from (f, g))
+simp only [Functor.Monoidal.μNatIso_hom_app] at this
+convert this using 1  -- handles definitional mismatches in tensor/Prod.map
+```
+
+The `show ... from ...` annotation is needed because `(f, g)` must be typed as a
+morphism in the product category `Type u × Type u`, not just a bare pair.
+
 ## Covering Maps
 
 ```lean
