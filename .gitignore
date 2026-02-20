@@ -11,3 +11,4 @@ devenv.local.yaml
 # pre-commit
 .pre-commit-config.yaml
 *.code-workspace
+.aristotle_api_key
