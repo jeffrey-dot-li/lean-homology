@@ -1,6 +1,23 @@
+/-
+This file was edited by Aristotle (https://aristotle.harmonic.fun).
+
+Lean version: leanprover/lean4:v4.24.0
+Mathlib version: f897ebcf72cd16f89ab4577d0c826cd14afaafc7
+This project request had uuid: 50b54e27-aba5-4286-9db7-cdfc0d8f251f
+
+To cite Aristotle, tag @Aristotle-Harmonic on GitHub PRs/issues, and add as co-author to commits:
+Co-authored-by: Aristotle (Harmonic) <aristotle-harmonic@harmonic.fun>
+
+The following was proved by Aristotle:
+
+- lemma invCount_add_invCount_swap {p q : ℕ} (u : Shuffle p q) :
+    u.invCount + (u.swap).invCount = p * q
+-/
+
 import Mathlib.Tactic
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Order.Fin.Basic
+
 
 noncomputable section
 
@@ -195,86 +212,85 @@ private lemma nat_sum_telescope : ∀ (n : ℕ) (g : ℕ → ℕ), (∀ i, i < n
       | succ m ihm => exact le_trans (ihm (Nat.le_of_succ_le hj)) (hg m (by omega))
     omega
 
-/-- Total inversions of a shuffle and its swap equal `p * q`. -/
+/- Total inversions of a shuffle and its swap equal `p * q`. -/
+noncomputable section AristotleLemmas
+
+/-
+A shuffle path starts at (0,0).
+-/
+open HomologyLean.SingularHomology
+
+lemma Shuffle.apply_zero {p q : ℕ} (u : Shuffle p q) : u.1 0 = (0, 0) := by
+  -- Since u is injective and monotone, it must map the least element 0 to itself.
+  have h_least : ∀ x : Fin (p + q + 1), (u.1 x).1.val + (u.1 x).2.val = x.val := by
+    -- Apply the lemma that states the coordinate sum equals the position for any shuffle.
+    apply coordSum_eq;
+  specialize h_least 0; aesop;
+
+/-
+A shuffle path ends at (p,q).
+-/
+open HomologyLean.SingularHomology
+
+lemma Shuffle.apply_last {p q : ℕ} (u : Shuffle p q) : u.1 (Fin.last (p + q)) = (Fin.last p, Fin.last q) := by
+  have := @coordSum_eq p q u ( Fin.last ( p + q ) );
+  exact Prod.ext ( Fin.ext ( by linarith! [ Fin.is_lt ( u.1 ( Fin.last ( p + q ) ) |>.1 ), Fin.is_lt ( u.1 ( Fin.last ( p + q ) ) |>.2 ) ] ) ) ( Fin.ext ( by linarith! [ Fin.is_lt ( u.1 ( Fin.last ( p + q ) ) |>.1 ), Fin.is_lt ( u.1 ( Fin.last ( p + q ) ) |>.2 ) ] ) )
+
+/-
+Express invCount as a sum of y * dx.
+-/
+open HomologyLean.SingularHomology
+
+lemma Shuffle.invCount_eq_sum_mul_diff {p q : ℕ} (u : Shuffle p q) :
+    u.invCount = ∑ r : Fin (p + q), (u.1 r.castSucc).2.val * ((u.1 r.succ).1.val - (u.1 r.castSucc).1.val) := by
+      refine' Finset.sum_congr rfl fun i hi => _;
+      have := shuffle_step u i;
+      grind
+
+/-
+Express swap.invCount as a sum of x * dy.
+-/
+open HomologyLean.SingularHomology
+
+lemma Shuffle.swap_invCount_eq_sum_mul_diff {p q : ℕ} (u : Shuffle p q) :
+    (u.swap).invCount = ∑ r : Fin (p + q), (u.1 r.castSucc).1.val * ((u.1 r.succ).2.val - (u.1 r.castSucc).2.val) := by
+      rw [ invCount_swap_eq, Finset.sum_congr rfl ];
+      intro x hx; split_ifs <;> simp_all +decide [ Nat.sub_eq_iff_eq_add ] ;
+      have := shuffle_step u x;
+      grind
+
+/-
+The change in the product of coordinates equals y*dx + x*dy.
+-/
+open HomologyLean.SingularHomology
+
+lemma Shuffle.xy_diff_eq_sum_mixed {p q : ℕ} (u : Shuffle p q) (r : Fin (p + q)) :
+    (u.1 r.succ).1.val * (u.1 r.succ).2.val - (u.1 r.castSucc).1.val * (u.1 r.castSucc).2.val =
+    (u.1 r.castSucc).2.val * ((u.1 r.succ).1.val - (u.1 r.castSucc).1.val) +
+    (u.1 r.castSucc).1.val * ((u.1 r.succ).2.val - (u.1 r.castSucc).2.val) := by
+      rw [ Nat.mul_sub_left_distrib, Nat.mul_sub_left_distrib ];
+      cases shuffle_step u r <;> simp_all +decide [ mul_comm ]
+
+end AristotleLemmas
+
 lemma invCount_add_invCount_swap {p q : ℕ} (u : Shuffle p q) :
     u.invCount + (u.swap).invCount = p * q := by
-  rw [invCount_swap_eq]
-  simp only [invCount, ← Finset.sum_add_distrib]
-  -- Each combined term = fst_{r+1} * snd_{r+1} - fst_r * snd_r by step dichotomy
-  -- First prove each term matches, staying at the .val level throughout
-  have hterm : ∀ r : Fin (p + q),
-      (if (u.1 r.castSucc).1 < (u.1 r.succ).1 then (u.1 r.castSucc).2.val else 0) +
-      (if (u.1 r.castSucc).2 < (u.1 r.succ).2 then (u.1 r.castSucc).1.val else 0)
-      = (u.1 r.succ).1.val * (u.1 r.succ).2.val -
-        (u.1 r.castSucc).1.val * (u.1 r.castSucc).2.val := by
-    intro r
-    rcases shuffle_step u r with ⟨h1, h2⟩ | ⟨h1, h2⟩
-    · -- fst increases by 1, snd stays
-      have hfst : (u.1 r.castSucc).1 < (u.1 r.succ).1 := by
-        show (u.1 r.castSucc).1.val < (u.1 r.succ).1.val; omega
-      have hsnd : ¬ ((u.1 r.castSucc).2 < (u.1 r.succ).2) := by
-        show ¬ ((u.1 r.castSucc).2.val < (u.1 r.succ).2.val); omega
-      rw [if_pos hfst, if_neg hsnd, add_zero]
-      suffices h : (u.1 r.castSucc).1.val * (u.1 r.castSucc).2.val + (u.1 r.castSucc).2.val =
-                   (u.1 r.succ).1.val * (u.1 r.succ).2.val by omega
-      nlinarith [Nat.succ_mul (u.1 r.castSucc).1.val (u.1 r.castSucc).2.val]
-    · -- snd increases by 1, fst stays
-      have hfst : ¬ ((u.1 r.castSucc).1 < (u.1 r.succ).1) := by
-        show ¬ ((u.1 r.castSucc).1.val < (u.1 r.succ).1.val); omega
-      have hsnd : (u.1 r.castSucc).2 < (u.1 r.succ).2 := by
-        show (u.1 r.castSucc).2.val < (u.1 r.succ).2.val; omega
-      rw [if_neg hfst, if_pos hsnd, zero_add]
-      suffices h : (u.1 r.castSucc).1.val * (u.1 r.castSucc).2.val + (u.1 r.castSucc).1.val =
-                   (u.1 r.succ).1.val * (u.1 r.succ).2.val by omega
-      nlinarith [Nat.mul_succ (u.1 r.castSucc).1.val (u.1 r.castSucc).2.val]
-  simp_rw [hterm]
-  -- Define g for telescoping
-  set g : ℕ → ℕ := fun k =>
-    if hk : k < p + q + 1 then (u.1 ⟨k, hk⟩).1.val * (u.1 ⟨k, hk⟩).2.val else 0
-  -- Show the sum matches g's differences
-  have hsum_eq : ∀ r : Fin (p + q),
-      (u.1 r.succ).1.val * (u.1 r.succ).2.val -
-      (u.1 r.castSucc).1.val * (u.1 r.castSucc).2.val = g (r.val + 1) - g r.val := by
-    intro r
-    simp only [g, show r.val < p + q + 1 from by omega, show r.val + 1 < p + q + 1 from by omega,
-               dif_pos]
-    congr 1 <;> (congr 1 <;> congr 1 <;> ext <;> simp)
-  simp_rw [hsum_eq]
-  -- g is monotone on the range
-  have hg_mono : ∀ i, i < p + q → g i ≤ g (i + 1) := by
-    intro i hi
-    simp only [g, show i < p + q + 1 from by omega, show i + 1 < p + q + 1 from by omega, dif_pos]
-    have hcs : (⟨i, by omega⟩ : Fin (p + q + 1)) = (⟨i, by omega⟩ : Fin (p + q)).castSucc := by
-      ext; simp
-    have hsu : (⟨i + 1, by omega⟩ : Fin (p + q + 1)) = (⟨i, by omega⟩ : Fin (p + q)).succ := by
-      ext; simp
-    rw [hcs, hsu]
-    rcases shuffle_step u ⟨i, by omega⟩ with ⟨h1, h2⟩ | ⟨h1, h2⟩
-    · nlinarith [Nat.succ_mul (u.1 (⟨i, by omega⟩ : Fin (p + q)).castSucc).1.val
-                              (u.1 (⟨i, by omega⟩ : Fin (p + q)).castSucc).2.val]
-    · nlinarith [Nat.mul_succ (u.1 (⟨i, by omega⟩ : Fin (p + q)).castSucc).1.val
-                              (u.1 (⟨i, by omega⟩ : Fin (p + q)).castSucc).2.val]
-  -- Convert Fin sum to range sum
-  rw [show ∑ r : Fin (p + q), (g (↑r + 1) - g ↑r) =
-      ∑ i ∈ Finset.range (p + q), (g (i + 1) - g i) from
-    Fin.sum_univ_eq_sum_range (fun i => g (i + 1) - g i) (p + q)]
-  -- Apply telescoping
-  rw [nat_sum_telescope (p + q) g hg_mono]
-  -- Evaluate endpoints
-  have hg0 : g 0 = 0 := by
-    simp only [g, show (0 : ℕ) < p + q + 1 from by omega, dif_pos]
-    have hsum : (u.1 ⟨0, by omega⟩).1.val + (u.1 ⟨0, by omega⟩).2.val = 0 :=
-      coordSum_eq u ⟨0, by omega⟩
-    have h1 : (u.1 ⟨0, by omega⟩).1.val = 0 := by omega
-    rw [h1, zero_mul]
-  have hgn : g (p + q) = p * q := by
-    simp only [g, show p + q < p + q + 1 from by omega, dif_pos]
-    have hsum := coordSum_eq u ⟨p + q, by omega⟩
-    have hfst := (u.1 ⟨p + q, by omega⟩).1.isLt
-    have hsnd := (u.1 ⟨p + q, by omega⟩).2.isLt
-    simp at hsum
-    nlinarith
-  rw [hgn, hg0]; simp
+  -- The sum of the differences in the product of coordinates is a telescoping sum, so most terms cancel out.
+  have h_telescope : ∑ r : Fin (p + q), ((u.1 (Fin.succ r)).1.val * (u.1 (Fin.succ r)).2.val - (u.1 (Fin.castSucc r)).1.val * (u.1 (Fin.castSucc r)).2.val) = (u.1 (Fin.last (p + q))).1.val * (u.1 (Fin.last (p + q))).2.val - (u.1 0).1.val * (u.1 0).2.val := by
+    have h_telescope : ∀ (n : ℕ) (f : Fin (n + 1) → ℕ), (∀ i : Fin n, f (Fin.castSucc i) ≤ f (Fin.succ i)) → ∑ i : Fin n, (f (Fin.succ i) - f (Fin.castSucc i)) = f (Fin.last n) - f 0 := by
+      intro n f hf; induction' n with n ih <;> simp_all +decide [ Fin.sum_univ_castSucc ] ;
+      convert congr_arg₂ ( · + · ) ( ih ( fun i => f i.castSucc ) ( fun i => hf ( Fin.castSucc i ) ) ) rfl using 1;
+      simp +zetaDelta at *;
+      rw [ tsub_add_eq_add_tsub ];
+      · rw [ Nat.add_sub_of_le ];
+        exact hf ( Fin.last _ );
+      · exact Fin.inductionOn ( Fin.last n |> Fin.castSucc ) ( by norm_num ) fun i hi => by linarith! [ hf i ] ;
+    convert h_telescope ( p + q ) ( fun i => ( u.1 i ).1.val * ( u.1 i ).2.val ) _ using 1;
+    exact fun i => mul_le_mul' ( u.1.monotone ( Nat.le_succ _ ) |>.1 ) ( u.1.monotone ( Nat.le_succ _ ) |>.2 );
+  convert h_telescope using 1;
+  · rw [ Shuffle.invCount_eq_sum_mul_diff, Shuffle.swap_invCount_eq_sum_mul_diff, ← Finset.sum_add_distrib ];
+    exact Finset.sum_congr rfl fun _ _ => by rw [ Shuffle.xy_diff_eq_sum_mixed ] ;
+  · rw [ eq_tsub_iff_add_eq_of_le ] <;> norm_num [ Shuffle.apply_zero, Shuffle.apply_last ]
 
 /-- Swapping a `(p,q)`-shuffle changes the sign by the Koszul factor `(-1)^(p*q)`. -/
 theorem sign_eq_negOnePow_mul_swap_sign {p q : ℕ} (u : Shuffle p q) :
