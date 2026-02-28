@@ -415,7 +415,6 @@ It then suffices to show the bottom-right triangle commutes:
       Rmod R ⊗ Rmod R ⟶ (mSingChain (R := R) (X ⨯ Y)).X (p + q)) =
     (λ_ (Rmod R)).hom ≫ simplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) s t := by
   have h := congrArg (fun k => k (s, t)) (crossProductNat_unit (R:=R) p q X Y)
-
   -- Step 1: Factor mι s ⊗ₘ mι t = (λ_ R).hom ≫ ((λ_ R).inv ≫ (mι s ⊗ₘ mι t))
   rw [show mι s ⊗ₘ mι t = (λ_ (Rmod R)).hom ≫ ((λ_ (Rmod R)).inv ≫ (mι s ⊗ₘ mι t)) from
     by rw [← Category.assoc, Iso.hom_inv_id, Category.id_comp]]
@@ -423,7 +422,6 @@ It then suffices to show the bottom-right triangle commutes:
   congr 1
   -- Step 2: Bottom-right triangle — suffices to compare underlying linear maps
   apply ModuleCat.hom_ext
-
   -- Both sides are linear maps R →ₗ[R] C_{p+q}(X×Y); suffices to check at 1 : R
   ext
   -- LHS: ((λ_ R).inv ≫ (mι s ⊗ₘ mι t) ≫ crossProduct)(x)
@@ -431,7 +429,6 @@ It then suffices to show the bottom-right triangle commutes:
   simp only [crossProduct, crossProductNat, NatTrans.comp_app,
     ModuleCat.hom_comp, LinearMap.coe_comp, Function.comp_apply]
   -- After tensorCoprodNatIso.hom, use the bridge lemma + crossProductNat_unit
-
   erw [mι_tensor_tensorCoprodNatIso (R := R) s t]
   -- Now LHS is U(liftedCrossProductNat)(η(s,t)); use crossProductNat_unit
   have h := congrFun (crossProductNat_unit (R := R) p q X Y) (s, t)
