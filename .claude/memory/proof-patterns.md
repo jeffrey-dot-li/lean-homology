@@ -2,6 +2,36 @@
 
 Reusable strategies for recurring proof shapes in this project.
 
+## Goal state discipline (CRITICAL)
+
+**Keep intermediate goals compact.** Bloated goals make it impossible for the user to
+supervise progress vs looping, and impossible for the agent to reason about what to do next.
+
+### Correctness first, style second
+- **Priority 1:** Get the proof to compile. Use `simp`, `aesop`, `grind`, whatever works.
+- **Priority 2:** Optimize for speed (`simp` → `simp only`, `grind` → direct proof, etc.) *after* it compiles.
+- `simp only` is a Mathlib style requirement because library lemmas are used heavily downstream. For *our* proofs, correctness comes first — replace `simp` with `simp only` via `simp?` as a polish step, not during initial proving.
+- Keeping goals concise is about **reasoning efficiency during proving**, not style.
+
+### `simp` vs `simp only` during proving
+- Default to **`simp`** during `/fill-sorry`. It's faster to write, and correctness comes first.
+- The only reason to use `simp only [...]` during proving is when you want to **partially simplify** — i.e., reduce to a specific level without going all the way down. In this case, write a comment explaining what you're deliberately *not* simplifying and why (e.g., `-- simp only to avoid unfolding SCF internals`).
+- Replace `simp` with `simp only` via `simp?` as a **polish step** after the proof compiles.
+
+### Push simplification up, not down
+- Simplify **before** `congr`, `ext`, or structural tactics — not after.
+- If `simp`/`dsimp` would reduce a goal from 15 lines to 3, do it *before* splitting into subgoals.
+- Unfolding definitions too early (e.g., `SCF`, `singChain`, `TopCat.toSSet`) causes goal blowup. Instead, use rewrite lemmas (like `mι_comp_map`) that keep the goal in high-level categorical language.
+
+### Extract rewrite lemmas to avoid unfolding
+- If the proof needs to unfold a definition, push through it, and re-fold — that's a missing lemma.
+- Example: `mι_comp_map` captures `mι s ≫ chain_map f = mι (f_*(s))` without ever exposing `colimit.ι_desc` or `TopCat.toSSet` internals.
+- The main proof stays in compact categorical notation; the ugly unfolding is isolated in the helper lemma.
+
+### `congr` introduces `id` wrappers
+- `congr 1` can wrap subterms in `id (...)`, which blocks `simp only` pattern matching.
+- Either `dsimp` immediately after `congr`, or use `change`/`show` to state the clean goal, or accept a `simp` at the end.
+
 ## Quotients
 
 ```lean
