@@ -624,6 +624,19 @@ lemma tensorHom_sub {C : Type*} [Category C] [Preadditive C]
     f ⊗ₘ (g - h) = f ⊗ₘ g - f ⊗ₘ h := by
   sorry
 
+/-- On generators, tensoring with a 0-simplex `δ` and applying `crossProduct 0 0`
+gives the product simplex: `mι τ ≫ (λ⁻¹ ≫ (mι δ ⊗ 𝟙) ≫ ×₀₀) = mι (δ, τ)`.
+
+Proof sketch: naturality of `λ⁻¹`, combine tensors, `crossProduct_normalized`,
+cancel unitor. -/
+lemma mι_leftUnitor_tensor_crossProduct_zero {X Y : TopCat.{u}}
+    (δ : Δ[0] ⟶ Y) (τ : SingularSimplex X 0) :
+    mι τ ≫ (λ_ ((mSingChain R X).X 0)).inv ≫
+      (mι (⟪δ⟫ₛ : SingularSimplex Y 0) ⊗ₘ 𝟙 ((mSingChain R X).X 0)) ≫
+      crossProduct 0 0 =
+    mι (prodSimplex ⟪δ⟫ₛ τ) := by
+  sorry
+
 /-! ## Chain homotopy from the cross product -/
 
 
@@ -638,6 +651,19 @@ lemma crossProduct_leibniz_right_zero {X Y : TopCat.{u}} (p : ℕ) :
     ((mSingChain R X).d (p + 1) p ⊗ₘ
         𝟙 ((mSingChain R Y).X 0)) ≫
       crossProduct p 0 := by
+  sorry
+
+/-- Leibniz rule for the cross product when the left index is zero (q = 0):
+the boundary acts only on the right factor.
+```
+  crossProduct 0 1 ≫ d = (𝟙 ⊗ d) ≫ crossProduct 0 0
+``` -/
+lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
+    crossProduct (R := R) (X := X) (Y := Y) 0 1 ≫
+      (mSingChain R (X ⨯ Y)).d 1 0 =
+    (𝟙 ((mSingChain R X).X 0) ⊗ₘ
+        (mSingChain R Y).d 1 0) ≫
+      crossProduct 0 0 := by
   sorry
 
 /-- The boundary of the identity 1-simplex is the difference of the two
@@ -669,22 +695,24 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     Homotopy
       ((mSCF R).map f)
       ((mSCF R).map g) := by
-  -- Lift the homotopy to a TopCat morphism Δ[1] ⨯ X ⟶ Y
+  -- Lift the homotopy to a TopCat morphism X ⨯ Δ[1] ⟶ Y.
+  -- We use X ⨯ Δ[1] (not Δ[1] ⨯ X) so that crossProduct n p outputs at
+  -- degree n + p, avoiding casts (since n + 0 = n and n + 1 = n + 1 definitionally,
+  -- but 0 + n ≠ n and 1 + n ≠ n + 1 for variable n).
   let HmapUlift : TopCat.of (ULift.{u} I) ⨯ X ⟶ Y :=
     (TopCat.prodIsoProd _ X).hom ≫
       (show TopCat.of (ULift.{u} I × X) ⟶ Y from
         ⟨⟨fun ⟨t, x⟩ => H.toContinuousMap ⟨t.down, x⟩, by fun_prop⟩⟩)
-  let Hmap : Δ[1] ⨯ X ⟶ Y :=
-    prod.map stdSimplex1_iso_I.hom (𝟙 X) ≫ HmapUlift
+  let Hmap : X ⨯ Δ[1] ⟶ Y :=
+    (prod.braiding X Δ[1]).hom ≫ prod.map stdSimplex1_iso_I.hom (𝟙 X) ≫ HmapUlift
   let chainH := (mSCF R).map Hmap
-  -- The canonical 1-simplex in I: the identity map Δ[1] → Δ[1] = I
+  -- The canonical 1-simplex in Δ[1]: the identity map Δ[1] → Δ[1]
   let ι₁ : SingularSimplex (Δ[1] : TopCat.{u}) 1 := ⟪𝟙 Δ[1]⟫ₛ
-  -- Tensoring with ι₁: C_n(X) → C_1(I) ⊗ C_n(X)
+  -- Right-tensoring with ι₁: C_n(X) → C_n(X) ⊗ C_1(Δ[1])
   let tensorι₁ := fun n =>
-    (λ_ (((mSCF R).obj X).X n)).inv ≫ (mι ι₁ ⊗ₘ 𝟙 (((mSCF R).obj X).X n))
+    (ρ_ (((mSCF R).obj X).X n)).inv ≫ (𝟙 (((mSCF R).obj X).X n) ⊗ₘ mι ι₁)
   -- The chain homotopy operator: C_n(X) → C_{n+1}(Y)
-  let P := fun n => tensorι₁ n ≫
-    (add_comm 1 n ▸ crossProduct 1 n) ≫ chainH.f (n + 1)
+  let P := fun n => tensorι₁ n ≫ crossProduct n 1 ≫ chainH.f (n + 1)
   refine Homotopy.mk
     (fun i j => if h : j = i + 1 then  h ▸P i else 0)
     (by intro i j h; dsimp; rw [dif_neg]; rw [ComplexShape.down_Rel] at h; omega)
@@ -693,34 +721,47 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
   -- Need to show: f_i = (dP + Pd)_i + g_i, i.e., f_i - g_i = d ∘ P_i + P_{i-1} ∘ d
   rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel (i + 1) i by simp [ComplexShape.down_Rel])]
   simp only [dif_pos trivial]
+  -- Chain-level boundary conditions: composing with δ₀ (resp. δ₁) through the
+  -- cross product and chain map of the homotopy recovers the chain map of f (resp. g).
+  -- These hold for all degrees n and are used in both the i=0 and i=n+1 cases.
+  have hBoundary₀ : ∀ n,
+      (ρ_ (((mSCF R).obj X).X n)).inv ≫
+        (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
+          mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
+            SingularSimplex Δ[1] 0)) ≫
+        crossProduct n 0 ≫ chainH.f n =
+      ((mSCF R).map f).f n := by sorry
+  have hBoundary₁ : ∀ n,
+      (ρ_ (((mSCF R).obj X).X n)).inv ≫
+        (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
+          mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
+            SingularSimplex Δ[1] 0)) ≫
+        crossProduct n 0 ≫ chainH.f n =
+      ((mSCF R).map g).f n := by sorry
   match i with
   | 0 =>
-    -- A 0-simplex in X is a point x₀. Then (f - g)(x₀) = f(x₀) - g(x₀) as
-    -- 0-simplices in Y. This equals ∂(P(x₀)), the boundary of the 1-simplex
-    -- t ↦ H(t, x₀), which is the path in Y connecting f(x₀) to g(x₀).
     rw [dNext_eq_zero _ 0 (by simp [ComplexShape.down_Rel])]
     simp
     -- Goal: f_0 = P 0 ≫ d₁₀ + g_0
-    -- Step 1: swap d past chainH using chain map property
-    conv_rhs => lhs; rw [show P 0 = tensorι₁ 0 ≫ _ ≫ chainH.f 1 from rfl]
-    -- rw [Category.assoc, Category.assoc, Category.assoc, chainH.comm 1 0]
-    -- Step 2: reassociate to isolate crossProduct ≫ d
-    -- conv_rhs => lhs; rw [← Category.assoc, ← Category.assoc, ← Category.assoc]
+    -- Unfold P, reassociate
+    conv_rhs => lhs; rw [show P 0 = tensorι₁ 0 ≫ crossProduct 0 1 ≫ chainH.f 1 from rfl]
     simp only [Category.assoc]
-    -- Step 2: chain map property: chainH.f 1 ≫ d_Y = d_{Δ×X} ≫ chainH.f 0
+    -- Chain map property: chainH.f 1 ≫ d_Y = d_{X×Δ[1]} ≫ chainH.f 0
     rw [chainH.comm 1 0]
-    -- Step 3: Leibniz rule: crossProduct 1 0 ≫ d = (d ⊗ 𝟙) ≫ crossProduct 0 0
-    rw [← Category.assoc (crossProduct 1 0), crossProduct_leibniz_right_zero]
-    -- Step 4: unfold tensorι₁, reassociate, combine tensors
-    show _ = (λ_ _).inv ≫ (mι ι₁ ⊗ₘ 𝟙 _) ≫
-      ((mSingChain R Δ[1]).d (0 + 1) 0 ⊗ₘ 𝟙 _) ≫ crossProduct 0 0 ≫ chainH.f 0 + _
-    rw [← Category.assoc (mι ι₁ ⊗ₘ 𝟙 _),
-      MonoidalCategory.tensorHom_comp_tensorHom, Category.id_comp]
-    -- Step 5: boundary of identity 1-simplex: mι ι₁ ≫ d = mι δ₀ - mι δ₁
+    -- Leibniz rule: crossProduct 0 1 ≫ d = (𝟙 ⊗ d) ≫ crossProduct 0 0
+    rw [← Category.assoc (crossProduct 0 1), crossProduct_leibniz_left_zero_zero]
+    -- Combine tensors: (𝟙 ⊗ mι ι₁) ≫ (𝟙 ⊗ d) = 𝟙 ⊗ (mι ι₁ ≫ d)
+    show _ = (ρ_ _).inv ≫ (𝟙 _ ⊗ₘ mι ι₁) ≫
+      (𝟙 _ ⊗ₘ (mSingChain R Δ[1]).d 1 0) ≫ crossProduct 0 0 ≫ chainH.f 0 + _
+    rw [← Category.assoc (𝟙 _ ⊗ₘ mι ι₁),
+      MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+    -- Boundary of identity 1-simplex: mι ι₁ ≫ d = mι δ₀ - mι δ₁
     rw [boundary_identity_1simplex]
-    -- Step 6: distribute (a - b) ⊗ₘ 𝟙 = a ⊗ₘ 𝟙 - b ⊗ₘ 𝟙, then through ≫
-    rw [sub_tensorHom, Preadditive.sub_comp]
-    sorry
+    -- Distribute subtraction through tensor and composition
+    rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+    -- Apply boundary conditions
+    rw [hBoundary₀ 0, hBoundary₁ 0]
+    abel
   | n + 1 =>
     rw [dNext_eq _ (show (ComplexShape.down ℕ).Rel (n + 1) n by simp [ComplexShape.down_Rel])]
     simp

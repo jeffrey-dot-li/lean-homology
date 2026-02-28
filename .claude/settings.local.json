@@ -22,7 +22,8 @@
       "mcp__lean-lsp__lean_declaration_file",
       "mcp__lean-lsp__lean_build",
       "Bash(find:*)",
-      "Bash(git -C /home/jeffreyli/Documents/lean-homology ls-files .claude/settings.local.json)"
+      "Bash(git -C /home/jeffreyli/Documents/lean-homology ls-files .claude/settings.local.json)",
+      "mcp__lean-lsp__lean_code_actions"
     ]
   },
   "enableAllProjectMcpServers": true,

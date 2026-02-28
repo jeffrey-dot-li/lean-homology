@@ -60,3 +60,28 @@ Or in the reverse direction, `simpa using ht` when the hypothesis already has th
 
 Pattern-matching `have` can fail with "unexpected token '⟨'" when variable names contain
 complex Unicode (e.g. `αₙ₊₁`). Use `obtain ⟨a, b⟩ := ...` or simpler ASCII names instead.
+
+## `0 + n ≠ n` definitionally — use product order to avoid casts
+
+`Nat.add` recurses on the **second** argument, so `n + 0 = n` is definitional but `0 + n ≠ n`.
+This matters for `crossProduct p q` which outputs at degree `p + q`:
+- `crossProduct n 0` → degree `n + 0 = n` ✓ (no cast)
+- `crossProduct 0 n` → degree `0 + n ≠ n` ✗ (needs `Nat.zero_add` cast)
+
+**Fix**: When building cross products with a fixed factor (e.g. `Δ[1]`), put the variable-degree
+space **first**: use `X ⨯ Δ[1]` (not `Δ[1] ⨯ X`) so that `crossProduct n 1` outputs at `n + 1`
+and `crossProduct n 0` outputs at `n`. Route through `prod.braiding` to swap if the original
+construction uses the other order.
+
+Similarly, `1 + n ≠ n + 1` definitionally. Using `crossProduct n 1` avoids the `add_comm 1 n ▸`
+cast that `crossProduct 1 n` would require.
+
+## `Sigma.hom_ext` introduces `Sigma.ι (fun x ↦ R) τ` not `mι τ`
+
+After `apply Sigma.hom_ext; intro τ`, the coprojection is `Sigma.ι (fun x ↦ Rmod R) τ`,
+which does NOT syntactically match `mι τ` even though they're definitionally equal.
+
+**Symptom**: `rw [some_lemma_about_mι]` fails with "did not find occurrence of pattern".
+
+**Fix**: Add `have hτ : Sigma.ι (fun x ↦ Rmod R) τ = mι (R := R) τ := rfl` then `rw [hτ]`
+before the rewrite that needs `mι`.

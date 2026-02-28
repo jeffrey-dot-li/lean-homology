@@ -142,7 +142,7 @@ n-simplex `s` in `X`, produce the corresponding "basis element" morphism
 
 The chain group `(singChain (C := C) (R := R) X).X n` is definitionally `∐_{σ} R` where
 σ ranges over all singular n-simplices in X. -/
-def simplexCoprojection {X : TopCat.{v}} {n : ℕ}
+abbrev simplexCoprojection {X : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) : R ⟶ (singChain (C := C) (R := R) X).X n :=
   Sigma.ι (fun _ : SingularSimplex X n ↦ R) s
 
