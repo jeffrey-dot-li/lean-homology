@@ -16,6 +16,7 @@
   - `singularHomology_map_eq_of_homotopy` : homotopy invariance
   - `singularHomology_iso_of_homotopyEquiv` : homotopy equivalences induce isomorphisms
 -/
+import HomologyLean.CategoryTheory.SubTensorHom
 import HomologyLean.SingularHomology.HomotopyInvariance
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Symmetric
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
@@ -35,7 +36,7 @@ import Mathlib.Topology.UnitInterval
 
 section
 
-open CategoryTheory CategoryTheory.Limits AlgebraicTopology unitInterval
+open CategoryTheory CategoryTheory.Limits AlgebraicTopology unitInterval HomologyLean.CategoryTheory
 open scoped MonoidalCategory
 
 universe u
@@ -608,22 +609,6 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
     Category.comp_id, prod.lift_map, prodSimplex]
   simp
 
-/-- In a monoidal preadditive category, tensor distributes over subtraction
-on the left: `(f - g) ⊗ₘ h = f ⊗ₘ h - g ⊗ₘ h`. -/
-lemma sub_tensorHom {C : Type*} [Category C] [Preadditive C]
-    [MonoidalCategory C] [MonoidalPreadditive C]
-    {W X Y Z : C} (f g : W ⟶ X) (h : Y ⟶ Z) :
-    (f - g) ⊗ₘ h = f ⊗ₘ h - g ⊗ₘ h := by
-  sorry
-
-/-- In a monoidal preadditive category, tensor distributes over subtraction
-on the right: `f ⊗ₘ (g - h) = f ⊗ₘ g - f ⊗ₘ h`. -/
-lemma tensorHom_sub {C : Type*} [Category C] [Preadditive C]
-    [MonoidalCategory C] [MonoidalPreadditive C]
-    {W X Y Z : C} (f : W ⟶ X) (g h : Y ⟶ Z) :
-    f ⊗ₘ (g - h) = f ⊗ₘ g - f ⊗ₘ h := by
-  sorry
-
 /-- On generators, tensoring with a 0-simplex `δ` and applying `crossProduct 0 0`
 gives the product simplex: `mι τ ≫ (λ⁻¹ ≫ (mι δ ⊗ 𝟙) ≫ ×₀₀) = mι (δ, τ)`.
 
@@ -674,7 +659,14 @@ lemma boundary_identity_1simplex :
     mι (R := R) ⟪𝟙 (Δ[1] : TopCat.{u})⟫ₛ ≫ (mSingChain R Δ[1]).d 1 0 =
     mι ⟪SimplexCategory.toTop.map (SimplexCategory.δ (n := 0) 0)⟫ₛ -
     mι ⟪SimplexCategory.toTop.map (SimplexCategory.δ (n := 0) 1)⟫ₛ := by
-  sorry
+  simp only [mSingChain, singChain]
+  dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
+  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
+  rw [Fin.sum_univ_two]
+  simp only [Fin.val_zero, pow_zero, one_smul, Fin.val_one, pow_one, neg_smul, sub_eq_add_neg]
+  erw [colimit.ι_desc, colimit.ι_desc]
+  rfl
 
 /-- The standard 1-simplex `Δ[1]` is isomorphic to the unit interval `I`. -/
 noncomputable def stdSimplex1_iso_I : (Δ[1] : TopCat.{u}) ≅ TopCat.of (ULift.{u} I) := by
@@ -765,7 +757,13 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
   | n + 1 =>
     rw [dNext_eq _ (show (ComplexShape.down ℕ).Rel (n + 1) n by simp [ComplexShape.down_Rel])]
     simp
-
+    -- Unfold P (n+1) in the "Pd" term
+    conv_rhs => rw [show P (n + 1) = tensorι₁ (n + 1) ≫ crossProduct (n + 1) 1 ≫ chainH.f (n + 2) from rfl]
+    simp only [Category.assoc]
+    -- Chain map property: chainH.f (n+2) ≫ d_Y = d_{X×Δ[1]} ≫ chainH.f (n+1)
+    rw [chainH.comm (n + 2) (n + 1)]
+    -- Leibniz rule: crossProduct (n+1) 1 ≫ d = (d_X ⊗ 𝟙) ≫ × + (-1)^{n+1} • (𝟙 ⊗ d_Δ[1]) ≫ ×
+    rw [← Category.assoc (crossProduct (n + 1) 1), crossProduct_leibniz n 0]
     sorry
 
 /-! ## Homotopy invariance of singular homology -/
