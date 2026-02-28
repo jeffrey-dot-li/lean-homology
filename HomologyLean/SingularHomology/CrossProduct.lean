@@ -62,7 +62,27 @@ lemma coprod_tensor_ext {A B : Type u} {M : ModuleCat.{u} R}
       (Sigma.ι (fun _ : A => Rmod R) a ⊗ₘ Sigma.ι (fun _ : B => Rmod R) b) ≫ f =
       (Sigma.ι (fun _ : A => Rmod R) a ⊗ₘ Sigma.ι (fun _ : B => Rmod R) b) ≫ g) :
     f = g := by
-  sorry
+  apply Equiv.injective ((ihom.adjunction (∐ fun _ : A => Rmod R)).homEquiv (∐ fun _ : B => Rmod R) M)
+  apply CategoryTheory.Limits.Sigma.hom_ext
+  intro b
+  apply Equiv.injective ((ihom.adjunction (∐ fun _ : A => Rmod R)).homEquiv (Rmod R) M).symm
+  simp only [Adjunction.homEquiv_naturality_left_symm, Equiv.symm_apply_apply]
+  rw [← cancel_epi (ρ_ (∐ fun _ : A => Rmod R)).inv]
+  apply CategoryTheory.Limits.Sigma.hom_ext
+  intro a
+  rw [CategoryTheory.MonoidalCategory.rightUnitor_inv_naturality_assoc (Sigma.ι (fun x ↦ Rmod R) a)]
+  rw [CategoryTheory.MonoidalCategory.rightUnitor_inv_naturality_assoc (Sigma.ι (fun x ↦ Rmod R) a)]
+  have hf : (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ▷ 𝟙_ (ModuleCat R)) ≫
+              (MonoidalCategory.tensorLeft (∐ fun x ↦ Rmod R)).map (Sigma.ι (fun x ↦ Rmod R) b) ≫ f =
+            (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ⊗ₘ Sigma.ι (fun x ↦ Rmod R) b) ≫ f := by
+    change (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ⊗ₘ Sigma.ι (fun x ↦ Rmod R) b) ≫ f = _
+    rfl
+  have hg : (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ▷ 𝟙_ (ModuleCat R)) ≫
+              (MonoidalCategory.tensorLeft (∐ fun x ↦ Rmod R)).map (Sigma.ι (fun x ↦ Rmod R) b) ≫ g =
+            (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ⊗ₘ Sigma.ι (fun x ↦ Rmod R) b) ≫ g := by
+    change (ρ_ (Rmod R)).inv ≫ (Sigma.ι (fun x ↦ Rmod R) a ⊗ₘ Sigma.ι (fun x ↦ Rmod R) b) ≫ g = _
+    rfl
+  rw [hf, hg, h]
 
 /-! ### Bridge between coproduct-based and Finsupp-based free modules -/
 
