@@ -138,6 +138,16 @@ lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
     mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((mSCF R).map s.down).f n := by
   sorry
 
+/-- Coproduct injection composed with a chain map equals the coproduct injection
+at the reindexed simplex: `mι s ≫ f_* = mι (f(s))`. -/
+lemma mι_comp_map {X Y : TopCat.{u}} {n : ℕ}
+    (s : SingularSimplex X n) (f : X ⟶ Y) :
+    mι s ≫ ((mSCF R).map f).f n =
+      mι ((singularSimplexFunctor n).map f s) := by
+  simp only [mι, simplexCoprojection, mSCF, SCF]
+  erw [colimit.ι_desc]
+  simp only [Cofan.mk_ι_app, Category.id_comp]; rfl
+
 /-! ### Naturality of `simplexCrossProduct` (specialized to `ModuleCat R`) -/
 
 /-- The underlying element of the chain group corresponding to the simplex-level cross product,
@@ -583,8 +593,7 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
     (λ_ (Rmod R)).hom ≫ mι (prodSimplex x y) := by
   rw [mι_tensor_comp_crossProduct]
   congr 1
-  simp only [simplexCrossProduct, universalSimplexCrossProduct,
-    mι, simplexCoprojection, prodSimplex]
+  simp only [simplexCrossProduct, universalSimplexCrossProduct]
   -- There is a unique (0,0)-shuffle, so the sum collapses to a single term.
   have huniq : ∀ (μ : Shuffle 0 0),
       μ.1 = ⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩ := by
@@ -598,32 +607,17 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
   rw [Fintype.sum_subsingleton _ μ₀]
   have hsign : μ₀.sign = 1 := by simp [Shuffle.sign, Shuffle.invCount]
   rw [hsign, one_smul]
-  -- Reduce through the coproduct structure to a simplex equality.
-  simp only [SCF, singChain]
-  erw [colimit.ι_desc]
-  simp only [Cofan.mk_ι_app, Category.id_comp]
-  congr 1
-  simp only [Nat.add_zero, Functor.op_obj, SimplexCategory.toTop_obj,
-    SimplexCategory.len_mk, Nat.reduceAdd, yoneda,
-    Pi.id_apply, singularSimplexEquivΔ_symm_apply]
-  -- `shuffleStdSimplexMap μ₀ = prod.lift 𝟙 𝟙` since [0] → [0] is unique.
-  have hshuf : shuffleStdSimplexMap (p := 0) (q := 0) μ₀ =
-      prod.lift (𝟙 _) (𝟙 _) := by
-    simp only [shuffleStdSimplexMap]
-    congr 1 <;>
-      rw [SimplexCategory.hom_zero_zero (SimplexCategory.Hom.mk _),
-        SimplexCategory.toTop.map_id]
-  -- Reduce to `.down` equality, then rewrite and simplify.
-  have hext : ∀ (a b : SingularSimplex (X ⨯ Y) (0 + 0)),
-      a.down = b.down → a = b := by
-    intro a b h; cases a; cases b; congr
-  apply hext
-  simp only [shuffleSimplex]
-  dsimp [TopCat.toSSet, Presheaf.restrictedULiftYoneda]
-  simp only [prod.map_id_id, Category.comp_id]
-  rw [hshuf, prod.lift_map]
-  simp only [Nat.add_zero, SimplexCategory.toTop_obj, SimplexCategory.len_mk, Nat.reduceAdd,
-    Category.id_comp]
+  -- Reindex through the coproduct to a simplex-level equality.
+  rw [mι_comp_map]
+  -- Goal: mι ((singularSimplexFunctor _).map _ (shuffleSimplex ...)) = mι (prodSimplex x y)
+  -- Show the simplex arguments are equal.
+  change mι ⟪(shuffleSimplex ⟪𝟙 Δ[0]⟫ₛ ⟪𝟙 Δ[0]⟫ₛ μ₀).down ≫ prod.map x.down y.down⟫ₛ =
+    mι (prodSimplex x y)
+  -- Unfold the shuffle simplex `.down` and reduce.
+  simp only [shuffleSimplex, SingularSimplex.ofΔ_down, shuffleStdSimplexMap,
+    SimplexCategory.hom_zero_zero, SimplexCategory.toTop.map_id,
+    Category.comp_id, prod.lift_map, prodSimplex]
+  simp
 
 /-! ## Chain homotopy from the cross product -/
 
