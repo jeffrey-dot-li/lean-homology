@@ -608,18 +608,38 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
 
 /-! ## Chain homotopy from the cross product -/
 
+
+/-- The standard 1-simplex `Δ[1]` is isomorphic to the unit interval `I`. -/
+noncomputable def stdSimplex1_iso_I : (Δ[1] : TopCat.{u}) ≅ TopCat.of (ULift.{u} I) := sorry
+
 /-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
 induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
 
 **Proof sketch**: Use the cross product with the unit interval. The homotopy
-`H : I × X → Y` composed with the cross product `C_0(I) ⊗ C_n(X) → C_n(I × X)`
+`H : I × X → Y` composed with the cross product `C_1(I) ⊗ C_n(X) → C_{n+1}(I × X)`
 gives the chain homotopy operator, using the fundamental class of `I` as a
 1-chain connecting the two endpoints. -/
+
 def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
       ((mSCF R).map f)
       ((mSCF R).map g) := by
+  -- Lift the homotopy to a TopCat morphism Δ[1] ⨯ X ⟶ Y
+  let HmapUlift : TopCat.of (ULift.{u} I) ⨯ X ⟶ Y :=
+    (TopCat.prodIsoProd _ X).hom ≫
+      (show TopCat.of (ULift.{u} I × X) ⟶ Y from
+        ⟨⟨fun ⟨t, x⟩ => H.toContinuousMap ⟨t.down, x⟩, by fun_prop⟩⟩)
+  let Hmap : Δ[1] ⨯ X ⟶ Y :=
+    prod.map stdSimplex1_iso_I.hom (𝟙 X) ≫ HmapUlift
+  let chainH := (mSCF R).map Hmap
+  -- The canonical 1-simplex in I: the identity map Δ[1] → Δ[1] = I
+  let ι₁ : SingularSimplex (Δ[1] : TopCat.{u}) 1 := ⟪𝟙 Δ[1]⟫ₛ
+  -- Tensoring with ι₁: C_n(X) → C_1(I) ⊗ C_n(X)
+  let tensorι₁ := fun n =>
+    (λ_ (((mSCF R).obj X).X n)).inv ≫ (mι ι₁ ⊗ₘ 𝟙 (((mSCF R).obj X).X n))
+  -- The chain homotopy operator: C_n(X) → C_{n+1}(Y)
+  let P := fun n => tensorι₁ n ≫ crossProduct 1 n ≫ chainH.f (1 + n)
   sorry
 
 /-! ## Homotopy invariance of singular homology -/
