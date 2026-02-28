@@ -304,6 +304,29 @@ theorem sign_eq_negOnePow_mul_swap_sign {p q : ℕ} (u : Shuffle p q) :
   rw [← mul_pow]
   norm_num
 
+/-! #### Shuffle (0,0) -/
+
+/-- For `Shuffle 0 0`, the domain and codomain are both `Fin 1`, so every shuffle
+has the same underlying map: the unique monotone injection to `(0, 0)`. -/
+lemma unique_0_0 (μ : Shuffle 0 0) :
+    μ.1 = ⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩ := by
+  ext x
+  · simp [Fin.eq_zero (μ.1 x).1]
+  · simp [Fin.eq_zero (μ.1 x).2]
+
+/-- There is exactly one `(0,0)`-shuffle. -/
+instance subsingleton_0_0 : Subsingleton (Shuffle 0 0) :=
+  ⟨fun μ ν => Subtype.ext (by rw [unique_0_0 μ, unique_0_0 ν])⟩
+
+/-- The unique `(0,0)`-shuffle. -/
+def default_0_0 : Shuffle 0 0 :=
+  ⟨⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩,
+    fun _ _ _ => Fin.ext (by simp [Fin.eq_zero])⟩
+
+/-- The unique `(0,0)`-shuffle has sign 1. -/
+lemma sign_0_0 : (default_0_0 : Shuffle 0 0).sign = 1 := by
+  simp [sign, invCount]
+
 end Shuffle
 
 end HomologyLean.SingularHomology

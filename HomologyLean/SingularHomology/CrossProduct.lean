@@ -595,23 +595,13 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
   congr 1
   simp only [simplexCrossProduct, universalSimplexCrossProduct]
   -- There is a unique (0,0)-shuffle, so the sum collapses to a single term.
-  have huniq : ∀ (μ : Shuffle 0 0),
-      μ.1 = ⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩ := by
-    intro μ; ext x
-    · simp [Fin.eq_zero (μ.1 x).1]
-    · simp [Fin.eq_zero (μ.1 x).2]
-  have hsub : Subsingleton (Shuffle 0 0) :=
-    ⟨fun μ ν => Subtype.ext (by rw [huniq μ, huniq ν])⟩
-  let μ₀ : Shuffle 0 0 := ⟨⟨fun _ => (0, 0), fun _ _ _ => le_refl _⟩,
-    fun _ _ _ => Fin.ext (by simp [Fin.eq_zero])⟩
-  rw [Fintype.sum_subsingleton _ μ₀]
-  have hsign : μ₀.sign = 1 := by simp [Shuffle.sign, Shuffle.invCount]
-  rw [hsign, one_smul]
+  rw [Fintype.sum_subsingleton _ Shuffle.default_0_0]
+  rw [Shuffle.sign_0_0, one_smul]
   -- Reindex through the coproduct to a simplex-level equality.
   rw [mι_comp_map]
   -- Goal: mι ((singularSimplexFunctor _).map _ (shuffleSimplex ...)) = mι (prodSimplex x y)
   -- Show the simplex arguments are equal.
-  change mι ⟪(shuffleSimplex ⟪𝟙 Δ[0]⟫ₛ ⟪𝟙 Δ[0]⟫ₛ μ₀).down ≫ prod.map x.down y.down⟫ₛ =
+  change mι ⟪(shuffleSimplex ⟪𝟙 Δ[0]⟫ₛ ⟪𝟙 Δ[0]⟫ₛ Shuffle.default_0_0).down ≫ prod.map x.down y.down⟫ₛ =
     mι (prodSimplex x y)
   -- Unfold the shuffle simplex `.down` and reduce.
   simp only [shuffleSimplex, SingularSimplex.ofΔ_down, shuffleStdSimplexMap,
