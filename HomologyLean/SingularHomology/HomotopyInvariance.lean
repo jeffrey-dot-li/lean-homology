@@ -134,7 +134,16 @@ noncomputable def chainGroupIsoCoprodFree (p : ℕ) :
       singularSimplexFunctor p ⋙ coprodFreeFunctor (R := R) :=
   NatIso.ofComponents
     (fun X => Iso.refl _)
-    (fun {X Y} f => by sorry)
+    (fun {X Y} f => by
+      dsimp
+      simp only [Category.comp_id, Category.id_comp]
+      dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor, coprodFreeFunctor]
+      apply CategoryTheory.Limits.Sigma.hom_ext
+      intro a
+      simp only [CategoryTheory.Limits.Sigma.ι_comp_map', Category.id_comp]
+      erw [CategoryTheory.Limits.Sigma.ι_desc]
+      rfl
+    )
 
 /-- The coprojection (basis inclusion) for a singular simplex: given a singular
 n-simplex `s` in `X`, produce the corresponding "basis element" morphism

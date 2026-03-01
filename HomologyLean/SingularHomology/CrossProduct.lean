@@ -172,7 +172,9 @@ noncomputable abbrev mι {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
 `mι ⟪𝟙 Δ[n]⟫ₛ` composed with the chain map induced by `s.down`. -/
 lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
     mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((mSCF R).map s.down).f n := by
-  sorry
+  dsimp [mι, mSCF, simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  rw [CategoryTheory.Limits.Sigma.ι_comp_map', Category.id_comp]
+  rfl
 
 /-- Coproduct injection composed with a chain map equals the coproduct injection
 at the reindexed simplex: `mι s ≫ f_* = mι (f(s))`. -/
