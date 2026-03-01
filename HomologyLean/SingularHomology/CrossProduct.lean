@@ -18,6 +18,7 @@
 -/
 import HomologyLean.CategoryTheory.SubTensorHom
 import HomologyLean.SingularHomology.HomotopyInvariance
+import HomologyLean.SingularHomology.HomotopyMap
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Symmetric
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
 import Mathlib.Algebra.Category.ModuleCat.Abelian
@@ -723,12 +724,6 @@ lemma boundary_identity_1simplex :
   erw [colimit.ι_desc, colimit.ι_desc]
   rfl
 
-/-- The standard 1-simplex `Δ[1]` is isomorphic to the unit interval `I`. -/
-noncomputable def stdSimplex1_iso_I : (Δ[1] : TopCat.{u}) ≅ TopCat.of (ULift.{u} I) := by
-  refine TopCat.isoOfHomeo
-    (Homeomorph.ulift.trans
-      (stdSimplexHomeomorphUnitInterval.trans Homeomorph.ulift.symm))
-
 /-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
 induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
 
@@ -793,7 +788,18 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     rw [show (ρ_ (Rmod R)).inv ≫ (λ_ (Rmod R)).hom = 𝟙 _ from by
       erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
     rw [Category.id_comp]
-    sorry
+    -- Both sides are R-linear maps R → C_n(Y); use mι_comp_map on RHS, simplexCrossProductElem_natural on LHS
+    rw [mι_comp_map]
+    unfold chainH
+    rw [simplexCrossProduct_zero_right]
+    rw [mι_comp_map]
+    congr 1
+    simp only [singularSimplexFunctor]
+    apply ULift.ext; simp only [SingularSimplex.ofΔ_down]
+    show prod.lift s.down
+      (SimplexCategory.toTop.map default ≫
+        SimplexCategory.toTop.map (SimplexCategory.δ 0)) ≫ Hmap = s.down ≫ f
+    exact homotopyMap_comp_delta0 H s.down
 
   have hBoundary₁ : ∀ n,
       (ρ_ (((mSCF R).obj X).X n)).inv ≫

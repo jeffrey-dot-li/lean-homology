@@ -224,6 +224,17 @@ def simplexCrossProduct {X Y : TopCat.{v}} {p q : ℕ}
   -- The map `Δ[p] ⨯ Δ[q] ⟶ X ⨯ Y` is `prod.map s.down t.down`.
   exact ((SCF R).map (prod.map s.down t.down)).f (p + q)
 
+/-- For `q = 0`, the cross product of an `n`-simplex `s` in `X` with a `0`-simplex `c`
+in `Y` reduces to a single product simplex `t ↦ (s(t), c(*))`.
+
+There is a unique `(n, 0)`-shuffle with sign `1`, so the shuffle sum collapses. -/
+lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
+    simplexCrossProduct (C := C) (R := R) s c =
+    simplexCoprojection
+      ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ := by
+  sorry
+
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
     simplexCrossProduct (R := R) (p := p) (q := q)
