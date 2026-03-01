@@ -228,12 +228,90 @@ def simplexCrossProduct {X Y : TopCat.{v}} {p q : ℕ}
 in `Y` reduces to a single product simplex `t ↦ (s(t), c(*))`.
 
 There is a unique `(n, 0)`-shuffle with sign `1`, so the shuffle sum collapses. -/
+instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
+  default := ⟨⟨fun i => (i, 0), fun i j h => ⟨h, by simp⟩⟩, fun i j h => by simpa using h⟩
+  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
+    apply Subtype.ext
+    apply OrderHom.ext
+    funext i
+    ext
+    · have hmono : StrictMono (fun i => (f i).1) := by
+        intro a b hab
+        have h_le := hf hab.le
+        have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
+        have h_le_1 : (f a).1 ≤ (f b).1 := h_le.1
+        cases eq_or_lt_of_le h_le_1 with
+        | inl heq =>
+          exfalso
+          apply h_neq
+          ext
+          · exact congrArg Fin.val heq
+          · simp
+        | inr hlt => exact hlt
+      have heq : ∀ i, (f i).1 = i := by
+        intro i
+        exact le_antisymm (StrictMono.le_id hmono i) (StrictMono.id_le hmono i)
+      exact congrArg Fin.val (heq i)
+    · simp
+
 lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
     simplexCrossProduct (C := C) (R := R) s c =
     simplexCoprojection
       ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ := by
-  sorry
+  simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
+  have hd : (default : Shuffle n 0).sign = 1 := by
+    dsimp [Shuffle.sign, Shuffle.invCount]
+    have hz : (∑ r : Fin (n + 0), if ((default : Shuffle n 0).1 (Fin.castSucc r)).1 < ((default : Shuffle n 0).1 (Fin.succ r)).1 then ((default : Shuffle n 0).1 (Fin.castSucc r)).2.val else 0) = 0 := by
+      apply Finset.sum_eq_zero
+      intro i _
+      split_ifs
+      · rfl
+      · rfl
+    exact congrArg (fun x => (-1 : ℤ) ^ x) hz
+  rw [hd]
+  simp
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp
+  apply congrArg
+  apply ULift.ext
+  dsimp [TopCat.toSSet]
+  apply CategoryTheory.Limits.prod.hom_ext
+  · sorry
+    -- have H : shuffleStdSimplexMap (p := n) (q := 0) default ≫ prod.fst = eqToHom (by rfl) := by
+    --   dsimp [shuffleStdSimplexMap]
+    --   rw [CategoryTheory.Limits.prod.lift_fst]
+    --   ext ⟨⟨i, hi⟩⟩
+    --   apply ULift.ext
+    --   apply Subtype.ext
+    --   funext j
+    --   dsimp [eqToHom]
+    --   change (stdSimplex.map _ ⟨i, hi⟩).val j = i j
+    --   have heq : stdSimplex.map _ = stdSimplex.map (id : Fin (n+1) → Fin (n+1)) := by
+    --     congr 1
+    --     ext x
+    --     change (x, 0).1 = x
+    --     rfl
+    --   rw [heq]
+    --   simp [stdSimplex.map]
+    -- erw [Category.assoc, CategoryTheory.Limits.prod.map_fst, ← Category.assoc, H]
+  · erw [Category.assoc, CategoryTheory.Limits.prod.map_snd, ← Category.assoc]
+    simp
+    ext x
+    have h_sub : Subsingleton ↑(Opposite.unop (SimplexCategory.toTop.op.obj (Opposite.op (SimplexCategory.mk 0)))) := by
+      dsimp [SimplexCategory.toTop]
+      constructor
+      rintro ⟨⟨a, ha⟩⟩ ⟨⟨b, hb⟩⟩
+      apply ULift.ext
+      apply Subtype.ext
+      funext i
+      have hz : i = 0 := Fin.eq_zero i
+      have h1 : a 0 = 1 := by simpa using ha.2
+      have h2 : b 0 = 1 := by simpa using hb.2
+      change a i = b i
+      rw [hz, h1, h2]
+    exact congrArg (ConcreteCategory.hom c.down) (Subsingleton.elim _ _)
 
 /-- For `p = 0`, the cross product of a `0`-simplex `c` in `X` with an `n`-simplex `s`
 in `Y` reduces to a single product simplex `t ↦ (c(*), s(t))`.

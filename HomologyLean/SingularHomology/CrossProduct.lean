@@ -772,8 +772,8 @@ gives the chain homotopy operator, using the fundamental class of `I` as a
 noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
-      ((mSCF R).map f)
-      ((mSCF R).map g) := by
+      ((mSCF R).map g)
+      ((mSCF R).map f) := by
   -- Lift the homotopy to a TopCat morphism X ⨯ Δ[1] ⟶ Y.
   -- We use X ⨯ Δ[1] (not Δ[1] ⨯ X) so that crossProduct n p outputs at
   -- degree n + p, avoiding casts (since n + 0 = n and n + 1 = n + 1 definitionally,
@@ -797,33 +797,33 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     (by intro i j h; dsimp; rw [dif_neg]; rw [ComplexShape.down_Rel] at h; omega)
     ?_
   intro i
-  -- Need to show: f_i = (dP + Pd)_i + g_i, i.e., f_i - g_i = d ∘ P_i + P_{i-1} ∘ d
+  -- Need to show: g_i = (dP + Pd)_i + f_i, i.e., g_i - f_i = d ∘ P_i + P_{i-1} ∘ d
   rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel (i + 1) i by simp [ComplexShape.down_Rel])]
   simp only [dif_pos trivial]
   -- Chain-level boundary conditions: composing with δ₀ (resp. δ₁) through the
-  -- cross product and chain map of the homotopy recovers the chain map of f (resp. g).
-  -- These hold for all degrees n and are used in both the i=0 and i=n+1 cases.
+  -- cross product and chain map of the homotopy recovers the chain map of g (resp. f).
+  -- (δ₀ skips vertex 0, lands on vertex 1 ↔ t=1 ↔ g; δ₁ skips vertex 1, lands on vertex 0 ↔ t=0 ↔ f.)
   have hBoundary₀ : ∀ n,
       (ρ_ (((mSCF R).obj X).X n)).inv ≫
         (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 ≫ chainH.f n =
-       ((mSCF R).map f).f n :=
-    crossProduct_zero_right_boundary (R := R) Hmap _ f fun s => homotopyMap_comp_delta0 H s.down
+       ((mSCF R).map g).f n :=
+    crossProduct_zero_right_boundary (R := R) Hmap _ g fun s => homotopyMap_comp_delta0 H s.down
   have hBoundary₁ : ∀ n,
       (ρ_ (((mSCF R).obj X).X n)).inv ≫
         (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 ≫ chainH.f n =
-        ((mSCF R).map g).f n :=
-    crossProduct_zero_right_boundary (R := R) Hmap _ g fun s => homotopyMap_comp_delta1 H s.down
+        ((mSCF R).map f).f n :=
+    crossProduct_zero_right_boundary (R := R) Hmap _ f fun s => homotopyMap_comp_delta1 H s.down
   match i with
   | 0 =>
     rw [dNext_eq_zero _ 0 (by simp [ComplexShape.down_Rel])]
     simp
-    -- Goal: f_0 = P 0 ≫ d₁₀ + g_0
+    -- Goal: g_0 = P 0 ≫ d₁₀ + f_0
     -- Unfold P, reassociate
     conv_rhs => lhs; rw [show P 0 = tensorι₁ 0 ≫ crossProduct 0 1 ≫ chainH.f 1 from by
       simp [P]]
@@ -870,13 +870,13 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
           chainH.f (n + 1)
     change _ = (-1) ^ n • (((mSCF R).obj X).d (n + 1) n ≫
         tensorι₁ n ≫ crossProduct n 1 ≫ chainH.f (n + 1)) +
-      (-1) ^ (n + 1) • Xbdy + Δbdy + ((mSCF R).map g).f (n + 1)
-    -- Show Δbdy = f_{n+1} - g_{n+1} (same pattern as i=0 case)
-    have hΔbdy : Δbdy = ((mSCF R).map f).f (n + 1) - ((mSCF R).map g).f (n + 1) := by
+      (-1) ^ (n + 1) • Xbdy + Δbdy + ((mSCF R).map f).f (n + 1)
+    -- Show Δbdy = g_{n+1} - f_{n+1} (same pattern as i=0 case)
+    have hΔbdy : Δbdy = ((mSCF R).map g).f (n + 1) - ((mSCF R).map f).f (n + 1) := by
       simp only [Δbdy]
       conv_lhs => rw [show (eqToHom (congrArg (mSingChain R (X ⨯ Δ[1])).X
         (Nat.add_zero (n + 1))) ≫ chainH.f (n + 1) : _ ⟶ _) = chainH.f (n + 1) from by simp]
-      -- Now: tensorι₁ (n+1) ≫ (𝟙 ⊗ d_Δ) ≫ ×_{n+1,0} ≫ chainH = f - g
+      -- Now: tensorι₁ (n+1) ≫ (𝟙 ⊗ d_Δ) ≫ ×_{n+1,0} ≫ chainH = g - f
       -- Unfold tensorι₁, reassociate, combine tensors
       show (ρ_ _).inv ≫ (𝟙 _ ⊗ₘ mι ι₁) ≫
         (𝟙 _ ⊗ₘ (mSingChain R Δ[1]).d 1 0) ≫
@@ -889,7 +889,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     rw [hΔbdy]
     abel
     simp only [Xbdy]
-    -- dP + Xbdy = (1 - (-1)^{n+1}) • (f - g)
+    -- dP + Xbdy = (1 - (-1)^{n+1}) • (g - f)
     -- tensorι₁ (n+1) ≫ (d_X ⊗ 𝟙) = d_X ≫ tensorι₁ n (naturality of right-tensoring)
     have htensor_nat : tensorι₁ (n + 1) ≫
         ((mSingChain R X).d (n + 1) n ⊗ₘ 𝟙 ((mSingChain R Δ[1]).X (0 + 1))) =
@@ -920,7 +920,7 @@ theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') (n : ℕ) :
     ((singularHomologyFunctor (ModuleCat.{u} R) n).obj (Rmod R)).map f =
       ((singularHomologyFunctor (ModuleCat.{u} R) n).obj (Rmod R)).map g := by
-  exact (singularChain_chainHomotopy_of_homotopy (R := R) H).homologyMap_eq n
+  exact ((singularChain_chainHomotopy_of_homotopy (R := R) H).homologyMap_eq n).symm
 
 /-! ## Homotopy equivalences induce isomorphisms -/
 

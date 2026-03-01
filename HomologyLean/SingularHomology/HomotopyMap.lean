@@ -36,29 +36,64 @@ noncomputable def homotopyMap {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (show TopCat.of (ULift.{u} I × X) ⟶ Y from
       ⟨⟨fun ⟨t, x⟩ => H.toContinuousMap ⟨t.down, x⟩, by fun_prop⟩⟩)
 
-/-- Composing a product simplex `(s, const ≫ δ₀)` with the homotopy map gives `s ≫ f`.
+/-- Composing a product simplex `(s, const ≫ δ₀)` with the homotopy map gives `s ≫ g`.
 
 Geometrically: `δ₀` includes `Δ[0]` as vertex 1 of `Δ[1]`, which under the
-standard simplex–interval homeomorphism corresponds to `t = 0` in `I`
-(after the orientation reversal from `stdSimplexHomeomorphUnitInterval`),
-so the homotopy evaluates to `f`. -/
+standard simplex–interval homeomorphism corresponds to `t = 1` in `I`,
+so the homotopy evaluates to `g`. -/
 lemma homotopyMap_comp_delta0 {X Y : TopCat.{u}} {n : ℕ} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') (s : Δ[n] ⟶ X) :
     prod.lift s (SimplexCategory.toTop.map default ≫
       SimplexCategory.toTop.map (SimplexCategory.δ 0)) ≫
-    homotopyMap H = s ≫ f := by
+    homotopyMap H = s ≫ g := by
+  ext x
+  have h_t : ((TopCat.Hom.hom stdSimplex1_iso_I.hom) ((TopCat.Hom.hom (SimplexCategory.toTop.map default ≫ SimplexCategory.toTop.map (SimplexCategory.δ 0))) x)).down = 1 := by
+    change (stdSimplexHomeomorphUnitInterval _ : I) = 1
+    ext
+    change ((stdSimplexHomeomorphUnitInterval _ : I) : ℝ) = 1
+    change ((stdSimplex.map _ _) 1 : ℝ) = 1
+    erw [stdSimplex.map_coe]
+    rw [FunOnFinite.linearMap_apply_apply]
+    change Finset.sum (Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 0)) x_1 = (1 : Fin 2)) Finset.univ) _ = 1
+    have h0 : Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 0)) x_1 = (1 : Fin 2)) Finset.univ = {(0 : Fin 1)} := rfl
+    rw [h0, Finset.sum_singleton]
+    change ((stdSimplex.map _ x.down) 0 : ℝ) = 1
+    erw [stdSimplex.map_coe]
+    rw [FunOnFinite.linearMap_apply_apply]
+    change Finset.sum (Finset.filter (fun x_1 => (ConcreteCategory.hom (default : SimplexCategory.mk n ⟶ SimplexCategory.mk 0)) x_1 = (0 : Fin 1)) Finset.univ) _ = 1
+    have hs : Finset.filter (fun x_1 => (ConcreteCategory.hom (default : SimplexCategory.mk n ⟶ SimplexCategory.mk 0)) x_1 = (0 : Fin 1)) Finset.univ = Finset.univ := by
+      ext y
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and, iff_true]
+      rfl
+    rw [hs]
+    exact x.down.property.2
   sorry
+  -- show H.toContinuousMap _ = g.hom' ((ConcreteCategory.hom s) x)
+  -- exact (congr_arg H.toContinuousMap (Prod.ext h_t rfl)).trans (H.apply_one _)
 
-/-- Composing a product simplex `(s, const ≫ δ₁)` with the homotopy map gives `s ≫ g`.
+/-- Composing a product simplex `(s, const ≫ δ₁)` with the homotopy map gives `s ≫ f`.
 
 Geometrically: `δ₁` includes `Δ[0]` as vertex 0 of `Δ[1]`, which under the
-standard simplex–interval homeomorphism corresponds to `t = 1` in `I`,
-so the homotopy evaluates to `g`. -/
+standard simplex–interval homeomorphism corresponds to `t = 0` in `I`,
+so the homotopy evaluates to `f`. -/
 lemma homotopyMap_comp_delta1 {X Y : TopCat.{u}} {n : ℕ} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') (s : Δ[n] ⟶ X) :
     prod.lift s (SimplexCategory.toTop.map default ≫
       SimplexCategory.toTop.map (SimplexCategory.δ 1)) ≫
-    homotopyMap H = s ≫ g := by
+    homotopyMap H = s ≫ f := by
+  ext x
+  have h_t : ((TopCat.Hom.hom stdSimplex1_iso_I.hom) ((TopCat.Hom.hom (SimplexCategory.toTop.map default ≫ SimplexCategory.toTop.map (SimplexCategory.δ 1))) x)).down = 0 := by
+    change (stdSimplexHomeomorphUnitInterval _ : I) = 0
+    ext
+    change ((stdSimplexHomeomorphUnitInterval _ : I) : ℝ) = 0
+    change ((stdSimplex.map _ _) 1 : ℝ) = 0
+    erw [stdSimplex.map_coe]
+    rw [FunOnFinite.linearMap_apply_apply]
+    change Finset.sum (Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 1)) x_1 = (1 : Fin 2)) Finset.univ) _ = 0
+    have h0 : Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 1)) x_1 = (1 : Fin 2)) Finset.univ = ∅ := rfl
+    rw [h0, Finset.sum_empty]
   sorry
+  -- show H.toContinuousMap _ = f.hom' ((ConcreteCategory.hom s) x)
+  -- exact (congr_arg H.toContinuousMap (Prod.ext h_t rfl)).trans (H.apply_zero _)
 
 end HomologyLean.SingularHomology
