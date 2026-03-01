@@ -49,7 +49,21 @@ lemma homotopyMap_eval {X Y : TopCat.{u}} {f g : X ⟶ Y}
     H.toContinuousMap
       (((TopCat.Hom.hom stdSimplex1_iso_I.hom) ((TopCat.Hom.hom c) x)).down,
        (TopCat.Hom.hom s) x) := by
-  sorry
+  unfold homotopyMap
+  simp only [ConcreteCategory.comp_apply]
+  erw [TopCat.prodIsoProd_hom_apply]
+  simp only [prod.braiding_hom]
+  simp only [← ConcreteCategory.comp_apply, prod.map_fst, prod.map_snd, Category.assoc]
+  simp only [ConcreteCategory.comp_apply, ConcreteCategory.id_apply]
+  rw [← ConcreteCategory.comp_apply (prod.lift prod.snd prod.fst) prod.fst]
+  rw [prod.lift_fst]
+  rw [← ConcreteCategory.comp_apply (prod.lift s c) prod.snd]
+  rw [prod.lift_snd]
+  rw [← ConcreteCategory.comp_apply (prod.lift prod.snd prod.fst) prod.snd]
+  rw [prod.lift_snd]
+  rw [← ConcreteCategory.comp_apply (prod.lift s c) prod.fst]
+  rw [prod.lift_fst]
+  rfl
 
 /-- Composing a product simplex `(s, const ≫ δ₀)` with the homotopy map gives `s ≫ g`.
 
