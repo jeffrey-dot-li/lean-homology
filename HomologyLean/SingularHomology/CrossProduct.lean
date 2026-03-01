@@ -655,6 +655,17 @@ lemma mι_leftUnitor_tensor_crossProduct_zero {X Y : TopCat.{u}}
       (mι (⟪δ⟫ₛ : SingularSimplex Y 0) ⊗ₘ 𝟙 ((mSingChain R X).X 0)) ≫
       crossProduct 0 0 =
     mι (prodSimplex ⟪δ⟫ₛ τ) := by
+  ext x
+  simp
+  dsimp [crossProduct, crossProductNat, liftedCrossProductNat, tensorCoprodNatIso]
+  dsimp [chainGroupIsoFree]
+  erw [coprodIsoFree_ι, coprodIsoFree_ι]
+  erw [freeTensorProductIso_unit]
+  erw [Adjunction.homEquiv_symm_apply]
+  simp only [NatTrans.comp_app, ModuleCat.hom_comp, LinearMap.coe_comp, Function.comp_apply]
+  dsimp [Adjunction.whiskerRight, Functor.whiskeringRight, simplexCrossProductNat]
+  rw [← LinearMap.comp_apply]
+  -- change _ ((ModuleCat.Hom.hom ((ModuleCat.free R).map _)) ((ModuleCat.adj R).unit.app _ _)) = _
   sorry
 
 /-! ## Chain homotopy from the cross product -/
@@ -799,6 +810,37 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     rw [chainH.comm (n + 2) (n + 1)]
     -- Leibniz rule: crossProduct (n+1) 1 ≫ d = (d_X ⊗ 𝟙) ≫ × + (-1)^{n+1} • (𝟙 ⊗ d_Δ[1]) ≫ ×
     rw [← Category.assoc (crossProduct (n + 1) 1), crossProduct_leibniz n 0]
+    -- Distribute tensorι₁ ≫ (A + B) ≫ chainH
+    simp only [Preadditive.add_comp, Preadditive.comp_add, Preadditive.comp_zsmul,
+      Preadditive.zsmul_comp, Category.assoc]
+    -- Flatten to: d_X ≫ P n + X-boundary + Δ-boundary + g
+    conv_rhs => lhs; rw [← add_assoc]
+    -- Name the two Leibniz terms
+    let Xbdy := tensorι₁ (n + 1) ≫
+      ((mSingChain R X).d (n + 1) n ⊗ₘ 𝟙 ((mSingChain R Δ[1]).X (0 + 1))) ≫
+        crossProduct n (0 + 1) ≫ chainH.f (n + 1)
+    let Δbdy := tensorι₁ (n + 1) ≫
+      (𝟙 ((mSingChain R X).X (n + 1)) ⊗ₘ (mSingChain R Δ[1]).d (0 + 1) 0) ≫
+        crossProduct (n + 1) 0 ≫ eqToHom (congrArg _ (Nat.add_zero (n + 1))) ≫
+          chainH.f (n + 1)
+    change _ = ((mSCF R).obj X).d (n + 1) n ≫ P n + Xbdy +
+      (-1) ^ (n + 1) • Δbdy + ((mSCF R).map g).f (n + 1)
+    -- Show Δbdy = f_{n+1} - g_{n+1} (same pattern as i=0 case)
+    have hΔbdy : Δbdy = ((mSCF R).map f).f (n + 1) - ((mSCF R).map g).f (n + 1) := by
+      simp only [Δbdy]
+      conv_lhs => rw [show (eqToHom (congrArg (mSingChain R (X ⨯ Δ[1])).X
+        (Nat.add_zero (n + 1))) ≫ chainH.f (n + 1) : _ ⟶ _) = chainH.f (n + 1) from by simp]
+      -- Now: tensorι₁ (n+1) ≫ (𝟙 ⊗ d_Δ) ≫ ×_{n+1,0} ≫ chainH = f - g
+      -- Unfold tensorι₁, reassociate, combine tensors
+      show (ρ_ _).inv ≫ (𝟙 _ ⊗ₘ mι ι₁) ≫
+        (𝟙 _ ⊗ₘ (mSingChain R Δ[1]).d 1 0) ≫
+          crossProduct (n + 1) 0 ≫ chainH.f (n + 1) = _
+      rw [← Category.assoc (𝟙 _ ⊗ₘ mι ι₁),
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+      rw [boundary_identity_1simplex]
+      rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+      rw [hBoundary₀ (n + 1), hBoundary₁ (n + 1)]
+    rw [hΔbdy]
     sorry
 
 /-! ## Homotopy invariance of singular homology -/
