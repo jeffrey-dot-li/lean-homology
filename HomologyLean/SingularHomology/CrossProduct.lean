@@ -724,6 +724,43 @@ lemma boundary_identity_1simplex :
   erw [colimit.ι_desc, colimit.ι_desc]
   rfl
 
+/-- Evaluating the cross product `C_n(X) ⊗ C_0(Δ[1]) → C_n(X × Δ[1])` on a
+0-simplex `c` in `Δ[1]` and pushing forward along `Hmap : X ⨯ Δ[1] ⟶ Y`
+recovers the chain map of `h`, provided `Hmap` sends `(s, c)` to `s ≫ h`
+for every `n`-simplex `s`.
+
+This is the common core of the `hBoundary₀` / `hBoundary₁` arguments. -/
+private lemma crossProduct_zero_right_boundary {X Y : TopCat.{u}}
+    (Hmap : X ⨯ Δ[1] ⟶ Y) (c : SingularSimplex Δ[1] 0) (h : X ⟶ Y)
+    (heval : ∀ {n : ℕ} (s : SingularSimplex X n),
+      prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down) ≫ Hmap = s.down ≫ h)
+    (n : ℕ) :
+    (ρ_ (((mSCF R).obj X).X n)).inv ≫
+      (𝟙 (((mSCF R).obj X).X n) ⊗ₘ mι c) ≫
+      crossProduct n 0 ≫ ((mSCF R).map Hmap).f n =
+    ((mSCF R).map h).f n := by
+  apply mι_ext; intro s
+  rw [← Category.assoc (mι s), MonoidalCategory.rightUnitor_inv_naturality]
+  simp only [Category.assoc]
+  have h_tensor : mι s ▷ 𝟙_ (ModuleCat R) = mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R)) := rfl
+  rw [h_tensor]
+  change _ ≫ (mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R))) ≫ _ = _
+  rw [← Category.assoc (mι s ⊗ₘ _)]
+  erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  rw [Category.id_comp]
+  rw [← Category.assoc (mι s ⊗ₘ _), mι_tensor_comp_crossProduct]
+  rw [Category.assoc, ← Category.assoc (ρ_ (Rmod R)).inv (λ_ (Rmod R)).hom]
+  rw [show (ρ_ (Rmod R)).inv ≫ (λ_ (Rmod R)).hom = 𝟙 _ from by
+    erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
+  rw [Category.id_comp]
+  rw [mι_comp_map]
+  rw [simplexCrossProduct_zero_right]
+  rw [mι_comp_map]
+  congr 1
+  simp only [singularSimplexFunctor]
+  apply ULift.ext; simp only [SingularSimplex.ofΔ_down]
+  exact heval s
+
 /-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
 induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
 
@@ -772,68 +809,16 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 ≫ chainH.f n =
-       ((mSCF R).map f).f n := by
-    intro n
-    apply mι_ext; intro s
-    rw [← Category.assoc (mι s), MonoidalCategory.rightUnitor_inv_naturality]
-    simp only [Category.assoc]
-    have h_tensor : mι s ▷ 𝟙_ (ModuleCat R) = mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R)) := rfl
-    rw [h_tensor]
-    change _ ≫ (mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R))) ≫ _ = _
-    rw [← Category.assoc (mι s ⊗ₘ _)]
-    erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
-    rw [Category.id_comp]
-    rw [← Category.assoc (mι s ⊗ₘ _), mι_tensor_comp_crossProduct]
-    rw [Category.assoc, ← Category.assoc (ρ_ (Rmod R)).inv (λ_ (Rmod R)).hom]
-    rw [show (ρ_ (Rmod R)).inv ≫ (λ_ (Rmod R)).hom = 𝟙 _ from by
-      erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
-    rw [Category.id_comp]
-    -- Both sides are R-linear maps R → C_n(Y); use mι_comp_map on RHS, simplexCrossProductElem_natural on LHS
-    rw [mι_comp_map]
-    unfold chainH
-    rw [simplexCrossProduct_zero_right]
-    rw [mι_comp_map]
-    congr 1
-    simp only [singularSimplexFunctor]
-    apply ULift.ext; simp only [SingularSimplex.ofΔ_down]
-    show prod.lift s.down
-      (SimplexCategory.toTop.map default ≫
-        SimplexCategory.toTop.map (SimplexCategory.δ 0)) ≫ Hmap = s.down ≫ f
-    exact homotopyMap_comp_delta0 H s.down
-
+       ((mSCF R).map f).f n :=
+    crossProduct_zero_right_boundary (R := R) Hmap _ f fun s => homotopyMap_comp_delta0 H s.down
   have hBoundary₁ : ∀ n,
       (ρ_ (((mSCF R).obj X).X n)).inv ≫
         (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 ≫ chainH.f n =
-        ((mSCF R).map g).f n := by
-    intro n
-    apply mι_ext; intro s
-    rw [← Category.assoc (mι s), MonoidalCategory.rightUnitor_inv_naturality]
-    simp only [Category.assoc]
-    have h_tensor : mι s ▷ 𝟙_ (ModuleCat R) = mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R)) := rfl
-    rw [h_tensor]
-    change _ ≫ (mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R))) ≫ _ = _
-    rw [← Category.assoc (mι s ⊗ₘ _)]
-    erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
-    rw [Category.id_comp]
-    rw [← Category.assoc (mι s ⊗ₘ _), mι_tensor_comp_crossProduct]
-    rw [Category.assoc, ← Category.assoc (ρ_ (Rmod R)).inv (λ_ (Rmod R)).hom]
-    rw [show (ρ_ (Rmod R)).inv ≫ (λ_ (Rmod R)).hom = 𝟙 _ from by
-      erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
-    rw [Category.id_comp]
-    rw [mι_comp_map]
-    unfold chainH
-    rw [simplexCrossProduct_zero_right]
-    rw [mι_comp_map]
-    congr 1
-    simp only [singularSimplexFunctor]
-    apply ULift.ext; simp only [SingularSimplex.ofΔ_down]
-    show prod.lift s.down
-      (SimplexCategory.toTop.map default ≫
-        SimplexCategory.toTop.map (SimplexCategory.δ 1)) ≫ Hmap = s.down ≫ g
-    exact homotopyMap_comp_delta1 H s.down
+        ((mSCF R).map g).f n :=
+    crossProduct_zero_right_boundary (R := R) Hmap _ g fun s => homotopyMap_comp_delta1 H s.down
   match i with
   | 0 =>
     rw [dNext_eq_zero _ 0 (by simp [ComplexShape.down_Rel])]
@@ -920,8 +905,6 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
       -- f ▷ Y = f ⊗ₘ 𝟙 Y, then (f ⊗ₘ 𝟙) ≫ (𝟙 ⊗ₘ g) = (f ≫ 𝟙) ⊗ₘ (𝟙 ≫ g) = f ⊗ₘ g
       rw [← MonoidalCategory.tensorHom_id,
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id, Category.id_comp]
-
-
     simp only [← Category.assoc (tensorι₁ (n + 1)), htensor_nat, Category.assoc]
     norm_num
     rw [pow_succ, mul_neg_one, neg_smul]
