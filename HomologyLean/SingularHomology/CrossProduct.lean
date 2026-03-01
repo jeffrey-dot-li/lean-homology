@@ -840,8 +840,29 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
       rw [boundary_identity_1simplex]
       rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
       rw [hBoundary₀ (n + 1), hBoundary₁ (n + 1)]
-    rw [hΔbdy]
-    sorry
+    -- dP + Xbdy = (1 - (-1)^{n+1}) • (f - g)
+    -- tensorι₁ (n+1) ≫ (d_X ⊗ 𝟙) = d_X ≫ tensorι₁ n (naturality of right-tensoring)
+    have htensor_nat : tensorι₁ (n + 1) ≫
+        ((mSingChain R X).d (n + 1) n ⊗ₘ 𝟙 ((mSingChain R Δ[1]).X (0 + 1))) =
+        ((mSCF R).obj X).d (n + 1) n ≫ tensorι₁ n := by
+      simp only [tensorι₁, Category.assoc]
+      rw [MonoidalCategory.tensorHom_comp_tensorHom, Category.id_comp, Category.comp_id]
+      -- Goal: ρ⁻¹ ≫ (d_X ⊗ₘ mι ι₁) = d_X ≫ ρ⁻¹ ≫ (𝟙 ⊗ₘ mι ι₁)
+      -- Rewrite RHS: d_X ≫ ρ⁻¹ = ρ⁻¹ ≫ (d_X ▷ 𝟙_) by rightUnitor_inv_naturality
+      conv_rhs =>
+        rw [← Category.assoc, MonoidalCategory.rightUnitor_inv_naturality, Category.assoc]
+      congr 1
+      -- Goal: d_X ⊗ₘ mι ι₁ = (d_X ▷ 𝟙_) ≫ (𝟙 ⊗ₘ mι ι₁)
+      -- f ▷ Y = f ⊗ₘ 𝟙 Y, then (f ⊗ₘ 𝟙) ≫ (𝟙 ⊗ₘ g) = (f ≫ 𝟙) ⊗ₘ (𝟙 ≫ g) = f ⊗ₘ g
+      rw [← MonoidalCategory.tensorHom_id,
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id, Category.id_comp]
+    have hXbdy : ((mSCF R).obj X).d (n + 1) n ≫ P n + Xbdy =
+        (1 - (-1) ^ (n + 1)) •
+          (((mSCF R).map f).f (n + 1) - ((mSCF R).map g).f (n + 1)) := by
+      sorry
+    rw [hXbdy, hΔbdy]
+    simp [smul_sub, sub_smul, one_smul]
+    abel
 
 /-! ## Homotopy invariance of singular homology -/
 
