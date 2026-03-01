@@ -103,7 +103,16 @@ noncomputable def coprodIsoFreeNat (R : Type u) [CommRing R] :
     coprodFreeFunctor (R := Rmod R) ≅ ModuleCat.free R :=
   NatIso.ofComponents
     (fun A => coprodIsoFree R A)
-    (fun {A B} f => by sorry)
+    (fun {A B} f => by
+      apply CategoryTheory.Limits.Sigma.hom_ext
+      intro a
+      dsimp [coprodFreeFunctor, coprodIsoFree]
+      simp only [CategoryTheory.Limits.colimit.ι_desc_assoc, CategoryTheory.Limits.Cofan.mk_pt, CategoryTheory.Limits.Cofan.mk_ι_app]
+      ext x
+      simp [ModuleCat.coprodIsoDirectSum, ModuleCat.coproductCocone]
+      erw [finsuppLEquivDirectSum_symm_lof, finsuppLEquivDirectSum_symm_lof]
+      erw [Finsupp.lmapDomain_apply, Finsupp.mapDomain_single]
+    )
 
 /-! ### The canonical isomorphism `Free(A) ⊗ Free(B) ≅ Free(A × B)` -/
 
