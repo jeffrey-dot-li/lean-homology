@@ -36,6 +36,21 @@ noncomputable def homotopyMap {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (show TopCat.of (ULift.{u} I × X) ⟶ Y from
       ⟨⟨fun ⟨t, x⟩ => H.toContinuousMap ⟨t.down, x⟩, by fun_prop⟩⟩)
 
+/-- Pointwise evaluation of `prod.lift s c ≫ homotopyMap H` at `x`:
+the categorical product chain (braiding, prod.map, prodIsoProd) reduces to
+`H.toContinuousMap` applied to `(iso(c(x)).down, s(x))`.
+
+This is the key computational lemma that normalizes away the `TopCat` limit
+machinery so that downstream rewrites (e.g., `rw [h_t]`) have clean motives. -/
+lemma homotopyMap_eval {X Y : TopCat.{u}} {f g : X ⟶ Y}
+    (H : ContinuousMap.Homotopy f.hom' g.hom')
+    {Z : TopCat.{u}} (s : Z ⟶ X) (c : Z ⟶ Δ[1]) (x : Z) :
+    (ConcreteCategory.hom (prod.lift s c ≫ homotopyMap H)) x =
+    H.toContinuousMap
+      (((TopCat.Hom.hom stdSimplex1_iso_I.hom) ((TopCat.Hom.hom c) x)).down,
+       (TopCat.Hom.hom s) x) := by
+  sorry
+
 /-- Composing a product simplex `(s, const ≫ δ₀)` with the homotopy map gives `s ≫ g`.
 
 Geometrically: `δ₀` includes `Δ[0]` as vertex 1 of `Δ[1]`, which under the
@@ -67,9 +82,9 @@ lemma homotopyMap_comp_delta0 {X Y : TopCat.{u}} {n : ℕ} {f g : X ⟶ Y}
       rfl
     rw [hs]
     exact x.down.property.2
-  sorry
-  -- show H.toContinuousMap _ = g.hom' ((ConcreteCategory.hom s) x)
-  -- exact (congr_arg H.toContinuousMap (Prod.ext h_t rfl)).trans (H.apply_one _)
+  rw [homotopyMap_eval]
+  rw [h_t]
+  exact H.apply_one _
 
 /-- Composing a product simplex `(s, const ≫ δ₁)` with the homotopy map gives `s ≫ f`.
 
@@ -92,8 +107,8 @@ lemma homotopyMap_comp_delta1 {X Y : TopCat.{u}} {n : ℕ} {f g : X ⟶ Y}
     change Finset.sum (Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 1)) x_1 = (1 : Fin 2)) Finset.univ) _ = 0
     have h0 : Finset.filter (fun x_1 => (ConcreteCategory.hom (SimplexCategory.δ 1)) x_1 = (1 : Fin 2)) Finset.univ = ∅ := rfl
     rw [h0, Finset.sum_empty]
-  sorry
-  -- show H.toContinuousMap _ = f.hom' ((ConcreteCategory.hom s) x)
-  -- exact (congr_arg H.toContinuousMap (Prod.ext h_t rfl)).trans (H.apply_zero _)
+  rw [homotopyMap_eval]
+  rw [h_t]
+  exact H.apply_zero _
 
 end HomologyLean.SingularHomology
