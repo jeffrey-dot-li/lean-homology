@@ -130,3 +130,58 @@ set lift := cov.liftPath γ e γ_0
 have h_lifts := cov.liftPath_lifts γ e γ_0
 have h_mono := cov.liftPath_apply_one_eq_of_homotopicRel h e₁ e₂
 ```
+
+## Extensionality for tensor of free modules (coproducts)
+
+When proving `f = g` for morphisms `f g : (∐ A) ⊗ (∐ B) ⟶ M` from a tensor product of coproducts in `ModuleCat`, you cannot directly apply `TensorProduct.ext` combined with `Sigma.hom_ext` cleanly. Instead, use the monoidal closed adjunction to curry out the tensor product:
+
+```lean
+-- Curry the tensor to extract `b : B` via Sigma.hom_ext on the right
+apply Equiv.injective ((ihom.adjunction (∐ fun _ : B => Rmod R)).homEquiv _ M)
+apply CategoryTheory.Limits.Sigma.hom_ext
+intro b
+
+-- Uncurry and simplify to expose the tensor structure
+apply Equiv.injective ((ihom.adjunction (∐ fun _ : B => Rmod R)).homEquiv _ M).symm
+simp only [Adjunction.homEquiv_naturality_left_symm, Equiv.symm_apply_apply]
+
+-- Compose out the right unitor and extract `a : A` via Sigma.hom_ext on the left
+rw [← cancel_epi (ρ_ _).inv]
+apply CategoryTheory.Limits.Sigma.hom_ext
+intro a
+
+-- Reassociate the tensored morphism and repackage `(Sigma.ι a ▷ _) ≫ (_ ◁ Sigma.ι b)`
+simp only [Category.assoc]
+rw [CategoryTheory.MonoidalCategory.rightUnitor_inv_naturality_assoc (Sigma.ι _ a)]
+have hf : (ρ_ _).inv ≫ (Sigma.ι _ a ▷ 𝟙_ _) ≫ (tensorLeft _).map (Sigma.ι _ b) ≫ f = 
+          (ρ_ _).inv ≫ (Sigma.ι _ a ⊗ₘ Sigma.ι _ b) ≫ f := by
+  change (ρ_ _).inv ≫ (Sigma.ι _ a ⊗ₘ Sigma.ι _ b) ≫ f = _
+  rfl
+```
+This reduces the goal to matching `(Sigma.ι a ⊗ₘ Sigma.ι b) ≫ f`, allowing you to apply hypotheses directly.
+
+## Relating categorical Coproducts to DirectSum and Finsupp
+
+When proving properties about isomorphisms between a categorical coproduct of free modules (`∐ fun _ : A => Rmod R`) and Mathlib's `ModuleCat.free R` (which is based on `Finsupp`), follow this standard sequence to reduce the goal to evaluating elements on `Finsupp.single`:
+
+```lean
+-- 1. Reduce equality of morphisms out of a coproduct to components
+apply CategoryTheory.Limits.Sigma.hom_ext
+intro a
+
+-- 2. Clean up functor/colimit mappings (exposes `Sigma.ι` composing with `Sigma.desc`)
+simp only [CategoryTheory.Limits.colimit.ι_desc_assoc, CategoryTheory.Limits.Cofan.mk_pt, CategoryTheory.Limits.Cofan.mk_ι_app]
+
+-- 3. Element extensionality: reduce to evaluating the module morphism at `1 : R`
+ext
+
+-- 4. Translate the categorical `coprodIsoDirectSum` into the algebraic `DirectSum.lof`
+simp [ModuleCat.coprodIsoDirectSum, ModuleCat.coproductCocone]
+
+-- 5. Translate `DirectSum.lof` to `Finsupp.single a 1` using the equivalence
+erw [finsuppLEquivDirectSum_symm_lof, finsuppLEquivDirectSum_symm_lof]
+
+-- 6. Evaluate the Finsupp maps (like `Finsupp.lmapDomain` inside `(ModuleCat.free R).map f`)
+erw [Finsupp.lmapDomain_apply, Finsupp.mapDomain_single]
+```
+This is the canonical path for traversing `CategoryTheory.Limits.Sigma` ↔ `DirectSum` ↔ `Finsupp`.

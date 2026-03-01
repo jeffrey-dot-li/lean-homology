@@ -108,7 +108,7 @@ noncomputable def coprodIsoFreeNat (R : Type u) [CommRing R] :
       intro a
       dsimp [coprodFreeFunctor, coprodIsoFree]
       simp only [CategoryTheory.Limits.colimit.ι_desc_assoc, CategoryTheory.Limits.Cofan.mk_pt, CategoryTheory.Limits.Cofan.mk_ι_app]
-      ext x
+      ext
       simp [ModuleCat.coprodIsoDirectSum, ModuleCat.coproductCocone]
       erw [finsuppLEquivDirectSum_symm_lof, finsuppLEquivDirectSum_symm_lof]
       erw [Finsupp.lmapDomain_apply, Finsupp.mapDomain_single]
