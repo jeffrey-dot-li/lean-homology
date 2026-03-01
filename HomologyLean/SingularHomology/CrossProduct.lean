@@ -133,7 +133,9 @@ lemma coprodIsoFree_ι (A : Type u) (a : A) :
     (ModuleCat.Hom.hom ((Sigma.ι (fun _ : A => Rmod R) a) ≫ (coprodIsoFree R A).hom))
       (1 : R) =
     (ModuleCat.adj R).unit.app A a := by
-  sorry
+  simp [coprodIsoFree, ModuleCat.coprodIsoDirectSum, ModuleCat.coproductCocone]
+  erw [finsuppLEquivDirectSum_symm_lof]
+  rfl
 
 /-- The monoidal structure iso `Free(A) ⊗ Free(B) ≅ Free(A × B)` maps
 `η(a) ⊗ η(b)` to `η(a, b)` (basis element of the product). -/
@@ -143,7 +145,9 @@ lemma freeTensorProductIso_unit (A B : Type u) (a : A) (b : B) :
         ((ModuleCat.adj R).unit.app A a)
         ((ModuleCat.adj R).unit.app B b)) =
     (ModuleCat.adj R).unit.app (A × B) (a, b) := by
-  sorry
+  change (finsuppTensorFinsupp' R A B) (Finsupp.single a 1 ⊗ₜ[R] Finsupp.single b 1) =
+    Finsupp.single (a, b) 1
+  rw [finsuppTensorFinsupp'_single_tmul_single R A B a b 1 1, mul_one]
 
 end ModuleCatLemmas
 
