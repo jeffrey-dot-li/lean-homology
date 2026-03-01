@@ -186,6 +186,15 @@ lemma mι_comp_map {X Y : TopCat.{u}} {n : ℕ}
   erw [colimit.ι_desc]
   simp only [Cofan.mk_ι_app, Category.id_comp]; rfl
 
+@[ext]
+lemma mι_ext {X : TopCat.{u}} {n : ℕ} {M : ModuleCat.{u} R}
+    {f g : (mSingChain R X).X n ⟶ M}
+    (h : ∀ s : SingularSimplex X n, mι s ≫ f = mι s ≫ g) :
+    f = g := by
+  apply CategoryTheory.Limits.Sigma.hom_ext
+  intro s
+  exact h s
+
 /-! ### Naturality of `simplexCrossProduct` (specialized to `ModuleCat R`) -/
 
 /-- The underlying element of the chain group corresponding to the simplex-level cross product,
@@ -768,7 +777,24 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 ≫ chainH.f n =
-       ((mSCF R).map f).f n := by sorry
+       ((mSCF R).map f).f n := by
+    intro n
+    apply mι_ext; intro s
+    rw [← Category.assoc (mι s), MonoidalCategory.rightUnitor_inv_naturality]
+    simp only [Category.assoc]
+    have h_tensor : mι s ▷ 𝟙_ (ModuleCat R) = mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R)) := rfl
+    rw [h_tensor]
+    change _ ≫ (mι s ⊗ₘ 𝟙 (𝟙_ (ModuleCat R))) ≫ _ = _
+    rw [← Category.assoc (mι s ⊗ₘ _)]
+    erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+    rw [Category.id_comp]
+    rw [← Category.assoc (mι s ⊗ₘ _), mι_tensor_comp_crossProduct]
+    rw [Category.assoc, ← Category.assoc (ρ_ (Rmod R)).inv (λ_ (Rmod R)).hom]
+    rw [show (ρ_ (Rmod R)).inv ≫ (λ_ (Rmod R)).hom = 𝟙 _ from by
+      erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
+    rw [Category.id_comp]
+    sorry
+
   have hBoundary₁ : ∀ n,
       (ρ_ (((mSCF R).obj X).X n)).inv ≫
         (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
