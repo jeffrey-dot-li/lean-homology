@@ -235,6 +235,18 @@ lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
       ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ := by
   sorry
 
+/-- For `p = 0`, the cross product of a `0`-simplex `c` in `X` with an `n`-simplex `s`
+in `Y` reduces to a single product simplex `t ↦ (c(*), s(t))`.
+
+There is a unique `(0, n)`-shuffle with sign `1`, so the shuffle sum collapses. -/
+lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
+    (c : SingularSimplex X 0) (s : SingularSimplex Y n) :
+    simplexCrossProduct (C := C) (R := R) c s =
+    simplexCoprojection
+      ⟪prod.lift (SimplexCategory.toTop.map default ≫ c.down) s.down⟫ₛ ≫
+    eqToHom (by simp) := by
+  sorry
+
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
     simplexCrossProduct (R := R) (p := p) (q := q)
