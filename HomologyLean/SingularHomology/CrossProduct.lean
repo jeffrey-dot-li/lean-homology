@@ -694,19 +694,6 @@ lemma crossProduct_leibniz_right_zero {X Y : TopCat.{u}} (p : ℕ) :
       crossProduct p 0 := by
   sorry
 
-/-- Leibniz rule for the cross product when the left index is zero (q = 0):
-the boundary acts only on the right factor.
-```
-  crossProduct 0 1 ≫ d = (𝟙 ⊗ d) ≫ crossProduct 0 0
-``` -/
-lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
-    crossProduct (R := R) (X := X) (Y := Y) 0 1 ≫
-      (mSingChain R (X ⨯ Y)).d 1 0 =
-    (𝟙 ((mSingChain R X).X 0) ⊗ₘ
-        (mSingChain R Y).d 1 0) ≫
-      crossProduct 0 0 := by
-  sorry
-
 /-- The boundary of the identity 1-simplex is the difference of the two
 face inclusions: `∂(𝟙_{Δ[1]}) = δ₀ - δ₁` in `C_0(Δ[1])`.
 
@@ -723,6 +710,57 @@ lemma boundary_identity_1simplex :
   simp only [Fin.val_zero, pow_zero, one_smul, Fin.val_one, pow_one, neg_smul, sub_eq_add_neg]
   erw [colimit.ι_desc, colimit.ι_desc]
   rfl
+
+/-- Leibniz rule for the cross product when the left index is zero (q = 0):
+the boundary acts only on the right factor.
+```
+  crossProduct 0 1 ≫ d = (𝟙 ⊗ d) ≫ crossProduct 0 0
+``` -/
+lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
+    crossProduct (R := R) (X := X) (Y := Y) 0 1 ≫
+      (mSingChain R (X ⨯ Y)).d 1 0 =
+    (𝟙 ((mSingChain R X).X 0) ⊗ₘ
+        (mSingChain R Y).d 1 0) ≫
+      crossProduct 0 0 := by
+  apply coprod_tensor_ext
+  intro s t
+  rw [show Sigma.ι _ s = mι s from rfl, show Sigma.ι _ t = mι t from rfl]
+  rw [← Category.assoc (mι s ⊗ₘ mι t) (crossProduct 0 1),
+      mι_tensor_comp_crossProduct]
+  conv_rhs =>
+    rw [← Category.assoc (mι s ⊗ₘ mι t),
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  conv_rhs =>
+    arg 1; arg 2
+    rw [mι_factor (R := R) t, Category.assoc, ((mSCF R).map t.down).comm 1 0,
+        ← Category.assoc]
+    erw [boundary_identity_1simplex]
+  conv_rhs =>
+    arg 1; arg 2
+    rw [Preadditive.sub_comp, mι_comp_map, mι_comp_map]
+  rw [tensorHom_sub, Preadditive.sub_comp,
+      mι_tensor_comp_crossProduct, mι_tensor_comp_crossProduct]
+  rw [Category.assoc, ← Preadditive.comp_sub]
+  congr 1
+  rw [simplexCrossProduct_zero_right, simplexCrossProduct_zero_right]
+  rw [simplexCrossProduct_zero_left, Category.assoc]
+  simp only [eqToHom_refl, Category.id_comp]
+  change mι _ ≫ _ = mι _ - mι _
+  rw [mι_factor (R := R) ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ,
+      Category.assoc, ((mSCF R).map _).comm 1 0, ← Category.assoc]
+  erw [boundary_identity_1simplex]
+  rw [Preadditive.sub_comp, mι_comp_map, mι_comp_map]
+  congr 1 <;> congr 1 <;> {
+    apply ULift.ext
+    simp only [singularSimplexFunctor, SingularSimplex.ofΔ_down]
+    rw [prod.comp_lift]
+    apply CategoryTheory.Limits.prod.hom_ext
+    · rw [prod.lift_fst, prod.lift_fst, ← Category.assoc,
+          ← SimplexCategory.toTop.map_comp, SimplexCategory.δ_comp_default_mk1,
+          SimplexCategory.toTop.map_id, Category.id_comp]
+    · rw [prod.lift_snd, prod.lift_snd, ← Category.assoc,
+          ← SimplexCategory.toTop.map_comp, SimplexCategory.default_mk0_eq_id, Category.id_comp]
+  }
 
 /-- Evaluating the cross product `C_n(X) ⊗ C_0(Δ[1]) → C_n(X × Δ[1])` on a
 0-simplex `c` in `Δ[1]` and pushing forward along `Hmap : X ⨯ Δ[1] ⟶ Y`

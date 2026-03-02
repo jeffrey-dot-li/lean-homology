@@ -254,6 +254,14 @@ instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
       exact congrArg Fin.val (heq i)
     · simp
 
+@[simp] lemma SimplexCategory.default_mk0_eq_id :
+    (default : SimplexCategory.mk 0 ⟶ SimplexCategory.mk 0) = 𝟙 _ := by
+  ext ⟨j, hj⟩; simp [default, SimplexCategory.Hom.toOrderHom]
+
+@[simp] lemma SimplexCategory.δ_comp_default_mk1 (i : Fin 2) :
+    SimplexCategory.δ i ≫ (default : SimplexCategory.mk 1 ⟶ SimplexCategory.mk 0) = 𝟙 _ := by
+  ext ⟨j, hj⟩; simp [default, SimplexCategory.Hom.toOrderHom, SimplexCategory.δ]
+
 lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
     simplexCrossProduct (C := C) (R := R) s c =
