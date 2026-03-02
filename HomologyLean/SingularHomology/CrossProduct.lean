@@ -521,7 +521,44 @@ theorem simplexCrossProduct_leibniz (p q : ℕ) :
     rw [← Category.assoc (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ),
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
 
-  sorry
+  have boundary_gen : ∀ (n : ℕ),
+      mι (R := R) ⟪𝟙 (Δ[n + 1] : TopCat.{u})⟫ₛ ≫ (mSingChain R Δ[n + 1]).d (n + 1) n =
+      ∑ i : Fin (n + 2), ((-1 : ℤ) ^ (i : ℕ)) •
+        mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ i)⟫ₛ : SingularSimplex Δ[n + 1] n) := by
+    intro n
+    simp only [mSingChain, singChain]
+    dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+    simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
+    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
+    refine Finset.sum_congr rfl (fun i _ => ?_)
+    refine congrArg ((-1 : ℤ) ^ (i : ℕ) • ·) ?_
+    erw [colimit.ι_desc]
+    rfl
+  rw [boundary_gen p, boundary_gen q]
+  simp only [sum_tensor, tensor_sum, Preadditive.sum_comp]
+  have zsmul_tensorHom : ∀ {A B C D : ModuleCat.{u} R}
+      (n : ℤ) (f : A ⟶ B) (g : C ⟶ D),
+      (n • f) ⊗ₘ g = n • (f ⊗ₘ g) := fun n f g => by
+    simp only [MonoidalCategory.tensorHom_def]
+    rw [show (n • f) ▷ _ = n • (f ▷ _) from
+      Functor.map_zsmul (F := MonoidalCategory.tensorRight _)]
+    rw [Preadditive.zsmul_comp]
+  have tensorHom_zsmul : ∀ {A B C D : ModuleCat.{u} R}
+      (n : ℤ) (f : A ⟶ B) (g : C ⟶ D),
+      f ⊗ₘ (n • g) = n • (f ⊗ₘ g) := fun n f g => by
+    simp only [MonoidalCategory.tensorHom_def]
+    rw [show _ ◁ (n • g) = n • (_ ◁ g) from
+      Functor.map_zsmul (F := MonoidalCategory.tensorLeft _)]
+    rw [Preadditive.comp_zsmul]
+  simp_rw [zsmul_tensorHom, tensorHom_zsmul,
+    Preadditive.zsmul_comp]
+  simp only [mι_tensor_comp_crossProduct]
+  simp_rw [← Category.assoc (mι _ ⊗ₘ mι _), mι_tensor_comp_crossProduct, Category.assoc]
+  simp_rw [← Preadditive.comp_zsmul, ← Preadditive.comp_sum]
+  rw [← Preadditive.comp_zsmul, ← Preadditive.comp_add]
+  congr 1
+  simp_rw [Preadditive.comp_zsmul]
+  exact universalSimplexCrossProduct_boundary p q
 
 /-- Pushing a tensor of chain maps past a tensor of morphisms and then past `crossProduct`.
 Given commutativity conditions `hα : f_* ≫ α₁ = α₂ ≫ f_*` and `hβ : g_* ≫ β₁ = β₂ ≫ g_*`,

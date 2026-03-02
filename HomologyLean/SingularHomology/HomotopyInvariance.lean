@@ -352,6 +352,35 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
   -- Finish by rewriting the LHS using `hmap` and `hprod`.
   simp [hmap, hprod]
 
+/-! ### Universal Leibniz rule for the simplex-level cross product -/
+
+/-- The boundary of the universal simplex cross product decomposes as a signed sum
+of face-map cross products (the "universal Leibniz rule"):
+```
+  universalSimplexCrossProduct (p+1) (q+1) ≫ ∂ =
+    ∑ j, (-1)^j · simplexCrossProduct (δ_j) (id) +
+    (-1)^{p+1} · ∑ j, (-1)^j · simplexCrossProduct (id) (δ_j) ≫ eqToHom ...
+```
+The `eqToHom` accounts for `(p+1) + q = p + (q+1)`. -/
+theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
+    universalSimplexCrossProduct (C := C) (R := R) (p + 1) (q + 1) ≫
+      (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+        (p + 1 + (q + 1)) (p + (q + 1)) =
+    ∑ j : Fin (p + 2),
+      ((-1 : ℤ) ^ (j : ℕ)) •
+        simplexCrossProduct (C := C) (R := R)
+          ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ
+          ⟪𝟙 Δ[q + 1]⟫ₛ +
+    ((-1 : ℤ) ^ (p + 1)) •
+      ∑ j : Fin (q + 2),
+        ((-1 : ℤ) ^ (j : ℕ)) •
+          simplexCrossProduct (C := C) (R := R)
+            ⟪𝟙 Δ[p + 1]⟫ₛ
+            ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ ≫
+          eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
+            (by omega)) := by
+  sorry
+
 /-! The chain-level cross product and homotopy invariance theorems
 are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
 
