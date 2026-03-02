@@ -41,7 +41,14 @@ the categorical product chain (braiding, prod.map, prodIsoProd) reduces to
 `H.toContinuousMap` applied to `(iso(c(x)).down, s(x))`.
 
 This is the key computational lemma that normalizes away the `TopCat` limit
-machinery so that downstream rewrites (e.g., `rw [h_t]`) have clean motives. -/
+machinery so that downstream rewrites (e.g., `rw [h_t]`) have clean motives.
+
+**Proof technique**: `TopCat` limit operations (`prod.lift`, `prod.fst`, `prod.map`, etc.)
+are not definitionally transparent — `rfl` cannot see through them.  The proof alternates
+between `← ConcreteCategory.comp_apply` (recombining `g(f(x))` back into `(f ≫ g)(x)`)
+and categorical lemmas (`prod.lift_fst`, `prod.map_fst`, etc.) that simplify the `≫` form.
+`simp` cannot drive this automatically because `← ConcreteCategory.comp_apply` is ambiguous
+about which pair of applications to recombine; explicit `rw` with named arguments is needed. -/
 lemma homotopyMap_eval {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom')
     {Z : TopCat.{u}} (s : Z ⟶ X) (c : Z ⟶ Δ[1]) (x : Z) :
