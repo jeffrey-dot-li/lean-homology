@@ -675,8 +675,21 @@ lemma mι_leftUnitor_tensor_crossProduct_zero {X Y : TopCat.{u}}
   simp only [NatTrans.comp_app, ModuleCat.hom_comp, LinearMap.coe_comp, Function.comp_apply]
   dsimp [Adjunction.whiskerRight, Functor.whiskeringRight, simplexCrossProductNat]
   rw [← LinearMap.comp_apply]
-  -- change _ ((ModuleCat.Hom.hom ((ModuleCat.free R).map _)) ((ModuleCat.adj R).unit.app _ _)) = _
-  sorry
+  rw [LinearMap.comp_apply]
+  erw [Finsupp.lmapDomain_apply, Finsupp.mapDomain_single]
+  dsimp [simplexCrossProductElem]
+  simp [ModuleCat.adj, ModuleCat.freeHomEquiv_symm_apply]
+  erw [ModuleCat.freeDesc_apply]
+  simp
+  rw [simplexCrossProduct_zero_right]
+  convert rfl using 3
+  congr 1
+  apply ULift.ext
+  simp only [prodSimplex, SingularSimplex.ofΔ_down]
+  apply CategoryTheory.Limits.prod.hom_ext
+  · simp [prod.lift_fst]
+  · simp only [prod.lift_snd]
+    rw [SimplexCategory.default_mk0_eq_id, SimplexCategory.toTop.map_id, Category.id_comp]
 
 /-! ## Chain homotopy from the cross product -/
 
