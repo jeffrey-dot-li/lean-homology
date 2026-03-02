@@ -58,9 +58,9 @@ The main proof should read like an outline: named lemmas composed with `rw`, `ex
 ## After completion
 
 If the proof involved a non-obvious strategy (took multiple attempts, required a surprising lemma, or used an unusual tactic pattern), **proactively save it to memory**:
-- Tactic pattern → `proof-patterns.md`
-- Useful Mathlib lemma → `mathlib-api.md`
-- Gotcha or failed approach → `pitfalls.md`
+- Tactic pattern → `proof-strategies.md`
+- Useful Mathlib lemma or API pattern → appropriate `.claude/memory/api/` file
+- Gotcha or failed approach → appropriate `.claude/memory/api/` file (under a "Pitfall" heading)
 
 Ask the user: "This proof used [strategy] — want me to save this pattern to memory for future use?"
 

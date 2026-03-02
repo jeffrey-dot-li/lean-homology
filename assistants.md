@@ -298,18 +298,16 @@ Loogle accepts several query forms, but **bare unquoted names silently return no
 
 ## Learning and Memory
 
-Project-specific patterns, useful Mathlib APIs, and pitfalls are stored in **memory files** at `.claude/memory/` (git-tracked, not in this document). Memory persists across sessions and machines.
+Project-specific patterns, useful Mathlib APIs, and gotchas are stored in **memory files** at `.claude/memory/` (git-tracked, not in this document). Memory persists across sessions and machines.
 
-Memory files:
-- `.claude/memory/proof-patterns.md` — Tactics and strategies for recurring proof shapes
-- `.claude/memory/mathlib-api.md` — Useful Mathlib lemmas/APIs discovered during work
-- `.claude/memory/pitfalls.md` — Things that look like they should work but don't
+Memory files (see `.claude/memory/MEMORY.md` for the full index):
+- `.claude/memory/proof-strategies.md` — General tactic patterns, goal state discipline, Lean gotchas
+- `.claude/memory/api/` — API-specific proof patterns, pitfalls, and useful lemmas, one file per subsystem
 
 Rules:
-- **Before starting proof work**: Consult `proof-patterns.md` and `pitfalls.md` for relevant strategies.
+- **Before starting proof work**: Read `proof-strategies.md`. Then check `MEMORY.md` to find and load any relevant `api/` file for the current topic.
 - **After completing a tricky proof**: Proactively save reusable strategies to memory:
-  - New tactic pattern or proof shape? → `proof-patterns.md`
-  - Discovered a useful Mathlib lemma? → `mathlib-api.md`
-  - Hit a surprising failure or gotcha? → `pitfalls.md`
+  - New general tactic pattern or Lean gotcha? → `proof-strategies.md`
+  - API-specific proof pattern, pitfall, or useful lemma? → appropriate `api/` file (create a new one if no file fits)
 - **Keep entries concise**: include the pattern, a code snippet, and a one-line explanation of when to use it.
 - **Don't save trivial things**: only patterns that were non-obvious or took multiple attempts to discover.
