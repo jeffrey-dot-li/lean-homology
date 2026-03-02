@@ -278,24 +278,17 @@ lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
   apply ULift.ext
   dsimp [TopCat.toSSet]
   apply CategoryTheory.Limits.prod.hom_ext
-  · sorry
-    -- have H : shuffleStdSimplexMap (p := n) (q := 0) default ≫ prod.fst = eqToHom (by rfl) := by
-    --   dsimp [shuffleStdSimplexMap]
-    --   rw [CategoryTheory.Limits.prod.lift_fst]
-    --   ext ⟨⟨i, hi⟩⟩
-    --   apply ULift.ext
-    --   apply Subtype.ext
-    --   funext j
-    --   dsimp [eqToHom]
-    --   change (stdSimplex.map _ ⟨i, hi⟩).val j = i j
-    --   have heq : stdSimplex.map _ = stdSimplex.map (id : Fin (n+1) → Fin (n+1)) := by
-    --     congr 1
-    --     ext x
-    --     change (x, 0).1 = x
-    --     rfl
-    --   rw [heq]
-    --   simp [stdSimplex.map]
-    -- erw [Category.assoc, CategoryTheory.Limits.prod.map_fst, ← Category.assoc, H]
+  ·
+    have H : shuffleStdSimplexMap (p := n) (q := 0) default ≫ prod.fst = eqToHom (by rfl) := by
+      dsimp [shuffleStdSimplexMap]
+      rw [CategoryTheory.Limits.prod.lift_fst]
+      ext ⟨⟨i, hi⟩⟩
+      simp only [ConcreteCategory.id_apply]
+      apply ULift.ext
+      change stdSimplex.map _ ⟨i, hi⟩ = ⟨i, hi⟩
+      convert stdSimplex.map_id_apply ⟨i, hi⟩
+    erw [Category.assoc, CategoryTheory.Limits.prod.map_fst, ← Category.assoc, H]
+    simp
   · erw [Category.assoc, CategoryTheory.Limits.prod.map_snd, ← Category.assoc]
     simp
     ext x
