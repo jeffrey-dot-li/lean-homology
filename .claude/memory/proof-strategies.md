@@ -32,38 +32,42 @@ supervise progress vs looping, and impossible for the agent to reason about what
 - `congr 1` can wrap subterms in `id (...)`, which blocks `simp only` pattern matching.
 - Either `dsimp` immediately after `congr`, or use `change`/`show` to state the clean goal, or accept a `simp` at the end.
 
-## Quotients
-
-```lean
-have h := Quotient.mk_out q          -- extract representative
-exact Quotient.exact (some_equality)  -- quotient equality → relation
-exact Quotient.sound (some_relation)  -- relation → quotient equality
-```
-
-## Homotopies
-
-```lean
--- Path.Homotopic ≈ ContinuousMap.HomotopyRel ... {0, 1}
-refine ⟨{
-  toFun := fun ⟨s, t⟩ => ...
-  continuous_toFun := by continuity / fun_prop
-  map_zero_left := by ...
-  map_one_left := by ...
-  prop' := by ...
-}⟩
-```
-
-## Covering Maps
-
-```lean
-set lift := cov.liftPath γ e γ_0
-have h_lifts := cov.liftPath_lifts γ e γ_0
-have h_mono := cov.liftPath_apply_one_eq_of_homotopicRel h e₁ e₂
-```
-
 ---
 
-## General Lean Pitfalls
+
+## General Lean Pitfalls and Strategies
+
+### Definitional equality is gold (CRITICAL)
+
+**The single most impactful design choice in Lean 4/Mathlib proofs is ensuring types and terms
+match _definitionally_ (by `rfl`/reduction) rather than merely _propositionally_ (requiring
+`rw`/`simp`/`eqToHom`/`cast`).** When you have a choice of construction, representation, or
+argument order, always pick the one that preserves definitional equality. When you're stuck
+because `rfl` fails, `simp` can't match, or goals are polluted with `eqToHom`, the root cause
+is almost always a definitional-vs-propositional gap.
+
+**Why it matters so much:**
+- `rfl` closes goals instantly; propositional rewrites cost lines and can cascade
+- Type unification works automatically with definitional equality; `eqToHom` blocks it
+- `simp` patterns match definitionally-equal terms; syntactic mismatches from propositional
+  equality cause "made no progress" on visually-matching goals
+- `ConcreteCategory.hom` and other opaque wrappers are not definitionally transparent —
+  going pointwise through them creates goals that no amount of `simp` can close
+
+**Instances of this principle throughout the project:**
+
+| Situation | Definitional (prefer) | Propositional (avoid) | Details |
+|-----------|----------------------|----------------------|---------|
+| Argument order | `crossProduct n 0` (degree `n+0 = n`) | `crossProduct 0 n` (degree `0+n ≠ n`) | [proof-strategies.md § `0+n ≠ n`](#0--n--n-definitionally--use-product-order-to-avoid-casts) |
+| Building NatIsos | `NatIso.ofComponents` (`.hom.app X` reduces) | Functor-level `≪≫` (leaves stray `𝟙`) | [monoidal-tensor.md § ofComponents](api/monoidal-tensor.md) |
+| TopCat pointwise | Stay categorical (`prod.lift_fst`) | Go pointwise through `ConcreteCategory.hom` | [topcat-limits.md](api/topcat-limits.md) |
+| Coercion matching | `erw` / `convert` (handles defeq mismatch) | `rw` / `simp` (fails on syntactic mismatch) | [monoidal-tensor.md § ConcreteCategory.hom vs Hom.hom](api/monoidal-tensor.md) |
+| Opaque goal exprs | `convert target_lemma` (unifier matches) | `have hf : f = id` (re-elaboration fails) | [proof-strategies.md § convert](#use-convert-to-bypass-opaque-subexpressions-you-cant-restate) |
+
+**When stuck, ask:** "Is the real problem that two things are propositionally but not
+definitionally equal?" If yes, restructure to restore definitional equality — or use `erw`/
+`convert`/`change` to bridge the gap.
+
 
 ### `rfl` cannot unfold recursive calls inside a pattern-matched definition
 
@@ -131,3 +135,27 @@ construction uses the other order.
 
 Similarly, `1 + n ≠ n + 1` definitionally. Using `crossProduct n 1` avoids the `add_comm 1 n ▸`
 cast that `crossProduct 1 n` would require.
+
+### Use `convert` to bypass opaque subexpressions you can't restate
+
+When the goal contains an elaborated subexpression (e.g. involving `ConcreteCategory.hom`,
+`default` resolved to a specific type, complex coercions) that you **cannot reproduce** in a
+`have`/`suffices` statement due to elaboration failures (lost coercions, unresolved typeclasses,
+`SimplexCategory.Hom.mk` vs `⟶` mismatch), use `convert` instead of `rw`/`have`.
+
+**Symptom**: Writing `have hf : f = id` or `suffices h : expr = ...` fails with type mismatch,
+coercion errors, or unresolved `default`/typeclass — even though the same expression exists in
+the goal and was built fine by the elaborator.
+
+**Fix**: Use `convert target_lemma args` to let Lean's unifier match the goal against the lemma
+and generate subgoals from the already-elaborated context:
+```lean
+-- Goal: stdSimplex.map ⇑(ConcreteCategory.hom ...) ⟨i, hi⟩ = ⟨i, hi⟩
+-- Can't write: have hf : ⇑(ConcreteCategory.hom ...) = id  (elaboration fails)
+-- Instead:
+convert stdSimplex.map_id_apply ⟨i, hi⟩  -- Lean unifies f with id automatically
+```
+
+**Why it works**: `convert` operates on the goal's already-elaborated terms. It doesn't require
+you to re-elaborate the problematic expression — it just asks "what subgoals would make this
+lemma's conclusion match the current goal?" and lets Lean's unifier handle the rest.
