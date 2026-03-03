@@ -49,7 +49,7 @@ abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
 Convenience notation for the standard simplex:
 - `Δ[p]` (no whitespace ambiguity).
 -/
-notation "Δ[" p "]" => stdSimplex p
+local notation "Δ[" p "]" => stdSimplex p
 abbrev SCF (R : C) : TopCat ⥤ ChainComplex C ℕ :=
   (singularChainComplexFunctor C).obj R
 
@@ -174,11 +174,72 @@ Given a `(p,q)`-shuffle, we will later build the corresponding continuous map
 
 /-- The map of standard simplices associated to a shuffle:
 `Δ[p+q] ⟶ Δ[p] × Δ[q]`. -/
-def shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
-    Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) :=
+-- Index (p + q) →o (Index p × Index q)
+def simplexProdMap {p q r : ℕ} (μ : Index (r) →o (Index p × Index q)) :
+    Δ[r] ⟶ (Δ[p] ⨯ Δ[q]) :=
   prod.lift
-    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.fst.comp μ.1)))
-    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.snd.comp μ.1)))
+    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.fst.comp μ)))
+    (SimplexCategory.toTop.map (SimplexCategory.Hom.mk (OrderHom.snd.comp μ)))
+
+@[simp]
+lemma simplexProdMap_comp {p q r s : ℕ}
+    (f : SimplexCategory.mk s ⟶ SimplexCategory.mk r)
+    (μ : Index r →o (Index p × Index q)) :
+    SimplexCategory.toTop.map f ≫ simplexProdMap μ =
+      simplexProdMap (μ.comp f.toOrderHom) := by
+  simp only [simplexProdMap]
+  rw [prod.comp_lift]
+  congr 1 <;> rw [← Functor.map_comp] <;> rfl
+
+/-- The transport `h ▸ ULift.up f` through `TopCat.toSSet` unwraps to
+`eqToHom _ ≫ f`: the cast on the ULift becomes precomposition with an identity-like map. -/
+lemma cast_ulift_toSSet_down {p q n : ℕ} (h : p + q = n + 1)
+    (X : TopCat.{v})
+    (f : stdSimplex.{v} (p + q) ⟶ X) :
+    (show (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk (n + 1))) from
+      h ▸ (ULift.up f : (TopCat.toSSet.obj X).obj
+        (Opposite.op (SimplexCategory.mk (p + q))))).down =
+    eqToHom (congrArg (SimplexCategory.toTop.obj ∘ SimplexCategory.mk) h.symm) ≫ f := by
+  generalize hm : n + 1 = m at h ⊢
+  revert f
+  rcases h
+  intro f
+  simp
+
+/-- Moving `SimplicialObject.δ` through a cast and `simplexProdMap`:
+the face map acts by precomposition (via `eqToHom` and the face `OrderHom`). -/
+lemma δ_cast_simplexProdMap {p q n : ℕ} (h : p + q = n + 1)
+    (μ : Index (p + q) →o (Index p × Index q))
+    (i : Fin (n + 2)) :
+    SimplicialObject.δ (TopCat.toSSet.obj (stdSimplex.{v} p ⨯ stdSimplex.{v} q)) i
+      (h ▸ .up (simplexProdMap μ ≫
+        prod.map (𝟙 (stdSimplex.{v} p)) (𝟙 (stdSimplex.{v} q)))) =
+    .up (simplexProdMap (μ.comp
+      (SimplexCategory.δ i ≫
+        eqToHom (congrArg SimplexCategory.mk h.symm)).toOrderHom)) := by
+  simp only [prod.map_id_id, Category.comp_id]
+  apply ULift.ext
+  dsimp only [SimplicialObject.δ]
+  dsimp [TopCat.toSSet, Presheaf.restrictedULiftYoneda]
+  -- LHS: toTop.map (δ i) ≫ (h ▸ ULift.up (simplexProdMap μ)).down
+  -- Use cast_ulift_toSSet_down to rewrite the transport into eqToHom ≫ simplexProdMap μ
+  rw [cast_ulift_toSSet_down h]
+  -- Remaining: toTop.map (δ i) ≫ eqToHom _ ≫ simplexProdMap μ
+  --          = simplexProdMap (μ.comp (δ i ≫ eqToHom _).toOrderHom)
+  -- Both sides are TopCat morphisms; reduce to pointwise equality on the product
+  -- eqToHom in TopCat = toTop.map (eqToHom in SimplexCategory)
+  rw [show (eqToHom _ : stdSimplex.{v} (n + 1) ⟶ stdSimplex.{v} (p + q)) =
+    SimplexCategory.toTop.map (eqToHom (congrArg SimplexCategory.mk h.symm))
+    from (eqToHom_map SimplexCategory.toTop _).symm]
+  -- toTop.map (eqToHom _) ≫ simplexProdMap μ = simplexProdMap (μ.comp (eqToHom _).toOrderHom)
+  simp only [simplexProdMap_comp]
+  -- The LHS still has an unfolded toTop.map (δ i); fold and apply simplexProdMap_comp again
+  change SimplexCategory.toTop.map (SimplexCategory.δ i) ≫ _ = _
+  rw [simplexProdMap_comp]
+  congr 1
+
+abbrev shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
+    Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) := simplexProdMap μ.1
 
 
 
@@ -322,7 +383,7 @@ lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
   apply CategoryTheory.Limits.prod.hom_ext
   ·
     have H : shuffleStdSimplexMap (p := n) (q := 0) default ≫ prod.fst = eqToHom (by rfl) := by
-      dsimp [shuffleStdSimplexMap]
+      dsimp [shuffleStdSimplexMap, simplexProdMap]
       rw [CategoryTheory.Limits.prod.lift_fst]
       ext ⟨⟨i, hi⟩⟩
       simp only [ConcreteCategory.id_apply]
@@ -508,8 +569,19 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   -- Step 1: Functoriality — rewrite coprojection ≫ eqToHom ≫ δ as coprojection(δ ∘ σ)
   simp_rw [simplexCoprojection_comp_eqToHom_comp_δ hrel]
   unfold shuffleSimplex
+  unfold shuffleStdSimplexMap
+  dsimp only [id]
+  simp only [SingularSimplex.ofΔ_down]
+  -- Step 2: Rewrite δᵢ(simplexProdMap μ) ↦ simplexProdMap(μ ∘ δᵢ) — the face map acts on a
+  -- shuffle simplex by precomposition, absorbing it into the OrderHom.
+  -- simp_rw can't match under the ∑ binders; drill down with conv + erw instead.
+  conv_lhs =>
+    enter [2, x]
+    enter [2]
+    enter [2, x_1]
+    enter [2]
+    erw [δ_cast_simplexProdMap hrel]
   sorry
-
 /-! The chain-level cross product and homotopy invariance theorems
 are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
 

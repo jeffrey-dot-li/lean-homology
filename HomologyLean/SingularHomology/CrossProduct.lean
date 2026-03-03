@@ -743,7 +743,7 @@ theorem crossProduct_normalized {X Y : TopCat.{u}}
   -- Unfold the shuffle simplex `.down` and reduce.
   simp only [shuffleSimplex, SingularSimplex.ofΔ_down, shuffleStdSimplexMap,
     SimplexCategory.hom_zero_zero, SimplexCategory.toTop.map_id,
-    Category.comp_id, prod.lift_map, prodSimplex]
+    Category.comp_id, prod.lift_map, prodSimplex, simplexProdMap]
   simp
 
 /-- On generators, tensoring with a 0-simplex `δ` and applying `crossProduct 0 0`

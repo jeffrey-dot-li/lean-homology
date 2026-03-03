@@ -55,6 +55,7 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 **Goal**: Prove a specific `sorry`'d lemma using the LSP tools iteratively.
 
 **Procedure**:
+0. Read `.claude/memory/proof-strategies.md` — it contains tactic patterns and Lean gotchas specific to this project. Skipping this causes repeated mistakes.
 1. Read the lemma and use `lean_goal` at the `sorry` to understand the proof state.
 2. Try simple tactics first via `lean_multi_attempt`: `["simp", "ring", "omega", "exact?", "aesop"]`.
 3. If those fail, use the search decision tree:
@@ -67,6 +68,7 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 **Key rules**:
 - Never leave a proof unverified.
 - If a proof exceeds ~30 lines, suggest decomposing into helper lemmas (switch to Mode 2).
+- **Add comments liberally.** Every non-obvious rewrite or tactic block should get a comment explaining the mathematical before → after and why it's done that way. See [§ Comments: explain *what* + *why*](#comments-explain-what--why-for-non-obvious-steps) for the format.
 
 **Anti-looping protocol** (CRITICAL):
 - **Test, don't theorize.** If you're unsure whether a tactic will work, *edit the file and check diagnostics*. Never spend more than 2-3 sentences reasoning about whether something will work — just try it. Lean's feedback is faster and more reliable than mental simulation.
@@ -153,6 +155,25 @@ Complex proofs should be structured as **compositions of obvious, standalone lem
 - **Main proofs should be plumbing.** The top-level proof of a complex theorem should mostly be `rw`, `simp`, `exact`, `apply` — composing named lemmas. If a step needs >5 lines of non-trivial tactics, a lemma is probably missing.
 - **Name things for reuse.** A well-named lemma (e.g., `TopCat.sigmaι_cancel`) is a tool in the toolkit. Inline reasoning is disposable. Prefer building tools over solving problems ad hoc.
 - **This applies in every mode.** `/draft` does the decomposition upfront. `/fill-sorry` should recognize when extraction is needed mid-proof. `/refactor` should extract inline reasoning into named lemmas.
+
+### Comments: explain *what* + *why* for non-obvious steps
+
+Don't narrate obvious code. But **do** add a comment whenever a tactic step is non-obvious or a workaround. The comment must explain **both**:
+1. **What** the rewrite/tactic achieves — describe it mathematically, showing the before → after transformation. Write it so someone unfamiliar with the proof's helper lemma names can follow.
+2. **Why** it's done this way (if non-obvious) — e.g., why the obvious tactic doesn't work.
+
+Example:
+
+```lean
+-- Rewrite δᵢ(simplexProdMap μ) ↦ simplexProdMap(μ ∘ δᵢ) — the face map acts on a
+-- shuffle simplex by precomposition, absorbing it into the OrderHom.
+-- simp_rw can't match under the ∑ binders; drill down with conv + erw instead.
+conv_lhs =>
+  enter [2, x]; enter [2]; enter [2, x_1]; enter [2]
+  erw [δ_cast_simplexProdMap hrel]
+```
+
+This is especially important for `conv` blocks, `erw` instead of `rw`, `convert`, universe workarounds, and anything involving casts or `eqToHom`.
 
 ### `lemma` vs `theorem`
 
