@@ -238,45 +238,105 @@ lemma δ_cast_simplexProdMap {p q n : ℕ} (h : p + q = n + 1)
   rw [simplexProdMap_comp]
   congr 1
 
+/-- Postcomposing `simplexProdMap μ` with `prod.map (toTop.map f) (𝟙 _)` yields another
+`simplexProdMap` where `f` is applied to the first projection. -/
+@[simp]
+lemma simplexProdMap_comp_prod_map_toTop_left {p p' q r : ℕ}
+    (μ : Index r →o (Index p × Index q))
+    (f : SimplexCategory.mk p ⟶ SimplexCategory.mk p') :
+    simplexProdMap μ ≫ prod.map (SimplexCategory.toTop.map f) (𝟙 _) =
+    simplexProdMap (⟨fun i => (f.toOrderHom (μ i).1, (μ i).2),
+      fun _ _ h => ⟨f.toOrderHom.monotone (μ.monotone h).1, (μ.monotone h).2⟩⟩ :
+      Index r →o (Index p' × Index q)) := by
+  simp only [simplexProdMap, prod.lift_map, Category.comp_id, ← Functor.map_comp]
+  congr 1
+
+/-- Postcomposing `simplexProdMap μ` with `prod.map (𝟙 _) (toTop.map g)` yields another
+`simplexProdMap` where `g` is applied to the second projection. -/
+@[simp]
+lemma simplexProdMap_comp_prod_map_toTop_right {p q q' r : ℕ}
+    (μ : Index r →o (Index p × Index q))
+    (g : SimplexCategory.mk q ⟶ SimplexCategory.mk q') :
+    simplexProdMap μ ≫ prod.map (𝟙 _) (SimplexCategory.toTop.map g) =
+    simplexProdMap (⟨fun i => ((μ i).1, g.toOrderHom (μ i).2),
+      fun _ _ h => ⟨(μ.monotone h).1, g.toOrderHom.monotone (μ.monotone h).2⟩⟩ :
+      Index r →o (Index p × Index q')) := by
+  simp only [simplexProdMap, prod.lift_map, Category.comp_id, ← Functor.map_comp]
+  congr 1
+
+/-- Postcomposing a `(p, q+1)`-shuffle simplex with `δⱼ × id` and wrapping in `⟪·⟫ₛ`
+yields a singular simplex whose underlying map applies `δⱼ` to the first component
+of the shuffle. -/
+@[simp]
+lemma ofΔ_simplexProdMap_comp_prod_map_toTop_left {p q : ℕ}
+    (s : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    (⟪simplexProdMap s.1 ≫
+        prod.map (SimplexCategory.toTop.map (SimplexCategory.δ j))
+          (𝟙 (stdSimplex (q + 1)))⟫ₛ : SingularSimplex (Δ[p + 1] ⨯ Δ[q + 1]) _) =
+    ⟪simplexProdMap (⟨fun i => ((SimplexCategory.δ j).toOrderHom (s.1 i).1, (s.1 i).2),
+      fun _ _ h => ⟨(SimplexCategory.δ j).toOrderHom.monotone (s.1.monotone h).1,
+        (s.1.monotone h).2⟩⟩ :
+      Index (p + q + 1) →o (Index (p + 1) × Index (q + 1)))⟫ₛ := by
+  congr 1; exact simplexProdMap_comp_prod_map_toTop_left s.1 (SimplexCategory.δ j)
+
+/-- Postcomposing a `(p+1, q)`-shuffle simplex with `id × δⱼ` and wrapping in `⟪·⟫ₛ`
+yields a singular simplex whose underlying map applies `δⱼ` to the second component
+of the shuffle. -/
+@[simp]
+lemma ofΔ_simplexProdMap_comp_prod_map_toTop_right {p q : ℕ}
+    (s : Shuffle (p + 1) q) (j : Fin (q + 2)) :
+    (⟪simplexProdMap s.1 ≫
+        prod.map (𝟙 (stdSimplex (p + 1)))
+          (SimplexCategory.toTop.map (SimplexCategory.δ j))⟫ₛ :
+      SingularSimplex (Δ[p + 1] ⨯ Δ[q + 1]) _) =
+    ⟪simplexProdMap (⟨fun i => ((s.1 i).1, (SimplexCategory.δ j).toOrderHom (s.1 i).2),
+      fun _ _ h => ⟨(s.1.monotone h).1,
+        (SimplexCategory.δ j).toOrderHom.monotone (s.1.monotone h).2⟩⟩ :
+      Index ((p + 1) + q) →o (Index (p + 1) × Index (q + 1)))⟫ₛ := by
+  congr 1; exact simplexProdMap_comp_prod_map_toTop_right s.1 (SimplexCategory.δ j)
+
 abbrev shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
     Δ[p + q] ⟶ (Δ[p] ⨯ Δ[q]) := simplexProdMap μ.1
 
 
 
-/-- Face-shuffle factorization (left step case):
-When step `r` of a `(p+1, q+1)`-shuffle `μ` is a left step, composing the
-face map `δᵣ` with `shuffleStdSimplexMap μ` factors as
-`shuffleStdSimplexMap ν ≫ prod.map (δⱼ) id` where `ν = removeLeftStep μ r`
-and `j = removedLeftIndex μ r`.
+/-- Face-shuffle factorization (left insertion):
+Inserting a left step into a `(p, q)`-shuffle `ν` at face index `j` and then
+removing the inserted vertex via `δ` recovers `ν ≫ prod.map (δⱼ) id`.
 
-Note: we cast via `eqToHom` because `p+1+(q+1) = p+(q+1)+1` is not definitional. -/
-lemma shuffleStdSimplexMap_comp_face_left {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : Shuffle.isLeftStep μ r) :
-    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + (q + 1))
-      ⟨r.val, by omega⟩) ≫
-      eqToHom (by simp [show p + (q + 1) + 1 = p + 1 + (q + 1) from by omega]) ≫
-      shuffleStdSimplexMap (p := p + 1) (q := q + 1) μ =
-    shuffleStdSimplexMap (p := p) (q := q + 1) (Shuffle.removeLeftStep μ r hr) ≫
+That is: `δ_{insertLeftIndex ν j} ≫ shuffleStdSimplexMap (insertLeftStep ν j)
+         = shuffleStdSimplexMap ν ≫ (δⱼ × id)`.
+
+In the boundary formula this is used with `q := q' + 1` to match the first
+RHS sum. -/
+lemma shuffleStdSimplexMap_insertLeft_face {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2)) :
+    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + q)
+      (Shuffle.insertLeftIndex ν j)) ≫
+      eqToHom (by simp [show p + q + 1 = (p + 1) + q from by omega]) ≫
+      shuffleStdSimplexMap (p := p + 1) (q := q) (Shuffle.insertLeftStep ν j) =
+    shuffleStdSimplexMap (p := p) (q := q) ν ≫
       prod.map
-        (SimplexCategory.toTop.map (SimplexCategory.δ (Shuffle.removedLeftIndex μ r hr)))
+        (SimplexCategory.toTop.map (SimplexCategory.δ j))
         (𝟙 _) := by
   sorry
 
-/-- Face-shuffle factorization (right step case):
-When step `r` is a right step, the face factors through `prod.map id (δₖ)`. -/
-lemma shuffleStdSimplexMap_comp_face_right {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : ¬ Shuffle.isLeftStep μ r) :
-    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + (q + 1))
-      ⟨r.val, by omega⟩) ≫
-      eqToHom (by simp [show p + (q + 1) + 1 = p + 1 + (q + 1) from by omega]) ≫
-      shuffleStdSimplexMap (p := p + 1) (q := q + 1) μ =
-    eqToHom (by simp [show p + (q + 1) = p + 1 + q from by omega]) ≫
-      shuffleStdSimplexMap (p := p + 1) (q := q) (Shuffle.removeRightStep μ r hr) ≫
-        prod.map
-          (𝟙 _)
-          (SimplexCategory.toTop.map (SimplexCategory.δ (Shuffle.removedRightIndex μ r hr))) := by
+/-- Face-shuffle factorization (right insertion):
+`δ_{insertRightIndex ν k} ≫ shuffleStdSimplexMap (insertRightStep ν k)
+ = shuffleStdSimplexMap ν ≫ (id × δₖ)`.
+
+In the boundary formula this is used with `p := p' + 1` to match the second
+RHS sum. -/
+lemma shuffleStdSimplexMap_insertRight_face {p q : ℕ}
+    (ν : Shuffle p q) (k : Fin (q + 2)) :
+    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + q)
+      (Shuffle.insertRightIndex ν k)) ≫
+      eqToHom (by simp [show p + q + 1 = p + (q + 1) from by omega]) ≫
+      shuffleStdSimplexMap (p := p) (q := q + 1) (Shuffle.insertRightStep ν k) =
+    shuffleStdSimplexMap (p := p) (q := q) ν ≫
+      prod.map
+        (𝟙 _)
+        (SimplexCategory.toTop.map (SimplexCategory.δ k)) := by
   sorry
 
 attribute [simp] CategoryTheory.yoneda
@@ -300,9 +360,8 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
 def universalSimplexCrossProduct (p q : ℕ) :
     R ⟶ (singChain (R := R) (X := (Δ[p] ⨯ Δ[q]))).X (p + q) := by
   -- simp [singularSimplexEquivΔ]
-  have id_p  := ⟪𝟙 stdSimplex.{v} p ⟫ₛ
-  have id_q :=  ⟪𝟙 stdSimplex.{v} q⟫ₛ
-  exact ∑ μ : Shuffle p q, μ.sign • simplexCoprojection (shuffleSimplex id_p id_q μ)
+  exact ∑ μ : Shuffle p q, μ.sign • simplexCoprojection
+    (shuffleSimplex ⟪𝟙 stdSimplex.{v} p ⟫ₛ ⟪𝟙 stdSimplex.{v} q⟫ₛ μ)
 
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
@@ -479,20 +538,36 @@ lemma singChain_d_eq_alternatingFaceMapObjD (X : TopCat.{v}) (n : ℕ) :
 
 **Proof sketch** (after expanding ∂ into face maps):
 
-The LHS is a double sum `∑ μ, μ.sign • ∑ r, (-1)^r • coprojection(shuffleSimplex(id,id,μ)) ≫ δ_r`.
+The LHS is `∑ μ, μ.sign • ∑ r, (-1)^r • coprojection(μ ∘ δ_r)` (double sum over
+all `(p+1,q+1)`-shuffles and face indices).
 
-1. **Functoriality**: Rewrite `coprojection(σ) ≫ δ_r` as `coprojection(δ_r ≫ σ)` — the face
-   map acts by precomposition on singular simplices (naturality of `Sigma.ι`).
-2. **Split by step type**: For each shuffle `μ`, partition `Fin (p+q+2)` into left steps and
-   right steps of `μ`. The inner sum splits into two sub-sums.
-3. **Face-shuffle factorization**: Apply `shuffleStdSimplexMap_comp_face_left` (resp. `_right`)
-   to rewrite `δ_r ≫ shuffleStdSimplexMap μ` as `shuffleStdSimplexMap ν ≫ prod.map (δ_j) id`
-   (resp. `prod.map id (δ_k)`).
-4. **Reindex**: The map `(μ, r) ↦ (removeLeftStep μ r, removedLeftIndex μ r)` bijects onto
-   `Shuffle(p, q+1) × Fin(p+2)` (via `removeLeftStep_surj`), and similarly for right steps.
-   Swap the double sum to `∑ j ∑ ν` form.
-5. **Match signs**: `μ.sign · (-1)^r = (-1)^j · ν.sign` (from `sign_removeLeftStep`), and
-   for right steps the extra `(-1)^(p+1)` factor appears (from `sign_removeRightStep`).
+The RHS is two sums: one over `(j, ν)` with `ν : Shuffle p (q+1)`, one over
+`(k, ν)` with `ν : Shuffle (p+1) q`.
+
+**Strategy: inject the RHS into the LHS, then cancel the remainder.**
+
+1. **Functoriality** (already done above): rewrite `coprojection(σ) ≫ δ_r` as
+   `coprojection(δ_r ≫ σ)`.
+
+2. **Inject RHS left terms into LHS**: For each `(j, ν)` on the RHS, use
+   `insertLeftStep ν j` to construct a `(p+1,q+1)`-shuffle `μ` and vertex
+   `r = insertLeftIndex ν j`.  By `shuffleStdSimplexMap_insertLeft_face`,
+   `δ_r ≫ μ = ν ≫ (δⱼ × id)`, so the RHS term equals the LHS term at `(μ, r)`.
+   By `sign_insertLeftStep`, the signs match.
+
+3. **Inject RHS right terms into LHS**: Analogous via `insertRightStep`.
+
+4. **Show injectivity**: The maps `(j, ν) ↦ (insertLeftStep ν j, insertLeftIndex ν j)`
+   and `(k, ν) ↦ (insertRightStep ν k, insertRightIndex ν k)` are injective with
+   disjoint images (via `insertLeftStep_injective`, `insertRightStep_injective`).
+
+5. **Cancel diagonal remainder**: The LHS terms `(μ, r)` not in either image are
+   **diagonal terms** — vertex `r` has one adjacent left step and one adjacent
+   right step.  These cancel pairwise via `swapDiagonalSteps`, a sign-reversing
+   involution that swaps the two steps around `r`:
+   - same map after vertex removal (`swapDiagonalSteps_same_map`)
+   - opposite sign (`swapDiagonalSteps_neg_sign`)
+   - involutive (`swapDiagonalSteps_involutive`)
 -/
 
 /-- Functoriality of `simplexCoprojection`: the face map acts by precomposition
@@ -511,6 +586,18 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {X : TopCat.{v}} {n m : ℕ} (h :
     SSet.singularChainComplexFunctor, SimplicialObject.δ, SimplicialObject.whiskering]
   erw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp
+
+/-- Naturality of `simplexCoprojection` w.r.t. the singular chain functor:
+pushing a continuous map `f : X ⟶ Y` through the coprojection reindexes the
+simplex by postcomposition, `σ ↦ σ ≫ f`. -/
+@[simp] lemma simplexCoprojection_comp_SCF_map {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (f : X ⟶ Y) :
+    simplexCoprojection (C := C) (R := R) s ≫ ((SCF R).map f).f n =
+    simplexCoprojection ⟪s.down ≫ f⟫ₛ := by
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor,
+    SSet.singularChainComplexFunctor]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp only [Category.id_comp]; congr 1
 
 /-- The boundary of the universal simplex cross product decomposes as a signed sum
 of face-map cross products (the "universal Leibniz rule"):
@@ -581,7 +668,69 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
     enter [2, x_1]
     enter [2]
     erw [δ_cast_simplexProdMap hrel]
-  sorry
+  -- Fold { down := simplexProdMap ... } back to ⟪simplexProdMap ...⟫ₛ for readability
+  conv_lhs =>
+    enter [2, x, 2, 2, x_1, 2, 1]
+    change ⟪simplexProdMap _⟫ₛ
+  -- Step 3: Use naturality to absorb δ j into the shuffle simplex arguments
+  unfold simplexCrossProduct
+  unfold universalSimplexCrossProduct
+  -- Distribute ≫ ((SCF R).map ...).f into the ∑
+  simp_rw [Preadditive.sum_comp, Preadditive.zsmul_comp,
+    simplexCoprojection_comp_SCF_map]
+  -- Simplify (shuffleSimplex ⟪𝟙⟫ₛ ⟪𝟙⟫ₛ μ).down ≫ prod.map (toTop.map (δ j)) 𝟙
+  simp only [shuffleSimplex, SingularSimplex.ofΔ_down, shuffleStdSimplexMap,
+    id, Category.assoc]
+  simp only [prod.map_map, Category.comp_id]
+  conv_rhs =>
+    -- First sum: 𝟙 ≫ toTop.map (δ x) → toTop.map (δ x) in left face
+    enter [1, 1, 2, x, 2, 2, x_1, 2, 1, 1, 2, 1]
+    erw [Category.id_comp]
+  conv_rhs =>
+    enter [1, 2, 2, 2, x, 2, 2, x_1, 2, 1, 1, 1, 2, 2]
+    erw [Category.id_comp]
+  -- Step 4: Collapse LHS double sum ∑ μ, μ.sign • ∑ r, (-1)^r • ... into ∑ (μ,r), (μ.sign * (-1)^r) • ...
+  simp_rw [Finset.smul_sum, smul_smul]
+  -- Step 4: Split inner sum into diagonal + non-diagonal vertices.
+  -- The inner sum is over Fin (p+q+1+2) but isDiagonalVertex expects Index ((p+1)+(q+1)),
+  -- so we cast via Fin.cast.
+  let isDiag := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + q + 1 + 2)) =>
+    Shuffle.isDiagonalVertex μ (r.cast (show p + q + 1 + 2 = (p + 1) + (q + 1) + 1 from by omega))
+  haveI isDiag_dec : ∀ μ, DecidablePred (isDiag μ) :=
+    fun μ r => Shuffle.isDiagonalVertex_decidable μ _
+  conv_lhs =>
+    enter [2, x]
+    rw [show ∑ r, _ = _ from
+      (Finset.sum_filter_add_sum_filter_not Finset.univ (isDiag x) _).symm]
+  -- Step 5: Distribute ∑ x over the diagonal + non-diagonal split
+  simp_rw [Finset.sum_add_distrib]
+  -- Step 6: Cancel the diagonal sum (first summand) via sign-reversing involution.
+  -- swapDiagonalSteps swaps the two steps adjacent to a diagonal vertex,
+  -- negating the sign while preserving the topological map. The paired terms cancel.
+  convert (zero_add _) using 2
+  · exact sum_sum_involution_zero isDiag _
+      (fun μ r h => Shuffle.swapDiagonalSteps μ (r.cast (by omega)) h)
+      (fun μ r h => Shuffle.swapDiagonalSteps_vertex μ (r.cast (by omega)) h)
+      (fun μ r h => Shuffle.swapDiagonalSteps_involutive μ (r.cast (by omega)) h)
+      (fun μ r h => by
+        dsimp only
+        have hsign := Shuffle.swapDiagonalSteps_neg_sign μ (r.cast (by omega)) h
+        rw [show (r.cast (by omega : p + q + 1 + 2 = (p + 1) + (q + 1) + 1)).val = r.val
+          from rfl] at hsign
+        rw [hsign, neg_smul]
+        -- Map part: the swap doesn't change the underlying map away from
+        -- the diagonal vertex. δ r avoids r, so the compositions agree.
+        congr 1; congr 1; congr 1; congr 1; congr 1
+        exact Shuffle.swapDiagonalSteps_same_map μ (r.cast (by omega)) h _
+          (fun k h_eq => by
+            have h_val := congr_arg Fin.val h_eq
+            simp only [SimplexCategory.comp_toOrderHom, SimplexCategory.δ,
+              SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk,
+              SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk,
+              Fin.val_cast] at h_val
+            exact absurd (Fin.ext h_val) (Fin.succAbove_ne r k)))
+      (fun μ r h => Shuffle.swapDiagonalSteps_ne μ (r.cast (by omega)) h)
+  · sorry
 /-! The chain-level cross product and homotopy invariance theorems
 are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
 

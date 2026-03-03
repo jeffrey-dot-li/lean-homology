@@ -329,11 +329,29 @@ lemma sign_0_0 : (default_0_0 : Shuffle 0 0).sign = 1 := by
 
 /-! #### Face-shuffle decomposition (Leibniz rule infrastructure)
 
-At each step `r` of a `(p+1, q+1)`-shuffle, exactly one coordinate increments.
-We call step `r` a **left step** if the first coordinate increments, and a
-**right step** if the second does. Removing a left step yields a `(p, q+1)`-shuffle;
-removing a right step yields a `(p+1, q)`-shuffle. These operations, together with
-appropriate sign tracking, give the Leibniz rule for the shuffle product. -/
+**Why "remove step" doesn't work.**  An earlier attempt defined `removeLeftStep μ r`
+by removing vertex `r` from the shuffle path whenever step `r` is a left step.
+This is wrong: the face map `δ_r` removes **vertex** `r`, which merges the steps
+on either side of `r`. If those steps have different types (one left, one right),
+the merged step is a **diagonal** (both coordinates increase), which cannot be a
+valid shuffle step.
+
+Example: the `(1,1)`-shuffle `(0,0) → (1,0) → (1,1)` has step 0 = Left,
+step 1 = Right.  Removing vertex 1 = `(1,0)` gives `(0,0) → (1,1)`, a diagonal.
+This doesn't factor as `ν ≫ (δⱼ × id)` for any shuffle `ν`.  The factorization
+only works for "LL" vertices (both adjacent steps are left) or "RR" vertices.
+
+**The insert approach.**  Instead of decomposing the LHS face terms, we work from
+the RHS and **inject** into the LHS.  Given a `(p, q+1)`-shuffle `ν` and a face
+index `j : Fin (p+2)`, we construct a `(p+1, q+1)`-shuffle `insertLeftStep ν j`
+by lifting ν's first coordinate via `Fin.succAbove j` (skipping value `j`) and
+inserting a new left step where the first coordinate crosses `j`.
+
+The proof of `universalSimplexCrossProduct_boundary` then proceeds:
+1. Show the RHS terms inject into the LHS via `insertLeftStep` / `insertRightStep`.
+2. Show the remaining LHS terms (diagonal terms) cancel via a sign-reversing
+   involution `swapDiagonalSteps`.
+-/
 
 /-- Whether step `r` of shuffle `μ` is a "left step" (first coordinate increments). -/
 def isLeftStep {p q : ℕ} (μ : Shuffle p q) (r : Fin (p + q)) : Prop :=
@@ -343,63 +361,179 @@ instance isLeftStep_decidable {p q : ℕ} (μ : Shuffle p q) (r : Fin (p + q)) :
     Decidable (isLeftStep μ r) :=
   inferInstanceAs (Decidable (_ < _))
 
-/-- Remove left step `r` from a `(p+1, q+1)`-shuffle to get a `(p, q+1)`-shuffle.
-Precondition: step `r` is a left step (first coordinate increments). -/
-def removeLeftStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : isLeftStep μ r) : Shuffle p (q + 1) := by
+/-! ##### Insertion maps (RHS → LHS direction) -/
+
+/-- Insert a left step at face index `j`, turning a `(p, q)`-shuffle into a
+`(p+1, q)`-shuffle.  The original path from `(0,0)` to `(p, q)` is embedded
+into a path from `(0,0)` to `(p+1, q)` by applying `Fin.succAbove j` to the
+first coordinate and inserting a new left step where the first coordinate
+crosses `j`. -/
+def insertLeftStep {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    Shuffle (p + 1) q := by
   sorry
 
-/-- Remove right step `r` from a `(p+1, q+1)`-shuffle to get a `(p+1, q)`-shuffle.
-Precondition: step `r` is a right step (second coordinate increments). -/
-def removeRightStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : ¬ isLeftStep μ r) : Shuffle (p + 1) q := by
+/-- The vertex index in the `(p+1, q)`-shuffle's domain where the new left step
+was inserted. Removing this vertex via `δ` recovers the original shuffle. -/
+def insertLeftIndex {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    Fin (p + q + 2) := by
   sorry
 
-/-- The left-coordinate index of the step removed by `removeLeftStep`.
-If step `r` is a left step with `μ(r) = (j, _)`, this returns `j : Fin (p + 2)`. -/
-def removedLeftIndex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : isLeftStep μ r) : Fin (p + 2) :=
-  (μ.1 r.castSucc).1
-
-/-- The right-coordinate index of the step removed by `removeRightStep`.
-If step `r` is a right step with `μ(r) = (_, k)`, this returns `k : Fin (q + 2)`. -/
-def removedRightIndex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
-    (hr : ¬ isLeftStep μ r) : Fin (q + 2) :=
-  (μ.1 r.castSucc).2
-
-/-- Sign relation for removing a left step: the original sign `μ.sign • (-1)^r`
-equals `(-1)^j • ν.sign` where `j` is the removed left index and `ν` is the
-resulting `(p, q+1)`-shuffle. -/
-lemma sign_removeLeftStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Fin (p + 1 + (q + 1))) (hr : isLeftStep μ r) :
-    μ.sign * (-1 : ℤ) ^ r.val =
-    (-1 : ℤ) ^ (removedLeftIndex μ r hr).val * (removeLeftStep μ r hr).sign := by
+/-- Insert a right step at face index `k`, turning a `(p, q)`-shuffle into a
+`(p, q+1)`-shuffle.  Applies `Fin.succAbove k` to the second coordinate and
+inserts a new right step where the second coordinate crosses `k`. -/
+def insertRightStep {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    Shuffle p (q + 1) := by
   sorry
 
-/-- Sign relation for removing a right step: the original sign `μ.sign • (-1)^r`
-equals `(-1)^(p+1) • (-1)^k • ν.sign` where `k` is the removed right index
-and `ν` is the resulting `(p+1, q)`-shuffle. -/
-lemma sign_removeRightStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Fin (p + 1 + (q + 1))) (hr : ¬ isLeftStep μ r) :
-    μ.sign * (-1 : ℤ) ^ r.val =
-    (-1 : ℤ) ^ (p + 1) * ((-1 : ℤ) ^ (removedRightIndex μ r hr).val *
-      (removeRightStep μ r hr).sign) := by
+/-- The vertex index where the new right step was inserted. -/
+def insertRightIndex {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    Fin (p + q + 2) := by
   sorry
 
-/-- The decomposition is a bijection: every `(ν, j)` with `ν : Shuffle p (q+1)` and
-`j : Fin (p+2)` arises uniquely from removing some left step of some `(p+1, q+1)`-shuffle.
-(Stated as surjectivity; injectivity follows from the constructions.) -/
-lemma removeLeftStep_surj {p q : ℕ} (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
-    ∃ (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1))) (hr : isLeftStep μ r),
-      removeLeftStep μ r hr = ν ∧ removedLeftIndex μ r hr = j := by
+/-- Inserting a left step and removing the inserted vertex recovers the original
+shuffle with `Fin.succAbove j` applied to the first coordinate.
+(Purely combinatorial: no `SimplexCategory` or topology needed.) -/
+lemma insertLeftStep_face {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    ∀ (k : Index (p + q)),
+      (insertLeftStep ν j).1 (Fin.succAbove
+        (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p + 1) + q + 1))
+        (k.cast (by omega))) =
+      (j.succAbove (ν.1 k).1, (ν.1 k).2) := by
   sorry
 
-/-- Same surjectivity for right steps. -/
-lemma removeRightStep_surj {p q : ℕ} (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
-    ∃ (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1))) (hr : ¬ isLeftStep μ r),
-      removeRightStep μ r hr = ν ∧ removedRightIndex μ r hr = k := by
+/-- Inserting a right step and removing the inserted vertex recovers the original
+shuffle with `Fin.succAbove k` applied to the second coordinate. -/
+lemma insertRightStep_face {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    ∀ (i : Index (p + q)),
+      (insertRightStep ν k).1 (Fin.succAbove
+        (⟨(insertRightIndex ν k).val, by omega⟩ : Fin (p + (q + 1) + 1))
+        (i.cast (by omega))) =
+      ((ν.1 i).1, k.succAbove (ν.1 i).2) := by
+  sorry
+
+/-- The insert-left map `(j, ν) ↦ (insertLeftStep ν j, insertLeftIndex ν j)` is
+injective: distinct `(j, ν)` pairs produce distinct `(μ, vertex)` pairs. -/
+lemma insertLeftStep_injective {p q : ℕ}
+    (j₁ j₂ : Fin (p + 2)) (ν₁ ν₂ : Shuffle p q)
+    (hμ : insertLeftStep ν₁ j₁ = insertLeftStep ν₂ j₂)
+    (hr : insertLeftIndex ν₁ j₁ = insertLeftIndex ν₂ j₂) :
+    j₁ = j₂ ∧ ν₁ = ν₂ := by
+  sorry
+
+/-- The insert-right map is injective. -/
+lemma insertRightStep_injective {p q : ℕ}
+    (k₁ k₂ : Fin (q + 2)) (ν₁ ν₂ : Shuffle p q)
+    (hμ : insertRightStep ν₁ k₁ = insertRightStep ν₂ k₂)
+    (hr : insertRightIndex ν₁ k₁ = insertRightIndex ν₂ k₂) :
+    k₁ = k₂ ∧ ν₁ = ν₂ := by
+  sorry
+
+/-- Sign relation for left insertion:
+`(insertLeftStep ν j).sign * (-1)^(insertLeftIndex ν j) = (-1)^j * ν.sign`. -/
+lemma sign_insertLeftStep {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2)) :
+    (insertLeftStep ν j).sign * (-1 : ℤ) ^ (insertLeftIndex ν j).val =
+    (-1 : ℤ) ^ j.val * ν.sign := by
+  sorry
+
+/-- Sign relation for right insertion:
+`(insertRightStep ν k).sign * (-1)^(insertRightIndex ν k) =
+ (-1)^p * (-1)^k * ν.sign`. -/
+lemma sign_insertRightStep {p q : ℕ}
+    (ν : Shuffle p q) (k : Fin (q + 2)) :
+    (insertRightStep ν k).sign * (-1 : ℤ) ^ (insertRightIndex ν k).val =
+    (-1 : ℤ) ^ p * ((-1 : ℤ) ^ k.val * ν.sign) := by
+  sorry
+
+/-! ##### Diagonal cancellation
+
+The LHS terms not in the image of `insertLeftStep` or `insertRightStep` are
+"diagonal" terms: they arise from vertex removals where the steps on either
+side have different types (one left, one right).  These cancel pairwise via
+a sign-reversing involution that swaps the two steps around the removed vertex. -/
+
+/-- A `(μ, r)` pair is a **diagonal term** if vertex `r` has one adjacent left
+step and one adjacent right step (in either order LR or RL).
+Boundary vertices (r = 0 or r = last) are never diagonal. -/
+def isDiagonalVertex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
+    (r : Index (p + 1 + (q + 1))) : Prop :=
+  if h₁ : 0 < r.val then
+    if h₂ : r.val < (p + 1) + (q + 1) then
+      (isLeftStep μ ⟨r.val - 1, by omega⟩ ∧ ¬ isLeftStep μ ⟨r.val, h₂⟩) ∨
+      (¬ isLeftStep μ ⟨r.val - 1, by omega⟩ ∧ isLeftStep μ ⟨r.val, h₂⟩)
+    else False
+  else False
+
+instance isDiagonalVertex_decidable {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) :
+    DecidablePred (isDiagonalVertex μ) := by
+  intro r; unfold isDiagonalVertex; split_ifs <;> infer_instance
+
+/-- The sign-reversing involution on diagonal terms.  Given a `(p+1, q+1)`-shuffle
+`μ` and a diagonal vertex `r`, swap the steps adjacent to `r` (replacing an LR
+corner with RL or vice versa).  This produces a new shuffle `μ'` such that:
+- `μ' ∘ δ_r = μ ∘ δ_r` (same underlying map after vertex removal)
+- `μ'.sign = -μ.sign` (opposite sign, from the inversion count change) -/
+def swapDiagonalSteps {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
+    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
+    Shuffle (p + 1) (q + 1) := by
+  sorry
+
+/-- The swap involution preserves the diagonal vertex property. -/
+lemma swapDiagonalSteps_vertex {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    isDiagonalVertex (swapDiagonalSteps μ r hr) r := by
+  sorry
+
+/-- The swap is an involution. -/
+lemma swapDiagonalSteps_involutive {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    swapDiagonalSteps (swapDiagonalSteps μ r hr) r
+      (swapDiagonalSteps_vertex μ r hr) = μ := by
+  sorry
+
+/-- The swap preserves the underlying OrderHom when composed with any OrderHom
+that avoids the diagonal vertex. -/
+lemma swapDiagonalSteps_same_map {p q n : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) (φ : Fin n →o Index (p + 1 + (q + 1)))
+    (hφ : ∀ k, φ k ≠ r) :
+    (swapDiagonalSteps μ r hr).1.comp φ = μ.1.comp φ := by
+  sorry
+
+/-- The swap negates the signed coefficient. -/
+lemma swapDiagonalSteps_neg_sign {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    (swapDiagonalSteps μ r hr).sign * (-1 : ℤ) ^ r.val =
+    -(μ.sign * (-1 : ℤ) ^ r.val) := by
+  sorry
+
+/-- The swap involution is never the identity: swapping two steps of different
+type always produces a distinct shuffle. -/
+lemma swapDiagonalSteps_ne {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    swapDiagonalSteps μ r hr ≠ μ := by
   sorry
 
 end Shuffle
+
+/-- Double sum cancellation via a sign-reversing involution on the first index.
+Given a predicate `p` on `α × β`, a function `f : α → β → M`, and an involution
+`g : α → α` (depending on `b` and a proof of `p a b`) that negates `f` and preserves `p`,
+the filtered double sum vanishes. -/
+lemma sum_sum_involution_zero {α β M : Type*}
+    [Fintype α] [Fintype β] [AddCommGroup M]
+    (p : α → β → Prop) [∀ a, DecidablePred (p a)]
+    (f : α → β → M)
+    (g : (a : α) → (b : β) → p a b → α)
+    (hg_pred : ∀ a b h, p (g a b h) b)
+    (hg_invol : ∀ a b h, g (g a b h) b (hg_pred a b h) = a)
+    (hg_neg : ∀ a b h, f (g a b h) b = -f a b)
+    (hg_ne : ∀ a b h, g a b h ≠ a) :
+    (∑ a : α, Finset.sum (Finset.univ.filter (p a)) (f a)) = 0 := by
+  sorry
 
 end HomologyLean.SingularHomology
