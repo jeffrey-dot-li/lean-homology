@@ -68,6 +68,48 @@ is almost always a definitional-vs-propositional gap.
 definitionally equal?" If yes, restructure to restore definitional equality — or use `erw`/
 `convert`/`change` to bridge the gap.
 
+---
+
+## Lemma won't match the goal? Use `conv` + one `enter` at a time (CRITICAL)
+
+If `rw [h]` / `erw [h]` / `simp_rw [h]` fail to apply a lemma at the top level, **STOP
+immediately.** Do NOT try `simp_rw [show ∀ ... from ...]`, universe annotations, or
+repeated `erw` tweaks. **Do NOT use a global `simp` to normalize the goal** — it blows
+up the goal state and makes everything harder to read. These all loop forever.
+
+**Instead**: use `conv` to drill down, one `enter` at a time, then apply the lemma
+surgically. Escalate through these levels only as needed:
+
+```
+conv_lhs =>
+  enter [2, x]    -- one step at a time, check goal after each
+  enter [2]
+  enter [2, x_1]
+  enter [2]
+  -- Level 1: try rw directly
+  rw [lemma args]
+  -- Level 2: if rw fails, try erw (handles more defeq mismatches)
+  erw [lemma args]
+  -- Level 3: if erw also fails, use tactic => to construct h with
+  -- exact bound variables, then simp just h, then rw h
+  tactic =>
+    have h := lemma arg1 (↑x) x_1
+    simp at h
+    rw [h]
+```
+
+**Why this works:** Inside `conv`, binder variables (`x`, `x_1`) are in scope. At level
+3, you pass them explicitly to the lemma — fully instantiated, no metavariables — which
+bypasses every possible matching issue (universes, notation, binders).
+
+**Rules:**
+1. Add ONE `enter` at a time. Check the conv goal state after each. Do not guess the path.
+2. `enter [2, binder]` enters a `Finset.sum` (arg 2 is the lambda).
+3. `enter [2]` skips past the left operand of `HSMul.hSMul` (i.e., past `c •`).
+4. Always try `rw` → `erw` → `tactic =>` in order. Don't skip to level 3.
+
+---
+
 
 ### `rfl` cannot unfold recursive calls inside a pattern-matched definition
 
@@ -159,6 +201,17 @@ in the context. It fails on `h : expr1 = expr2` where both sides are compound (e
 **Fix**: Use `.symm` on a matching lemma instead of `subst`. For example, if you have a lemma
 `eqToHom_comp_d K h` that takes `h : i = i'`, use `(eqToHom_comp_d K hrel).symm` as a proof
 term rather than trying to `subst hrel`.
+
+For eliminating `h ▸` transports when `subst` fails, see **[`api/transport-cast.md`](api/transport-cast.md)**
+— use `generalize` to create a fresh variable, then `rcases`. If that also fails (due to
+successor-indexed defs like `SimplexCategory.δ`), decompose into a transport-only helper lemma.
+
+### `rw`/`erw` can't rewrite under `∑` binders; universe mismatches block `simp_rw`
+
+`rw`/`erw` don't descend into lambda binders (`∑ x, f x` has a lambda). `simp_rw` does,
+but silently fails when the lemma's universe doesn't match the goal's (common when the
+lemma doesn't reference a section variable pinning `v`). Both symptoms look like "did not
+find occurrence" on a visually matching pattern. **Fix: use the `conv` strategy above.**
 
 ### Use `convert` to bypass opaque subexpressions you can't restate
 

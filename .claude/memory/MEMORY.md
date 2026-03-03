@@ -22,6 +22,7 @@ Then read the full section from the matching file if needed.
 | [`api/homology-shortcomplex.md`](api/homology-shortcomplex.md) | `ShortComplex`, homology functor, AB4, connecting homomorphism δ, chain map mono |
 | [`api/homotopy-paths.md`](api/homotopy-paths.md) | `Path.Homotopic`, `HomotopyRel`, quotients, covering maps |
 | [`api/chain-complex.md`](api/chain-complex.md) | `HomologicalComplex.d`, `Nat.add` index shifting, `eqToHom_comp_d`, face map expansion |
+| [`api/transport-cast.md`](api/transport-cast.md) | `h ▸` transport elimination, `generalize`+`rcases` trick, successor-index blockers, `cast`↔`eqToHom` |
 
 ## When to update memory
 
