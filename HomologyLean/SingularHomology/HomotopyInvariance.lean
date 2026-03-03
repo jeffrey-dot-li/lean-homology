@@ -170,8 +170,6 @@ def prodSimplex {X Y : TopCat.{v}} {n : ℕ}
 
 Given a `(p,q)`-shuffle, we will later build the corresponding continuous map
 \( \Delta^{p+q} \to \Delta^p \times \Delta^q \).
-
-For now we introduce it as a placeholder; we will implement it next.
 -/
 
 /-- The map of standard simplices associated to a shuffle:
@@ -388,7 +386,70 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
   -- Finish by rewriting the LHS using `hmap` and `hprod`.
   simp [hmap, hprod]
 
-/-! ### Universal Leibniz rule for the simplex-level cross product -/
+/-- Composing `.d i j` with an `eqToHom` on the codomain gives `.d i j'`
+where `j'` is the transported index. -/
+lemma HomologicalComplex.d_comp_eqToHom
+    {ι : Type*} {c : ComplexShape ι} {A : Type*} [Category A] [HasZeroMorphisms A]
+    (K : HomologicalComplex A c) {i j j' : ι} (h : j = j') :
+    K.d i j ≫ eqToHom (congrArg K.X h) = K.d i j' := by
+  subst h; simp
+
+/-- Composing an `eqToHom` on the domain with `.d` gives `.d i' j`. -/
+lemma HomologicalComplex.eqToHom_comp_d
+    {ι : Type*} {c : ComplexShape ι} {A : Type*} [Category A] [HasZeroMorphisms A]
+    (K : HomologicalComplex A c) {i i' j : ι} (h : i = i') :
+    eqToHom (congrArg K.X h) ≫ K.d i' j = K.d i j := by
+  subst h; simp
+
+/-- The boundary map of `singChain` equals the alternating face map differential.
+This avoids unfolding `singChain`/`SCF` through deep functor composition. -/
+lemma singChain_d_eq_alternatingFaceMapObjD (X : TopCat.{v}) (n : ℕ) :
+    (singChain (C := C) (R := R) X).d (n + 1) n =
+    AlternatingFaceMapComplex.objD
+      (((SimplicialObject.whiskering (Type v) C).obj
+        ((sigmaConst (C := C)).obj R)).obj (TopCat.toSSet.obj X)) n := by
+  simp only [singChain]
+  dsimp [singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  rw [alternatingFaceMapComplex_obj_d]
+  rfl
+
+
+/-! ### Universal Leibniz rule for the simplex-level cross product
+
+**Proof sketch** (after expanding ∂ into face maps):
+
+The LHS is a double sum `∑ μ, μ.sign • ∑ r, (-1)^r • coprojection(shuffleSimplex(id,id,μ)) ≫ δ_r`.
+
+1. **Functoriality**: Rewrite `coprojection(σ) ≫ δ_r` as `coprojection(δ_r ≫ σ)` — the face
+   map acts by precomposition on singular simplices (naturality of `Sigma.ι`).
+2. **Split by step type**: For each shuffle `μ`, partition `Fin (p+q+2)` into left steps and
+   right steps of `μ`. The inner sum splits into two sub-sums.
+3. **Face-shuffle factorization**: Apply `shuffleStdSimplexMap_comp_face_left` (resp. `_right`)
+   to rewrite `δ_r ≫ shuffleStdSimplexMap μ` as `shuffleStdSimplexMap ν ≫ prod.map (δ_j) id`
+   (resp. `prod.map id (δ_k)`).
+4. **Reindex**: The map `(μ, r) ↦ (removeLeftStep μ r, removedLeftIndex μ r)` bijects onto
+   `Shuffle(p, q+1) × Fin(p+2)` (via `removeLeftStep_surj`), and similarly for right steps.
+   Swap the double sum to `∑ j ∑ ν` form.
+5. **Match signs**: `μ.sign · (-1)^r = (-1)^j · ν.sign` (from `sign_removeLeftStep`), and
+   for right steps the extra `(-1)^(p+1)` factor appears (from `sign_removeRightStep`).
+-/
+
+/-- Functoriality of `simplexCoprojection`: the face map acts by precomposition
+on singular simplices through the coproduct structure. -/
+lemma simplexCoprojection_comp_eqToHom_comp_δ {X : TopCat.{v}} {n m : ℕ} (h : n = m + 1)
+    (s : SingularSimplex X n) (i : Fin (m + 2)) :
+    simplexCoprojection (C := C) (R := R) s ≫
+      eqToHom (congrArg (singChain (C := C) (R := R) X).X h) ≫
+      (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj R)).obj
+        (TopCat.toSSet.obj X)).δ i =
+    simplexCoprojection (C := C) (R := R)
+      ((TopCat.toSSet.obj X).δ i (h ▸ s)) := by
+  subst h
+  simp only [eqToHom_refl, Category.id_comp]
+  dsimp [simplexCoprojection, singChain, SCF, singularChainComplexFunctor,
+    SSet.singularChainComplexFunctor, SimplicialObject.δ, SimplicialObject.whiskering]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp
 
 /-- The boundary of the universal simplex cross product decomposes as a signed sum
 of face-map cross products (the "universal Leibniz rule"):
@@ -415,6 +476,38 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ ≫
           eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
             (by omega)) := by
+  simp only [universalSimplexCrossProduct, Preadditive.sum_comp, Preadditive.zsmul_comp]
+  apply (cancel_mono (eqToHom (congrArg (singChain (C := C) (R := R)
+    (Δ[p + 1] ⨯ Δ[q + 1])).X (show p + (q + 1) = p + q + 1 from by omega)))).mp
+  simp_rw [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
+  have hd_eq : (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+      (p + 1 + (q + 1)) (p + (q + 1)) ≫
+      eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
+        (show p + (q + 1) = p + q + 1 from by omega)) =
+    (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+      (p + 1 + (q + 1)) (p + q + 1) :=
+    HomologicalComplex.d_comp_eqToHom _ (show p + (q + 1) = p + q + 1 from by omega)
+  simp_rw [show ∀ (f : R ⟶ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
+      (p + 1 + (q + 1))),
+      f ≫ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+        (p + 1 + (q + 1)) (p + (q + 1)) ≫
+        eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
+          (show p + (q + 1) = p + q + 1 from by omega)) =
+      f ≫ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+        (p + 1 + (q + 1)) (p + q + 1) from
+    fun f => by rw [hd_eq]]
+  have hrel : (p + 1 + (q + 1) : ℕ) = (p + q + 1) + 1 := by omega
+  conv_lhs => rw [show (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
+      (p + 1 + (q + 1)) (p + q + 1) =
+      eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X hrel) ≫
+      (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + q + 1) + 1) (p + q + 1) from
+    (HomologicalComplex.eqToHom_comp_d _ hrel).symm]
+  rw [singChain_d_eq_alternatingFaceMapObjD]
+  simp only [AlternatingFaceMapComplex.objD]
+  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
+  -- Step 1: Functoriality — rewrite coprojection ≫ eqToHom ≫ δ as coprojection(δ ∘ σ)
+  simp_rw [simplexCoprojection_comp_eqToHom_comp_δ hrel]
+  unfold shuffleSimplex
   sorry
 
 /-! The chain-level cross product and homotopy invariance theorems
