@@ -184,6 +184,42 @@ def shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
 
 
 
+/-- Face-shuffle factorization (left step case):
+When step `r` of a `(p+1, q+1)`-shuffle `μ` is a left step, composing the
+face map `δᵣ` with `shuffleStdSimplexMap μ` factors as
+`shuffleStdSimplexMap ν ≫ prod.map (δⱼ) id` where `ν = removeLeftStep μ r`
+and `j = removedLeftIndex μ r`.
+
+Note: we cast via `eqToHom` because `p+1+(q+1) = p+(q+1)+1` is not definitional. -/
+lemma shuffleStdSimplexMap_comp_face_left {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : Shuffle.isLeftStep μ r) :
+    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + (q + 1))
+      ⟨r.val, by omega⟩) ≫
+      eqToHom (by simp [show p + (q + 1) + 1 = p + 1 + (q + 1) from by omega]) ≫
+      shuffleStdSimplexMap (p := p + 1) (q := q + 1) μ =
+    shuffleStdSimplexMap (p := p) (q := q + 1) (Shuffle.removeLeftStep μ r hr) ≫
+      prod.map
+        (SimplexCategory.toTop.map (SimplexCategory.δ (Shuffle.removedLeftIndex μ r hr)))
+        (𝟙 _) := by
+  sorry
+
+/-- Face-shuffle factorization (right step case):
+When step `r` is a right step, the face factors through `prod.map id (δₖ)`. -/
+lemma shuffleStdSimplexMap_comp_face_right {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : ¬ Shuffle.isLeftStep μ r) :
+    SimplexCategory.toTop.map (SimplexCategory.δ (n := p + (q + 1))
+      ⟨r.val, by omega⟩) ≫
+      eqToHom (by simp [show p + (q + 1) + 1 = p + 1 + (q + 1) from by omega]) ≫
+      shuffleStdSimplexMap (p := p + 1) (q := q + 1) μ =
+    eqToHom (by simp [show p + (q + 1) = p + 1 + q from by omega]) ≫
+      shuffleStdSimplexMap (p := p + 1) (q := q) (Shuffle.removeRightStep μ r hr) ≫
+        prod.map
+          (𝟙 _)
+          (SimplexCategory.toTop.map (SimplexCategory.δ (Shuffle.removedRightIndex μ r hr))) := by
+  sorry
+
 attribute [simp] CategoryTheory.yoneda
 
 /-- Given a p-simplex σ in X, a q-simplex τ in Y, and a (p,q)-shuffle μ,

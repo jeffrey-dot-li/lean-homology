@@ -136,6 +136,30 @@ construction uses the other order.
 Similarly, `1 + n ≠ n + 1` definitionally. Using `crossProduct n 1` avoids the `add_comm 1 n ▸`
 cast that `crossProduct 1 n` would require.
 
+### `set` doesn't fold `abbrev` terms reliably
+
+`set K := myAbbrev args` creates a `let` binding, but the goal may still contain the
+*elaborated* form of `myAbbrev args` instead of `K`. This happens because `set` uses
+syntactic matching, and `abbrev`s can elaborate with different implicit arguments in the
+goal vs the `set` expression.
+
+**Symptom**: After `set K := singChain ...`, the goal still shows `(singChain ...).d` instead
+of `K.d`. Then `simp_rw [d_shift]` (where `d_shift` is stated about `K`) can't match.
+
+**Fix**: Don't rely on `set` for syntactic folding of `abbrev` terms. Instead:
+- State your `have` lemma directly about the full expression (not the `set` variable)
+- Use `conv_lhs => rw [show full_expr = ... from ...]` to target the exact subexpression
+
+### `subst` needs a free variable on one side
+
+`subst h` only works when `h : x = expr` or `h : expr = x` where `x` is a **free variable**
+in the context. It fails on `h : expr1 = expr2` where both sides are compound (e.g.
+`h : p + 1 + (q + 1) = p + q + 1 + 1`).
+
+**Fix**: Use `.symm` on a matching lemma instead of `subst`. For example, if you have a lemma
+`eqToHom_comp_d K h` that takes `h : i = i'`, use `(eqToHom_comp_d K hrel).symm` as a proof
+term rather than trying to `subst hrel`.
+
 ### Use `convert` to bypass opaque subexpressions you can't restate
 
 When the goal contains an elaborated subexpression (e.g. involving `ConcreteCategory.hom`,

@@ -165,7 +165,7 @@ When in doubt, use `lemma`. Reserve `theorem` for results a reader would want to
 
 ## General Operating Rules
 
-1. **At the start of every session**: Read `.claude/memory/proof-strategies.md`. Then `rg` the `.claude/memory/api/` folder for concepts relevant to the current task and read matching sections.
+1. **At the start of every session**: Read `.claude/memory/proof-strategies.md` and `.claude/memory/MEMORY.md`. Then `rg` the `.claude/memory/api/` folder for concepts relevant to the current task and read matching sections.
 2. **Always** verify the proof of a lemma or theorem upon completion before moving onto the next one.
 3. Use `lean_diagnostic_messages` to check for errors after writing/editing proofs.
 4. Use `lean_goal` to inspect proof states at specific positions.
@@ -306,7 +306,7 @@ Memory files (see `.claude/memory/MEMORY.md` for the full index):
 - `.claude/memory/api/` — API-specific proof patterns, pitfalls, and useful lemmas, one file per subsystem
 
 Rules:
-- **Before starting proof work**: Read `proof-strategies.md`. Then `rg` the `api/` folder for concepts relevant to the task and read matching sections.
+- **Before starting proof work**: Read `proof-strategies.md` and `MEMORY.md`. Then `rg` the `api/` folder for concepts relevant to the task and read matching sections.
 - **After completing a tricky proof**: Proactively save reusable strategies to memory:
   - New general tactic pattern or Lean gotcha? → `proof-strategies.md`
   - API-specific proof pattern, pitfall, or useful lemma? → appropriate `api/` file (create a new one if no file fits)

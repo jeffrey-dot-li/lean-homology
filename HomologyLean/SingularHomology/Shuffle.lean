@@ -327,6 +327,79 @@ def default_0_0 : Shuffle 0 0 :=
 lemma sign_0_0 : (default_0_0 : Shuffle 0 0).sign = 1 := by
   simp [sign, invCount]
 
+/-! #### Face-shuffle decomposition (Leibniz rule infrastructure)
+
+At each step `r` of a `(p+1, q+1)`-shuffle, exactly one coordinate increments.
+We call step `r` a **left step** if the first coordinate increments, and a
+**right step** if the second does. Removing a left step yields a `(p, q+1)`-shuffle;
+removing a right step yields a `(p+1, q)`-shuffle. These operations, together with
+appropriate sign tracking, give the Leibniz rule for the shuffle product. -/
+
+/-- Whether step `r` of shuffle `μ` is a "left step" (first coordinate increments). -/
+def isLeftStep {p q : ℕ} (μ : Shuffle p q) (r : Fin (p + q)) : Prop :=
+  (μ.1 r.castSucc).1.val < (μ.1 r.succ).1.val
+
+instance isLeftStep_decidable {p q : ℕ} (μ : Shuffle p q) (r : Fin (p + q)) :
+    Decidable (isLeftStep μ r) :=
+  inferInstanceAs (Decidable (_ < _))
+
+/-- Remove left step `r` from a `(p+1, q+1)`-shuffle to get a `(p, q+1)`-shuffle.
+Precondition: step `r` is a left step (first coordinate increments). -/
+def removeLeftStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : isLeftStep μ r) : Shuffle p (q + 1) := by
+  sorry
+
+/-- Remove right step `r` from a `(p+1, q+1)`-shuffle to get a `(p+1, q)`-shuffle.
+Precondition: step `r` is a right step (second coordinate increments). -/
+def removeRightStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : ¬ isLeftStep μ r) : Shuffle (p + 1) q := by
+  sorry
+
+/-- The left-coordinate index of the step removed by `removeLeftStep`.
+If step `r` is a left step with `μ(r) = (j, _)`, this returns `j : Fin (p + 2)`. -/
+def removedLeftIndex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : isLeftStep μ r) : Fin (p + 2) :=
+  (μ.1 r.castSucc).1
+
+/-- The right-coordinate index of the step removed by `removeRightStep`.
+If step `r` is a right step with `μ(r) = (_, k)`, this returns `k : Fin (q + 2)`. -/
+def removedRightIndex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1)))
+    (hr : ¬ isLeftStep μ r) : Fin (q + 2) :=
+  (μ.1 r.castSucc).2
+
+/-- Sign relation for removing a left step: the original sign `μ.sign • (-1)^r`
+equals `(-1)^j • ν.sign` where `j` is the removed left index and `ν` is the
+resulting `(p, q+1)`-shuffle. -/
+lemma sign_removeLeftStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
+    (r : Fin (p + 1 + (q + 1))) (hr : isLeftStep μ r) :
+    μ.sign * (-1 : ℤ) ^ r.val =
+    (-1 : ℤ) ^ (removedLeftIndex μ r hr).val * (removeLeftStep μ r hr).sign := by
+  sorry
+
+/-- Sign relation for removing a right step: the original sign `μ.sign • (-1)^r`
+equals `(-1)^(p+1) • (-1)^k • ν.sign` where `k` is the removed right index
+and `ν` is the resulting `(p+1, q)`-shuffle. -/
+lemma sign_removeRightStep {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
+    (r : Fin (p + 1 + (q + 1))) (hr : ¬ isLeftStep μ r) :
+    μ.sign * (-1 : ℤ) ^ r.val =
+    (-1 : ℤ) ^ (p + 1) * ((-1 : ℤ) ^ (removedRightIndex μ r hr).val *
+      (removeRightStep μ r hr).sign) := by
+  sorry
+
+/-- The decomposition is a bijection: every `(ν, j)` with `ν : Shuffle p (q+1)` and
+`j : Fin (p+2)` arises uniquely from removing some left step of some `(p+1, q+1)`-shuffle.
+(Stated as surjectivity; injectivity follows from the constructions.) -/
+lemma removeLeftStep_surj {p q : ℕ} (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    ∃ (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1))) (hr : isLeftStep μ r),
+      removeLeftStep μ r hr = ν ∧ removedLeftIndex μ r hr = j := by
+  sorry
+
+/-- Same surjectivity for right steps. -/
+lemma removeRightStep_surj {p q : ℕ} (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
+    ∃ (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + 1 + (q + 1))) (hr : ¬ isLeftStep μ r),
+      removeRightStep μ r hr = ν ∧ removedRightIndex μ r hr = k := by
+  sorry
+
 end Shuffle
 
 end HomologyLean.SingularHomology

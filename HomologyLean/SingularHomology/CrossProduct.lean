@@ -491,6 +491,62 @@ It then suffices to show the bottom-right triangle commutes:
   simp only [simplexCrossProduct, SingularSimplex.ofΔ_down]
   erw [prod.map_id_id, CategoryTheory.Functor.map_id, Category.comp_id]
 
+/-- The Leibniz rule for `universalSimplexCrossProduct`: the core combinatorial
+identity that the boundary of the shuffle product decomposes into left-face and
+right-face contributions. This is the main content of the shuffle Leibniz rule.
+```
+  universalCross(p+1, q+1) ≫ d =
+    ∑ j, (-1)^j • (universalCross(p, q+1) ≫ (δⱼ × id)_*) +
+    (-1)^(p+1) • ∑ k, (-1)^k • (universalCross(p+1, q) ≫ (id × δₖ)_* ≫ eqToHom)
+``` -/
+lemma universalSimplexCrossProduct_comp_d (p q : ℕ) :
+    (universalSimplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) (p + 1) (q + 1) :
+      Rmod R ⟶ _) ≫
+      (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    (∑ j : Fin (p + 2), (-1 : ℤ) ^ (j : ℕ) •
+      ((universalSimplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) p (q + 1) :
+        Rmod R ⟶ _) ≫
+        ((mSCF R).map (prod.map (SimplexCategory.toTop.map (SimplexCategory.δ j))
+          (𝟙 _))).f (p + (q + 1)))) +
+    (-1 : ℤ) ^ (p + 1) • (∑ k : Fin (q + 2), (-1 : ℤ) ^ (k : ℕ) •
+      ((universalSimplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) (p + 1) q :
+        Rmod R ⟶ _) ≫
+        ((mSCF R).map (prod.map (𝟙 _) (SimplexCategory.toTop.map (SimplexCategory.δ k)))).f
+          ((p + 1) + q) ≫
+        eqToHom (congrArg (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).X (by omega)))) := by
+  sorry
+
+/-- Left summand of the Leibniz rule: the sum of `(δⱼ × id)`-pushforwards of lower cross products
+equals the tensor `(mι ⟪𝟙⟫ ≫ d) ⊗ₘ mι ⟪𝟙⟫` composed with crossProduct. -/
+private lemma simplexCrossProduct_leibniz_left_summand (p q : ℕ) :
+    (λ_ (Rmod R)).hom ≫
+      ∑ j : Fin (p + 2), (-1 : ℤ) ^ (j : ℕ) •
+        ((universalSimplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) p (q + 1) :
+          Rmod R ⟶ _) ≫
+          ((mSCF R).map (prod.map (SimplexCategory.toTop.map (SimplexCategory.δ j))
+            (𝟙 Δ[q + 1]))).f (p + (q + 1))) =
+    (mι ⟪𝟙 Δ[p + 1]⟫ₛ ≫ (mSingChain R Δ[p + 1]).d (p + 1) p ⊗ₘ
+      mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫ crossProduct (R := R) p (q + 1) := by
+  sorry
+
+/-- Right summand of the Leibniz rule: the sum of `(id × δₖ)`-pushforwards of lower cross products
+equals the tensor `mι ⟪𝟙⟫ ⊗ₘ (mι ⟪𝟙⟫ ≫ d)` composed with crossProduct and eqToHom. -/
+private lemma simplexCrossProduct_leibniz_right_summand (p q : ℕ) :
+    (λ_ (Rmod R)).hom ≫
+      ∑ k : Fin (q + 2), (-1 : ℤ) ^ (k : ℕ) •
+        ((universalSimplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) (p + 1) q :
+          Rmod R ⟶ _) ≫
+          ((mSCF R).map (prod.map (𝟙 Δ[p + 1])
+            (SimplexCategory.toTop.map (SimplexCategory.δ k)))).f ((p + 1) + q) ≫
+          eqToHom (congrArg (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).X
+            (show (p + 1) + q = p + (q + 1) by omega))) =
+    (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ
+      mι ⟪𝟙 Δ[q + 1]⟫ₛ ≫ (mSingChain R Δ[q + 1]).d (q + 1) q) ≫
+      crossProduct (R := R) (p + 1) q ≫
+      eqToHom (congrArg (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).X
+        (show (p + 1) + q = p + (q + 1) by omega)) := by
+  sorry
+
 /-- **Element-level Leibniz rule**: The cross product is compatible
 with the boundary operators, stated for the universal simplices.
 ```
@@ -520,7 +576,6 @@ theorem simplexCrossProduct_leibniz (p q : ℕ) :
     rhs; rhs -- second summand inside smul
     rw [← Category.assoc (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ),
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
-
   have boundary_gen : ∀ (n : ℕ),
       mι (R := R) ⟪𝟙 (Δ[n + 1] : TopCat.{u})⟫ₛ ≫ (mSingChain R Δ[n + 1]).d (n + 1) n =
       ∑ i : Fin (n + 2), ((-1 : ℤ) ^ (i : ℕ)) •
