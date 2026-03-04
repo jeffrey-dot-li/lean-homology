@@ -1192,7 +1192,12 @@ lemma sign_insertLeftStep {p q : ℕ}
     (ν : Shuffle p q) (j : Fin (p + 2)) :
     (insertLeftStep ν j).sign * (-1 : ℤ) ^ (insertLeftIndex ν j).val =
     (-1 : ℤ) ^ j.val * ν.sign := by
-  sorry
+  simp only [sign, ← pow_add]
+  have h := invCount_insertLeftStep_add ν j
+  have hge := insertLeftIndex_ge ν j
+  rw [show (insertLeftStep ν j).invCount + (insertLeftIndex ν j).val =
+    (j.val + ν.invCount) + 2 * ((insertLeftIndex ν j).val - j.val) from by omega]
+  rw [pow_add, pow_mul, neg_one_sq, one_pow, mul_one]
 
 /-- Sign relation for right insertion:
 `(insertRightStep ν k).sign * (-1)^(insertRightIndex ν k) =
