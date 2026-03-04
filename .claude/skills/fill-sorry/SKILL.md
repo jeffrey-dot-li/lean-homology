@@ -19,7 +19,10 @@ Target: $ARGUMENTS
    - Check `lean_goal` — often the simplified goal suggests the next step
    - Use `simpa using h` to see if existing hypotheses close it after simplification
 5. Only search Mathlib (`lean_state_search`, `lean_leansearch`, `lean_loogle`) when you have a **specific** lemma shape in mind, not as a fishing expedition.
-6. Build the proof incrementally — add tactics one at a time, checking `lean_goal` after each.
+6. Build the proof incrementally — add tactics one at a time. **After every edit:**
+   - First, check `lean_diagnostic_messages` on the edited line(s) (`start_line`/`end_line`) to confirm no errors. `lean_goal` succeeding does NOT mean the tactic compiled — a failing tactic (e.g., "`simp` made no progress") still shows a goal on the next line (the unchanged one).
+   - Then, check `lean_goal` after the tactic to see the new proof state.
+   - If diagnostics show an error, **revert the edit** before trying something else.
 7. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
 8. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
 

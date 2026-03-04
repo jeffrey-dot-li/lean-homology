@@ -22,128 +22,25 @@ The user works in distinct modes. Modes are activated by slash commands (e.g., `
 - When in a read-only mode (`/research`, `/discuss`), **do not edit files** unless the user explicitly asks to switch to an editing mode.
 
 ### Mode 1: Research (`/research`)
-
-**Goal**: Find whether a theorem/concept exists in Mathlib, and locate the building blocks needed for a new theorem.
-
-**Procedure**:
-1. Use `lean_leansearch`, `lean_loogle`, `lean_leanfinder` to search for the concept.
-2. Use `lean_local_search` to check what already exists in this project.
-3. For each relevant result, use `lean_hover_info` and/or `lean_declaration_file` to get the full signature and source location.
-4. **Always cite results with `file_path:line_number`** format so the user can alt+click to navigate.
-5. Summarize findings: what exists, what's missing, and what building blocks are available.
-
-**Output**: A structured summary with clickable references. No code edits.
+Find whether a theorem/concept exists in Mathlib and locate building blocks for a new theorem. Full procedure: `.claude/skills/research/SKILL.md`.
 
 ### Mode 2: Draft (`/draft`)
-
-**Goal**: Draft the theorem/lemma structure needed to prove a larger result, given a proof sketch or mathematical reference (e.g., from Hatcher).
-
-**Important**: `/draft` is a **custom skill**, not the builtin `/plan`. The builtin `/plan` enters a read-only mode that writes a markdown plan for approval before any code is written. `/draft` writes **actual Lean code** — sorry'd declarations that compile — directly in source files.
-
-**Procedure**:
-1. **Research first** — run Mode 1 to understand what Mathlib already provides.
-2. Work **interactively** with the user to decompose the proof into lemmas.
-3. Write all declarations with `sorry` proofs — no filled proofs in this mode.
-4. Each lemma should be **provable independently in ~30 lines or fewer**.
-5. Verify each `sorry`'d statement compiles with `lean_diagnostic_messages` before moving on.
-6. Present the full dependency structure: which lemmas feed into which.
-
-**Output**: A compilable file (or section) of `sorry`'d declarations with clear names and docstrings. Iterate with the user until the decomposition is right.
+Draft sorry'd theorem/lemma structure from a proof sketch. **Not the builtin `/plan`** — writes actual Lean code directly. Full procedure: `.claude/skills/draft/SKILL.md`.
 
 ### Mode 3: Fill Sorry (`/fill-sorry`)
-
-**Goal**: Prove a specific `sorry`'d lemma using the LSP tools iteratively.
-
-**Procedure**:
-0. Read `.claude/memory/proof-strategies.md` — it contains tactic patterns and Lean gotchas specific to this project. Skipping this causes repeated mistakes.
-1. Read the lemma and use `lean_goal` at the `sorry` to understand the proof state.
-2. Try simple tactics first via `lean_multi_attempt`: `["simp", "ring", "omega", "exact?", "aesop"]`.
-3. If those fail, use the search decision tree:
-   - `lean_state_search` / `lean_hammer_premise` to find closing lemmas
-   - `lean_leansearch` / `lean_loogle` for specific lemma lookup
-4. Build the proof incrementally — add tactics one at a time, checking `lean_goal` after each.
-5. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
-6. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
-
-**Key rules**:
-- Never leave a proof unverified.
-- If a proof exceeds ~30 lines, suggest decomposing into helper lemmas (switch to Mode 2).
-- **Add comments liberally.** Every non-obvious rewrite or tactic block should get a comment explaining the mathematical before → after and why it's done that way. See [§ Comments: explain *what* + *why*](#comments-explain-what--why-for-non-obvious-steps) for the format.
-
-**Anti-looping protocol** (CRITICAL):
-- **Test, don't theorize.** If you're unsure whether a tactic will work, *edit the file and check diagnostics*. Never spend more than 2-3 sentences reasoning about whether something will work — just try it. Lean's feedback is faster and more reliable than mental simulation.
-- **Detect cycles.** If you catch yourself considering an approach you already rejected, you are looping. Stop immediately and report.
-- **Recognize structural problems.** If the issue is not "which tactic closes this goal" but "the definition/API doesn't support this proof strategy," that's a `/draft` problem, not a `/fill-sorry` problem. Report to the user: "This may need a restructuring — want to switch to `/draft`?"
-- **Never silently struggle.** The user prefers a concise "I'm stuck because X" message over 5000 tokens of increasingly desperate attempts.
-- **Narrate your reasoning.** Before each tool call, write a one-line summary of *why* you're making it (e.g., "Checking whether `liftFromProjective_comp` gives the rewrite I need" or "Goal has `biprod` — trying `simp` with biprod lemmas"). This lets the user follow your thought process and interrupt early if you're going down a wrong path.
+Prove a specific sorry'd lemma iteratively using LSP tools. Before starting, read `.claude/memory/proof-strategies.md`. Full procedure: `.claude/skills/fill-sorry/SKILL.md`.
 
 ### Mode 4: Interactive (`/interactive`)
-
-**Goal**: Work through a proof one step at a time, with the user directing each move.
-
-**How this differs from `/fill-sorry`**: `/fill-sorry` is autonomous — the agent drives the proof to completion. `/interactive` is **user-driven** — execute exactly what the user asks, show the goal state, and wait.
-
-**Procedure**:
-1. Read the target and show the initial goal state at the `sorry`.
-2. Wait for the user's instruction (e.g., "apply X", "rewrite with h", "simplify").
-3. Convert to clean Lean, edit the file, show the new goal state.
-4. Stop and wait. Do not attempt more steps.
-
-**Key rules**:
-- One step per turn. No speculative next steps.
-- Show goal state after every edit.
-- No autonomous Mathlib searching unless asked.
-- Revert on failure — don't try alternatives unless asked.
-- Always verify with `lean_diagnostic_messages` and `lean_goal` before responding. Never assume a tactic compiled.
-- Flag structural issues before editing — if the step needs changes elsewhere (definition update, missing lemma), don't deliberate for hundreds of tokens. A short clarifying question is always cheaper.
+Work through a proof one step at a time, user-directed. The agent executes exactly what the user asks, shows the goal state, and waits. Full procedure: `.claude/skills/interactive/SKILL.md`.
 
 ### Mode 5: Refactor (`/refactor`)
-
-**Goal**: Improve an existing working proof for brevity, clarity, or documentation.
-
-**Procedure**:
-1. Read the current proof and understand it with `lean_goal` at key positions.
-2. Propose a specific refactoring (e.g., "replace lines 15-25 with `simp [lemma_a, lemma_b]`").
-3. Apply the change and **immediately verify** with `lean_diagnostic_messages`.
-4. If the refactor breaks the proof, **revert** and try a different approach.
-5. Work **one change at a time** — never batch multiple refactors before verifying.
-6. After each successful change, show the user the before/after diff.
-
-**Key rules**:
-- The proof must compile after every single edit. No intermediate breakage.
-- Prefer `simp only [...]` over `simp` for stability.
-- If adding documentation, use Lean doc comments (`/-- ... -/`).
+Improve an existing working proof for brevity, clarity, or documentation. Full procedure: `.claude/skills/refactor/SKILL.md`.
 
 ### Mode 6: Discuss (`/discuss`)
-
-**Goal**: Read and discuss proofs, strategies, or math concepts without making any edits.
-
-**Use for**:
-- "Can this proof be simplified?"
-- "Would it be better to use X instead of Y?"
-- "Explain what this definition does."
-- Comparing proof strategies before committing.
-
-**Procedure**:
-1. Read the relevant code with `Read`, `lean_goal`, `lean_hover_info`, search tools, etc.
-2. Give a clear, direct analysis or answer.
-3. **Do not edit any files.** If the discussion leads to a concrete action, ask the user if they want to switch modes.
+Read and discuss proofs or math concepts. **No file edits.** Full procedure: `.claude/skills/discuss/SKILL.md`.
 
 ### Mode 7: Improve Workflow (`/improve-workflow`)
-
-**Goal**: Improve the Claude Code setup — instructions, skills, memory, and conventions.
-
-**Procedure**:
-1. Read current state: `assistants.md`, relevant skill files, `CLAUDE.md`, `.claude/` contents.
-2. Discuss with the user what's working and what to change.
-3. Propose changes before applying them.
-4. Keep instructions concise and actionable — avoid bloat.
-
-**Key rules**:
-- Don't duplicate content across `assistants.md` and skill files.
-- Verify project-specific patterns against actual repo code.
-- Remove stale guidance when adding new guidance.
-- **All project config must be git-tracked.** The user works on multiple machines (laptop + VM). Store everything under the repo (`.claude/`, `assistants.md`, etc.), not in `~/.claude/`. The only exception is the auto-loaded `~/.claude/projects/.../memory/MEMORY.md` which should just redirect to the in-repo files.
+Improve the Claude Code setup — instructions, skills, memory, conventions. **All config must be git-tracked** (store under the repo, not `~/.claude/`). Full procedure: `.claude/skills/improve-workflow/SKILL.md`.
 
 ## Lean Conventions
 

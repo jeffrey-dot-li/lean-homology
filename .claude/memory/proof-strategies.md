@@ -35,6 +35,18 @@ supervise progress vs looping, and impossible for the agent to reason about what
 ---
 
 
+## `lean_goal` does NOT confirm a tactic compiled (CRITICAL)
+
+`lean_goal` on the line *after* a tactic will show a goal state even if the tactic has an error
+(e.g., "`simp` made no progress", type mismatch). The goal shown is simply the unchanged state.
+This silently passes bad tactics through the feedback loop.
+
+**After every tactic edit**, check `lean_diagnostic_messages` with `start_line`/`end_line`
+targeting the edited line(s) **before** checking `lean_goal`. If diagnostics show an error,
+revert the edit. Never trust `lean_goal` alone as proof that a tactic worked.
+
+---
+
 ## General Lean Pitfalls and Strategies
 
 ### Definitional equality is gold (CRITICAL)

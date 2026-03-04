@@ -23,6 +23,7 @@ Then read the full section from the matching file if needed.
 | [`api/homotopy-paths.md`](api/homotopy-paths.md) | `Path.Homotopic`, `HomotopyRel`, quotients, covering maps |
 | [`api/chain-complex.md`](api/chain-complex.md) | `HomologicalComplex.d`, `Nat.add` index shifting, `eqToHom_comp_d`, face map expansion |
 | [`api/transport-cast.md`](api/transport-cast.md) | `h ▸` transport elimination, `generalize`+`rcases` trick, successor-index blockers, `cast`↔`eqToHom` |
+| [`api/eqToHom-casting.md`](api/eqToHom-casting.md) | `eqToHom` through functors (TopCat/SimplexCategory), `eqToHom_map`, `Functor.map_comp` folding, `slice_lhs`/`slice_rhs`, Fin.succAbove simp recipe |
 
 ## When to update memory
 
