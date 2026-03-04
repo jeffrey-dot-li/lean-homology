@@ -28,9 +28,14 @@ supervise progress vs looping, and impossible for the agent to reason about what
 - Example: `mι_comp_map` captures `mι s ≫ chain_map f = mι (f_*(s))` without ever exposing `colimit.ι_desc` or `TopCat.toSSet` internals.
 - The main proof stays in compact categorical notation; the ugly unfolding is isolated in the helper lemma.
 
-### `congr` introduces `id` wrappers
+### `congr` pitfalls
 - `congr 1` can wrap subterms in `id (...)`, which blocks `simp only` pattern matching.
-- Either `dsimp` immediately after `congr`, or use `change`/`show` to state the clean goal, or accept a `simp` at the end.
+  Either `dsimp` immediately after `congr`, or use `change`/`show` to state the clean goal.
+- `congr 1` on `F.map f = F.map g` (for a concrete-category functor like `toTop`) does
+  **not** reduce to `f = g` — it goes pointwise through `ConcreteCategory.hom`, producing
+  goals about function values. Use `congr 1` **twice** to peel off the functor application,
+  or fold both sides into `F.map(f ≫ ...) = F.map(g ≫ ...)` first so the first `congr 1`
+  strips `≫ rest` and the second strips `F.map`.
 
 ---
 
@@ -75,10 +80,39 @@ is almost always a definitional-vs-propositional gap.
 | TopCat pointwise | Stay categorical (`prod.lift_fst`) | Go pointwise through `ConcreteCategory.hom` | [topcat-limits.md](api/topcat-limits.md) |
 | Coercion matching | `erw` / `convert` (handles defeq mismatch) | `rw` / `simp` (fails on syntactic mismatch) | [monoidal-tensor.md § ConcreteCategory.hom vs Hom.hom](api/monoidal-tensor.md) |
 | Opaque goal exprs | `convert target_lemma` (unifier matches) | `have hf : f = id` (re-elaboration fails) | [proof-strategies.md § convert](#use-convert-to-bypass-opaque-subexpressions-you-cant-restate) |
+| eqToHom through functor | Fold into `F.map(...)`, prove in source cat | Fight bare `eqToHom` in target cat | [eqToHom-casting.md](api/eqToHom-casting.md) |
 
 **When stuck, ask:** "Is the real problem that two things are propositionally but not
 definitionally equal?" If yes, restructure to restore definitional equality — or use `erw`/
 `convert`/`change` to bridge the gap.
+
+---
+
+## `slice_lhs`/`slice_rhs` for categorical compositions
+
+When the goal is `a ≫ b ≫ c ≫ d = ...` and you need to rewrite a specific pair (e.g.,
+fold `b ≫ c` via `← Functor.map_comp`), don't fight `Category.assoc`. Use `slice_lhs i j`
+(1-indexed) to isolate morphisms `i` through `j`:
+
+```lean
+slice_lhs 2 3 => rw [← Functor.map_comp]   -- targets b ≫ c
+slice_rhs 1 2 => rw [show eqToHom _ = F.map ... from (eqToHom_map _ _).symm]
+```
+
+This is strictly better than manual `Category.assoc` + `conv` for categorical proofs.
+
+---
+
+## `dsimp` for `def`s, `simp` for `@[simp]` lemmas
+
+`simp` applies rewrite rules (equational lemmas, `@[simp]`-tagged lemmas). It **cannot**
+unfold a plain `def` that has no `@[simp]` tag or equational lemma. Use `dsimp [defName]`
+for definitional reduction first, then `simp` on the result.
+
+**Symptom**: `simp [Foo]` "made no progress" even though `Foo` appears in the goal.
+
+**Common in this project**: `Fin.succAboveOrderEmb`, `OrderEmbedding.ofStrictMono` need
+`dsimp` before `simp` can work on `Fin.succAbove`.
 
 ---
 

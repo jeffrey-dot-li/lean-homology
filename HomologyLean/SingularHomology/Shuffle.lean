@@ -468,6 +468,70 @@ instance isDiagonalVertex_decidable {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) :
     DecidablePred (isDiagonalVertex μ) := by
   intro r; unfold isDiagonalVertex; split_ifs <;> infer_instance
 
+/-! ##### Insertion–diagonal interface
+
+The insertion maps produce exactly the non-diagonal terms of the boundary sum.
+Each insertion lands in the non-diagonal set, together they cover it, and
+their images are disjoint. -/
+
+/-- Left insertion always produces a non-diagonal vertex: the two steps
+adjacent to the inserted vertex are both left steps (LL pattern). -/
+lemma insertLeftStep_not_diagonal {p q : ℕ}
+    (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    ¬isDiagonalVertex (insertLeftStep ν j)
+      ((insertLeftIndex ν j).cast (by omega)) := by
+  sorry
+
+/-- Right insertion always produces a non-diagonal vertex: the two steps
+adjacent to the inserted vertex are both right steps (RR pattern). -/
+lemma insertRightStep_not_diagonal {p q : ℕ}
+    (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
+    ¬isDiagonalVertex (insertRightStep ν k)
+      ((insertRightIndex ν k).cast (by omega)) := by
+  sorry
+
+/-- Every non-diagonal vertex of a `(p+1,q+1)`-shuffle is in the image of
+either `insertLeftStep` (from a `(p, q+1)`-shuffle and face index `j`) or
+`insertRightStep` (from a `(p+1, q)`-shuffle and face index `k`).
+
+This covers interior LL/RR vertices and boundary vertices (r = 0 or r = last). -/
+lemma nondiag_mem_insertLeft_or_insertRight {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index ((p + 1) + (q + 1)))
+    (hr : ¬isDiagonalVertex μ r) :
+    (∃ (j : Fin (p + 2)) (ν : Shuffle p (q + 1)),
+      μ = insertLeftStep ν j ∧ (insertLeftIndex ν j).val = r.val) ∨
+    (∃ (k : Fin (q + 2)) (ν : Shuffle (p + 1) q),
+      μ = insertRightStep ν k ∧ (insertRightIndex ν k).val = r.val) := by
+  sorry
+
+/-- The images of `insertLeftStep` and `insertRightStep` are disjoint:
+no `(p+1,q+1)`-shuffle with a given vertex index can arise from both
+a left insertion and a right insertion. -/
+lemma insertLeft_insertRight_disjoint {p q : ℕ}
+    (j : Fin (p + 2)) (ν₁ : Shuffle p (q + 1))
+    (k : Fin (q + 2)) (ν₂ : Shuffle (p + 1) q)
+    (hμ : insertLeftStep ν₁ j = insertRightStep ν₂ k)
+    (hr : (insertLeftIndex ν₁ j).val = (insertRightIndex ν₂ k).val) :
+    False := by
+  sorry
+
+/-- Left insertion produces a left-type vertex: the step at (or just before)
+the inserted vertex is a left step.  Here `isLeftType` checks `isLeftStep`
+at index `min r.val ((p+1)+(q+1)-1)`. -/
+lemma insertLeftStep_isLeftType {p q : ℕ}
+    (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    isLeftStep (insertLeftStep ν j)
+      ⟨min (insertLeftIndex ν j).val ((p + 1) + (q + 1) - 1), by omega⟩ := by
+  sorry
+
+/-- Right insertion produces a non-left-type vertex: the step at (or just before)
+the inserted vertex is a right step, not a left step. -/
+lemma insertRightStep_not_isLeftType {p q : ℕ}
+    (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
+    ¬isLeftStep (insertRightStep ν k)
+      ⟨min (insertRightIndex ν k).val ((p + 1) + (q + 1) - 1), by omega⟩ := by
+  sorry
+
 /-- The sign-reversing involution on diagonal terms.  Given a `(p+1, q+1)`-shuffle
 `μ` and a diagonal vertex `r`, swap the steps adjacent to `r` (replacing an LR
 corner with RL or vice versa).  This produces a new shuffle `μ'` such that:

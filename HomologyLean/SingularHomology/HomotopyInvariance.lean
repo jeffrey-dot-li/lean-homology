@@ -206,6 +206,14 @@ lemma cast_ulift_toSSet_down {p q n : ℕ} (h : p + q = n + 1)
   intro f
   simp
 
+/-- General version of `cast_ulift_toSSet_down` for arbitrary equality `h : n = m`. -/
+lemma cast_singularSimplex_down {n m : ℕ} (h : n = m)
+    (X : TopCat.{v})
+    (f : stdSimplex.{v} n ⟶ X) :
+    (show SingularSimplex X m from h ▸ ⟪f⟫ₛ).down =
+    eqToHom (congrArg (SimplexCategory.toTop.obj ∘ SimplexCategory.mk) h.symm) ≫ f := by
+  subst h; simp
+
 /-- Moving `SimplicialObject.δ` through a cast and `simplexProdMap`:
 the face map acts by precomposition (via `eqToHom` and the face `OrderHom`). -/
 lemma δ_cast_simplexProdMap {p q n : ℕ} (h : p + q = n + 1)
@@ -570,6 +578,15 @@ The RHS is two sums: one over `(j, ν)` with `ν : Shuffle p (q+1)`, one over
    - involutive (`swapDiagonalSteps_involutive`)
 -/
 
+/-- Transport lemma: coprojection composed with `eqToHom` on the chain group
+equals coprojection of the transported simplex. -/
+lemma simplexCoprojection_comp_eqToHom {X : TopCat.{v}} {n m : ℕ} (h : n = m)
+    (s : SingularSimplex X n) :
+    simplexCoprojection (C := C) (R := R) s ≫
+      eqToHom (congrArg (singChain (C := C) (R := R) X).X h) =
+    simplexCoprojection (C := C) (R := R) (h ▸ s) := by
+  subst h; simp
+
 /-- Functoriality of `simplexCoprojection`: the face map acts by precomposition
 on singular simplices through the coproduct structure. -/
 lemma simplexCoprojection_comp_eqToHom_comp_δ {X : TopCat.{v}} {n m : ℕ} (h : n = m + 1)
@@ -800,7 +817,113 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           rw [Functor.map_comp, Category.assoc,
             show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
           exact (shuffleStdSimplexMap_insertLeft_face ν j).symm
-    · sorry
+    · -- Right-type case: analogous to left-type via insertRightStep/insertRightIndex
+      -- Step 1: Push eqToHom through the sums
+      simp only [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
+      simp only [eqToHom_refl, Category.comp_id]
+      rw [← Fintype.sum_prod_type']
+      rw [Finset.sum_sigma']
+      apply Finset.sum_nbij
+        (fun x => ⟨Shuffle.insertRightStep x.2 x.1,
+          (Shuffle.insertRightIndex x.2 x.1).cast (by omega)⟩)
+      · -- hi: image lands in the sigma finset
+        intro ⟨k, ν⟩ _
+        simp only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and]
+        exact ⟨Shuffle.insertRightStep_not_diagonal ν k,
+               fun h => Shuffle.insertRightStep_not_isLeftType ν k h⟩
+      · -- i_inj: injective on source
+        intro ⟨k₁, ν₁⟩ _ ⟨k₂, ν₂⟩ _ h
+        rw [Sigma.mk.inj_iff] at h
+        obtain ⟨hμ, hr⟩ := h
+        have hr' : Shuffle.insertRightIndex ν₁ k₁ = Shuffle.insertRightIndex ν₂ k₂ := by
+          have heq := eq_of_heq hr
+          exact Fin.ext (by simp [Fin.ext_iff] at heq; exact heq)
+        obtain ⟨hk, hν⟩ := Shuffle.insertRightStep_injective k₁ k₂ ν₁ ν₂ hμ hr'
+        exact Prod.ext hk hν
+      · -- i_surj: surjective onto target
+        intro ⟨μ, r⟩ hmem
+        simp only [Finset.mem_coe, Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter,
+          true_and] at hmem
+        obtain ⟨hnd, hnlt⟩ := hmem
+        rcases Shuffle.nondiag_mem_insertLeft_or_insertRight μ (r.cast (by omega)) hnd with
+          ⟨j, ν, hμ_eq, hr_eq⟩ | ⟨k, ν, hμ_eq, hr_eq⟩
+        · exfalso
+          have hleft := Shuffle.insertLeftStep_isLeftType ν j
+          apply hnlt
+          subst hμ_eq
+          have : isLeftType (Shuffle.insertLeftStep ν j) r = Shuffle.isLeftStep
+            (Shuffle.insertLeftStep ν j) ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩ := rfl
+          rw [this]
+          convert hleft using 2; congr 1
+          simp [Fin.val_cast] at hr_eq ⊢; omega
+        · exact ⟨(k, ν), Finset.mem_univ _,
+            Sigma.ext hμ_eq.symm (heq_of_eq (Fin.ext (by simp [Fin.val_cast] at hr_eq ⊢; omega)))⟩
+      · -- h: summands agree
+        intro ⟨k, ν⟩ _
+        dsimp only
+        have hsign := Shuffle.sign_insertRightStep ν k
+        congr 1
+        · -- Coefficient
+          simp only [Fin.val_cast]; linarith
+        · -- Map: LHS = coprojection ⟪f⟫ₛ ≫ eqToHom _; RHS = coprojection ⟪g⟫ₛ
+          -- Use simplexCoprojection_comp_eqToHom to absorb the eqToHom into a transport on the simplex
+          rw [simplexCoprojection_comp_eqToHom (by omega : (p + 1) + q = p + (q + 1))]
+          congr 1
+          -- Goal: h ▸ ⟪f⟫ₛ = ⟪g⟫ₛ where f and g are TopCat morphisms
+          -- Unwrap ULift and transport to get a categorical equality of TopCat morphisms
+          apply ULift.ext
+          simp only [cast_singularSimplex_down (by omega : (p + 1) + q = p + (q + 1)),
+            SingularSimplex.ofΔ_down]
+          -- The left case had no eqToHom because (p+1)+q matches definitionally.
+          -- Here (p+1)+q ≠ p+(q+1) definitionally, so an eqToHom appears.
+          -- Unfold RHS via simplexProdMap_comp to match the face lemma pattern
+          conv_rhs => rw [← @simplexProdMap_comp _ _ _ _
+            (SimplexCategory.δ (Fin.cast _ (ν.insertRightIndex k)) ≫ eqToHom _)
+            (ν.insertRightStep k).1]
+          rw [Functor.map_comp, Category.assoc,
+            show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
+          -- Use the face lemma to rewrite LHS
+          have hface := shuffleStdSimplexMap_insertRight_face ν k
+          change eqToHom _ ≫ shuffleStdSimplexMap ν ≫
+            prod.map (𝟙 Δ[p + 1]) (SimplexCategory.toTop.map (SimplexCategory.δ k)) =
+            SimplexCategory.toTop.map (SimplexCategory.δ (Fin.cast _ (ν.insertRightIndex k))) ≫
+            eqToHom _ ≫ shuffleStdSimplexMap (ν.insertRightStep k)
+          rw [hface.symm]
+          -- Goal: eqToHom ≫ δ idx ≫ eqToHom ≫ shuffle = δ (Fin.cast idx) ≫ eqToHom ≫ shuffle
+          -- All are the same underlying face map, just routed through different types.
+          -- Convert the leading TopCat eqToHom to toTop.map(eqToHom), fold with Functor.map_comp
+          erw [show (eqToHom _ : SimplexCategory.toTop.obj _ ⟶ SimplexCategory.toTop.obj _) =
+            SimplexCategory.toTop.{v}.map (eqToHom (by congr 1; omega :
+              SimplexCategory.mk (p + (q + 1)) = SimplexCategory.mk ((p + 1) + q)))
+            from (eqToHom_map _ _).symm]
+          conv_lhs => rw [← Category.assoc (SimplexCategory.toTop.{v}.map (eqToHom _))
+            (SimplexCategory.toTop.{v}.map (SimplexCategory.δ _)) _,
+            ← Functor.map_comp]
+          -- Convert LHS middle eqToHom to toTop.map(eqToHom) and fold
+          slice_lhs 1 2 =>
+            rw [show (eqToHom _ : SimplexCategory.toTop.obj _ ⟶ _) =
+              SimplexCategory.toTop.{v}.map (eqToHom (by rfl))
+              from (eqToHom_map _ _).symm, ← Functor.map_comp]
+          -- Convert RHS eqToHom to toTop.map(eqToHom) and fold
+          slice_rhs 1 2 =>
+            rw [show (eqToHom _ : SimplexCategory.toTop.obj _ ⟶ _) =
+              SimplexCategory.toTop.{v}.map (eqToHom (by congr 1; omega))
+              from (eqToHom_map _ _).symm, ← Functor.map_comp]
+          -- Both sides: toTop.map(f) = toTop.map(g). Peel off toTop.map, then ext in SimplexCategory.
+          congr 1; congr 1; ext ⟨i, hi⟩
+          simp only [SimplexCategory.comp_toOrderHom, SimplexCategory.Hom.toOrderHom_mk,
+            SimplexCategory.eqToHom_toOrderHom, SimplexCategory.δ, OrderHom.comp_coe,
+            OrderEmbedding.toOrderHom_coe, Function.comp_apply, SimplexCategory.mkHom]
+          -- Unfold castOrderIso, then succAboveOrderEmb to succAbove
+          simp only [Fin.castOrderIso, OrderIso.coe_toOrderEmbedding, Fin.val_cast,
+            RelIso.coe_fn_mk, Equiv.coe_fn_mk]
+          -- succAbove(idx, cast(i)) = succAbove(cast(idx), i)
+          -- Both give the same Nat value since cast doesn't change .val
+          dsimp [Fin.succAboveOrderEmb]
+          simp only [Fin.succAbove, Fin.lt_def, Fin.val_cast]
+          split <;> split <;>
+            simp_all only [Fin.val_castSucc, Fin.val_succ] <;>
+            first | omega | exact absurd trivial ‹_›
 /-! The chain-level cross product and homotopy invariance theorems
 are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
 
