@@ -412,20 +412,47 @@ private lemma insertRightIndex_le {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2
           have := coordSum_eq ν r; have := (ν.1 r).1.isLt; omega
     _ = p + k.val := Finset.card_range _
 
+/-- Lower bound: the left insertion index satisfies `j ≤ t`.
+Proof: any r with r.val < j has fst(r) ≤ r < j, so the filter includes all r < j. -/
+private lemma insertLeftIndex_ge {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    j.val ≤ (insertLeftIndex ν j).val := by
+  sorry
+
+/-- Symmetric lower bound: the right insertion index satisfies `k ≤ t`. -/
+private lemma insertRightIndex_ge {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    k.val ≤ (insertRightIndex ν k).val := by
+  sorry
+
 /-- The filter `{r | fst(r) < j}` is a downward-closed initial segment:
 `fst(ν r) < j ↔ r.val < t` where `t = insertLeftIndex`. -/
 private lemma insertLeftIndex_iff {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2))
     (r : Fin (p + q + 1)) :
     (ν.1 r).1.val < j.val ↔ r.val < (insertLeftIndex ν j).val := by
-  sorry
-
-/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
+  constructor <;> intro h;
+  · -- Since ν is monotone, the set {x | x.val < t} is exactly the set of elements in the filter. Therefore, if r is in the filter, then r < t.
+    have h_filter : {x : Fin (p + q + 1) | (ν.1 x).1.val < j.val} ⊇ Finset.Iio r := by
+      intro x hx;
+      exact lt_of_le_of_lt ( Nat.cast_le.mpr <| ν.1.monotone ( le_of_lt <| by aesop ) |> fun h => h.1 ) h;
+    have h_filter_card : Finset.card (Finset.filter (fun x => (ν.1 x).1.val < j.val) Finset.univ) ≥ Finset.card (Finset.Iio r) + 1 := by
+      refine' Finset.card_lt_card _;
+      simp_all +decide [ Finset.ssubset_def, Finset.subset_iff ];
+      exact ⟨ fun x hx => h_filter hx, r, h, le_rfl ⟩;
+    aesop;
+  · contrapose! h;
+    exact le_trans ( Finset.card_le_card <| show Finset.filter ( fun x : Fin ( p + q + 1 ) => ( ν.1 x |>.1 : ℕ ) < j ) Finset.univ ⊆ Finset.Iio r from fun x hx => Finset.mem_Iio.mpr <| lt_of_not_ge fun hx' => by linarith [ Finset.mem_filter.mp hx, show ( ν.1 x |>.1 : ℕ ) ≥ ( ν.1 r |>.1 : ℕ ) by exact ν.1.monotone hx' |>.1 ] ) <| by simp +decide [ Finset.card_sdiff, Finset.card_range ] ;/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
 private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
     (r : Fin (p + q + 1)) :
     (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val := by
   sorry
 
 /-! ##### Insertion maps (RHS → LHS direction) -/
+
+/-- For an order-preserving injection into a product, the first component at consecutive
+indices can increase by at most 1. -/
+lemma shuffle_fst_succ_le {p q : ℕ} (ν : Shuffle p q) (i : Fin (p + q + 1))
+    (hi : i.val + 1 < p + q + 1) :
+    (ν.1 ⟨i.val + 1, by omega⟩).1.val ≤ (ν.1 ⟨i.val, i.isLt⟩).1.val + 1 := by
+  sorry
 
 /-- The underlying piecewise map for `insertLeftStep`: before the insertion point,
 embed the original vertex via `succAbove j`; at the insertion point, place `(j, t-j)`;
@@ -450,7 +477,32 @@ noncomputable def insertLeftStepFun {p q : ℕ} (ν : Shuffle p q) (j : Fin (p +
 private lemma insertLeftStepFun_coordSum {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2))
     (r : Fin ((p + 1) + q + 1)) :
     (insertLeftStepFun ν j r).1.val + (insertLeftStepFun ν j r).2.val = r.val := by
-  sorry
+  simp only [insertLeftStepFun]
+  split_ifs with h1 h2
+  · -- r < t: succAbove preserves value since fst < j, then use coordSum_eq
+    have hfst := (insertLeftIndex_iff ν j ⟨r.val, by omega⟩).mpr h1
+    simp only [Fin.succAbove]
+    split
+    · simp only [Fin.val_castSucc]
+      have := coordSum_eq ν ⟨r.val, by omega⟩
+      simp at this; omega
+    · rename_i hn
+      exfalso
+      simp only [not_lt, Fin.le_def, Fin.val_castSucc] at hn
+      omega
+  · -- r = t: j + (t - j) = t = r
+    have hge := insertLeftIndex_ge ν j
+    simp; omega
+  · -- r > t: succAbove adds 1 since fst ≥ j, then use coordSum_eq
+    have hfst : ¬ (ν.1 ⟨r.val - 1, by omega⟩).1.val < j.val := by
+      rw [insertLeftIndex_iff]; simp; omega
+    simp only [Fin.succAbove]
+    split
+    · rename_i hlt; exfalso; simp only [Fin.lt_def, Fin.val_castSucc] at hlt; omega
+    · simp only [Fin.val_succ]
+      have := coordSum_eq ν ⟨r.val - 1, by omega⟩
+      simp at this; omega
+
 
 /-- Insert a left step at face index `j`, turning a `(p, q)`-shuffle into a
 `(p+1, q)`-shuffle.  The original path from `(0,0)` to `(p, q)` is embedded
@@ -461,7 +513,107 @@ noncomputable def insertLeftStep {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)
     Shuffle (p + 1) q :=
   ⟨⟨insertLeftStepFun ν j, by
     -- Monotonicity: use coordSum to derive both coordinates weakly increasing
-    sorry⟩, by
+    intro a b hab
+    simp only [Prod.le_def]
+    constructor
+    · -- First coordinate monotone
+      suffices hsuc : ∀ r : Fin (p + 1 + q),
+          (insertLeftStepFun ν j r.castSucc).1 ≤ (insertLeftStepFun ν j r.succ).1 by
+        exact (Fin.monotone_iff_le_succ (f := fun r => (insertLeftStepFun ν j r).1) ).2 hsuc hab
+      intro r
+      simp only [insertLeftStepFun]
+      split_ifs with h1 h2 h3 h4 h5
+      · exact (Fin.succAbove_le_succAbove_iff.mpr (ν.1.monotone (Fin.castSucc_le_succ r)).1) -- cs < t, succ < t
+      · -- cs < t, succ = t: succAbove(fst) ≤ j since fst < j
+        have hfst := (insertLeftIndex_iff ν j ⟨r.val, by omega⟩).mpr h1
+        simp only [Fin.succAbove]
+        split
+        · simp [Fin.le_def, Fin.val_castSucc]; omega
+        · rename_i hn; exfalso; simp only [not_lt, Fin.le_def, Fin.val_castSucc] at hn; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs < t, succ > t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs = t, succ < t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs = t, succ = t (impossible)
+      · -- cs = t, succ > t: j ≤ succAbove(fst) since fst ≥ j
+        have hfst : ¬ (ν.1 ⟨r.val, by omega⟩).1.val < j.val := by
+          rw [insertLeftIndex_iff]; simp [Fin.val_castSucc] at h4; simp; omega
+        push_neg at hfst
+        have heq : (⟨r.succ.val - 1, by omega⟩ : Fin (p + q + 1)) = ⟨r.val, by omega⟩ := by
+          ext; simp [Fin.val_succ]
+        rw [heq]
+        simp only [Fin.succAbove]
+        split
+        · rename_i hlt; exfalso; simp only [Fin.lt_def, Fin.val_castSucc] at hlt; omega
+        · simp [Fin.le_def, Fin.val_succ]; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs > t, succ < t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs > t, succ = t (impossible)
+      · exact (Fin.succAbove_le_succAbove_iff.mpr -- cs > t, succ > t
+          (ν.1.monotone (by simp [Fin.le_def, Fin.val_castSucc, Fin.val_succ])).1)
+    · -- Second coordinate monotone
+      suffices hsuc : ∀ r : Fin (p + 1 + q),
+          (insertLeftStepFun ν j r.castSucc).2 ≤ (insertLeftStepFun ν j r.succ).2 by
+        exact (Fin.monotone_iff_le_succ (f := fun r => (insertLeftStepFun ν j r).2)).2 hsuc hab
+      intro r
+      simp only [insertLeftStepFun]
+      split_ifs with h1 h2 h3 h4 h5
+      · exact (ν.1.monotone (Fin.castSucc_le_succ r)).2 -- castSucc < t, succ < t
+      · -- castSucc < t, succ = t: snd(ν r) ≤ r+1-j
+        simp
+        suffices (ν.1 ⟨r.val, by omega⟩).1.val + (ν.1 ⟨r.val, by omega⟩).2.val ≤
+            (ν.1 ⟨r.val, by omega⟩).1.val + (r.val + 1 - j.val) by
+          simp [Fin.le_def] at this ⊢; omega
+        have := coordSum_eq ν ⟨r.val, by omega⟩
+        rw [this]; simp
+        simp at this
+        conv_lhs => rw [← this]
+        apply Nat.add_le_add_left
+        have hge := insertLeftIndex_ge ν j
+        have hsv := Fin.val_succ r
+        rw [Nat.le_sub_iff_add_le (by omega)]
+        suffices h :
+            (ν.1 ⟨r.val, by omega⟩).1.val + ((ν.1 ⟨r.val, by omega⟩).2.val + j.val) ≤
+              (ν.1 ⟨r.val, by omega⟩).1.val + (r.val + 1) by
+          exact Nat.le_of_add_le_add_left h
+
+        rw [←Nat.add_assoc]
+        rw [this]
+        have hR : (ν.1 ⟨r.val, by omega⟩).1.val + (r.val + 1) = r.val + ((ν.1 ⟨r.val, by omega⟩).1.val + 1) := by ring
+        rw [hR]
+        suffices h : ↑j ≤ (ν.1 ⟨r.val, by omega⟩).1.val + 1 from Nat.add_le_add_left h ↑r
+        by_cases hr : r.val + 1 = p + 1 + q
+        · -- r is the last vertex: ν(r) = (p, q), so fst = p and j ≤ p + 1
+          have hlast : ν.1 ⟨r.val, by omega⟩ = (Fin.last p, Fin.last q) := by
+            have : (⟨r.val, by omega⟩ : Fin (p + q + 1)) = Fin.last (p + q) :=
+              Fin.ext (by simp [Fin.last]; omega)
+            rw [this]; exact Shuffle.apply_last ν
+          have hfst : (ν.1 ⟨r.val, by omega⟩).1.val = p := by
+            rw [hlast]; simp [Fin.last]
+          rw [hfst]; omega
+        · -- r is not the last vertex: ν(r+1).1 ≥ j (by insertLeftIndex_iff)
+          -- and ν(r+1).1 ≤ ν(r).1 + 1 (by shuffle step), so j ≤ ν(r).1 + 1
+          let r' : Fin (p + q + 1) := ⟨r.val + 1, by omega⟩
+          have hge_j : j.val ≤ (ν.1 r').1.val := by
+            by_contra hlt
+            push_neg at hlt
+            have h_iff := (insertLeftIndex_iff ν j r').mp hlt
+            have ht : (insertLeftIndex ν j).val = r.val + 1 := by
+              simp [Fin.val_succ] at hsv; omega
+            change r.val + 1 < _ at h_iff
+            omega
+          have hstep := shuffle_step ν ⟨r.val, by omega⟩
+          have hcs : (⟨r.val, by omega⟩ : Fin (p + q)).castSucc = (⟨r.val, by omega⟩ : Fin (p + q + 1)) :=
+            Fin.ext (by simp [Fin.castSucc])
+          have hsu : (⟨r.val, by omega⟩ : Fin (p + q)).succ = r' :=
+            Fin.ext (by simp [Fin.succ, r'])
+          rw [hcs, hsu] at hstep
+          rcases hstep with ⟨h1, _⟩ | ⟨h1, _⟩ <;> omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs < t, succ > t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs = t, succ < t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs = t, succ = t (impossible)
+      · sorry  -- castSucc = t, succ > t
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs > t, succ < t (impossible)
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega -- cs > t, succ = t (impossible)
+      · exact (ν.1.monotone (by simp [Fin.le_def, Fin.val_castSucc, Fin.val_succ])).2 -- cs > t, succ > t
+      ⟩, by
     -- Injectivity: f(a) = f(b) → coordSum(f(a)) = coordSum(f(b)) → a = b
     intro a b hab
     have ha := insertLeftStepFun_coordSum ν j a
