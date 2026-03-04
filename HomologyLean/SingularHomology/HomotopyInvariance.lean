@@ -472,6 +472,34 @@ instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
       exact congrArg Fin.val (heq i)
     · simp
 
+instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
+  default := ⟨⟨fun i => (0, i.cast (by omega)),
+    fun i j h => ⟨by simp, by simpa using h⟩⟩,
+    fun i j h => by ext; simpa using congrArg (Fin.val ∘ Prod.snd) h⟩
+  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
+    apply Subtype.ext; apply OrderHom.ext; funext i
+    have hmono : StrictMono (fun i => (f i).2) := by
+      intro a b hab
+      have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
+      cases eq_or_lt_of_le (hf hab.le).2 with
+      | inl heq =>
+        exact absurd (Prod.ext (by simp [Fin.eq_zero])
+          (Fin.ext (congrArg Fin.val heq))) h_neq
+      | inr hlt => exact hlt
+    let g : Fin (n + 1) → Fin (n + 1) := fun j => (f (j.cast (by omega))).2
+    have hg : StrictMono g := fun a b h =>
+      hmono (show a.cast _ < b.cast _ by exact_mod_cast h)
+    have hg_eq : ∀ j, g j = j :=
+      fun j => le_antisymm (StrictMono.le_id hg j) (StrictMono.id_le hg j)
+    have hcast : ∀ i : Fin (0 + n + 1),
+        (i.cast (show 0 + n + 1 = n + 1 by omega)).cast
+          (show n + 1 = 0 + n + 1 by omega) = i :=
+      fun i => Fin.ext (by simp)
+    have h2 : (f i).2 = i.cast (by omega) := by
+      have := hg_eq (i.cast (by omega))
+      simp only [g, hcast] at this; exact this
+    exact Prod.ext (Fin.eq_zero _) h2
+
 @[simp] lemma SimplexCategory.default_mk0_eq_id :
     (default : SimplexCategory.mk 0 ⟶ SimplexCategory.mk 0) = 𝟙 _ := by
   ext ⟨j, hj⟩; simp [default, SimplexCategory.Hom.toOrderHom]
@@ -531,6 +559,26 @@ lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
       change a i = b i
       rw [hz, h1, h2]
     exact congrArg (ConcreteCategory.hom c.down) (Subsingleton.elim _ _)
+/-- The snd projection of the unique `(0, n)`-shuffle is `eqToHom` (i.e., the identity
+up to `0 + n = n`). Proved in `SimplexCategory` where `ext + omega` closes it. -/
+private lemma snd_comp_default_shuffle_eq_eqToHom (n : ℕ) :
+    (SimplexCategory.Hom.mk (OrderHom.snd.comp (default : Shuffle 0 n).1) :
+      SimplexCategory.mk (0 + n) ⟶ SimplexCategory.mk n) =
+    eqToHom (by change SimplexCategory.mk (0 + n) = SimplexCategory.mk n; congr 1; omega) := by
+  apply SimplexCategory.Hom.ext
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.eqToHom_toOrderHom]
+  dsimp [Fin.castOrderIso, SimplexCategory.Hom.toOrderHom, OrderHom.snd,
+    default, Unique_Shuffle_0_n]
+
+/-- Transport lemma: coprojection composed with `eqToHom` on the chain group
+equals coprojection of the transported simplex. -/
+lemma simplexCoprojection_comp_eqToHom {X : TopCat.{v}} {n m : ℕ} (h : n = m)
+    (s : SingularSimplex X n) :
+    simplexCoprojection (C := C) (R := R) s ≫
+      eqToHom (congrArg (singChain (C := C) (R := R) X).X h) =
+    simplexCoprojection (C := C) (R := R) (h ▸ s) := by
+  subst h; simp
 
 /-- For `p = 0`, the cross product of a `0`-simplex `c` in `X` with an `n`-simplex `s`
 in `Y` reduces to a single product simplex `t ↦ (c(*), s(t))`.
@@ -542,7 +590,57 @@ lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
     simplexCoprojection
       ⟪prod.lift (SimplexCategory.toTop.map default ≫ c.down) s.down⟫ₛ ≫
     eqToHom (by simp) := by
-  sorry
+  simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
+  have hd : (default : Shuffle 0 n).sign = 1 := by
+    dsimp [Shuffle.sign, Shuffle.invCount]
+    have hz : (∑ r : Fin (0 + n), if ((default : Shuffle 0 n).1 (Fin.castSucc r)).1 < ((default : Shuffle 0 n).1 (Fin.succ r)).1 then ((default : Shuffle 0 n).1 (Fin.castSucc r)).2.val else 0) = 0 := by
+      apply Finset.sum_eq_zero
+      intro i _
+      split_ifs with h
+      · exact absurd h (lt_irrefl _)
+      · rfl
+    exact congrArg (fun x => (-1 : ℤ) ^ x) hz
+  rw [hd]
+  simp
+  -- Absorb eqToHom into the coprojection on the RHS
+  rw [simplexCoprojection_comp_eqToHom (show n = 0 + n from by omega)]
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp
+  apply congrArg
+  apply ULift.ext
+  dsimp [TopCat.toSSet]
+  erw [cast_singularSimplex_down (show n = 0 + n from by omega)]
+  apply CategoryTheory.Limits.prod.hom_ext
+  · -- fst component
+    erw [Category.assoc, CategoryTheory.Limits.prod.map_fst, ← Category.assoc]
+    conv_rhs => rw [Category.assoc, CategoryTheory.Limits.prod.lift_fst, ← Category.assoc]
+    congr 1
+    ext x
+    have h_sub : Subsingleton ↑(TopCat.uliftFunctor.obj
+        { carrier := ↑(_root_.stdSimplex ℝ (Fin 1)), str := instTopologicalSpaceSubtype }) := by
+      constructor
+      rintro ⟨⟨a, ha⟩⟩ ⟨⟨b, hb⟩⟩
+      apply ULift.ext
+      apply Subtype.ext
+      funext i
+      have hz : i = 0 := Fin.eq_zero i
+      have h1 : a 0 = 1 := by simpa using ha.2
+      have h2 : b 0 = 1 := by simpa using hb.2
+      change a i = b i
+      rw [hz, h1, h2]
+    exact Subsingleton.elim _ _
+  · -- snd component
+    erw [Category.assoc, CategoryTheory.Limits.prod.map_snd, ← Category.assoc]
+    conv_rhs => rw [Category.assoc, CategoryTheory.Limits.prod.lift_snd]
+    have H : shuffleStdSimplexMap (p := 0) (q := n) default ≫ prod.snd = eqToHom (by simp) := by
+      dsimp [shuffleStdSimplexMap, simplexProdMap]
+      rw [CategoryTheory.Limits.prod.lift_snd]
+      -- Re-fold the dsimp-expanded form back to toTop.map, then retreat to SimplexCategory
+      change SimplexCategory.toTop.map _ = eqToHom _
+      rw [snd_comp_default_shuffle_eq_eqToHom]
+      exact eqToHom_map _ _
+    congr 1
 
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
     (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
@@ -633,15 +731,6 @@ The RHS is two sums: one over `(j, ν)` with `ν : Shuffle p (q+1)`, one over
    - opposite sign (`swapDiagonalSteps_neg_sign`)
    - involutive (`swapDiagonalSteps_involutive`)
 -/
-
-/-- Transport lemma: coprojection composed with `eqToHom` on the chain group
-equals coprojection of the transported simplex. -/
-lemma simplexCoprojection_comp_eqToHom {X : TopCat.{v}} {n m : ℕ} (h : n = m)
-    (s : SingularSimplex X n) :
-    simplexCoprojection (C := C) (R := R) s ≫
-      eqToHom (congrArg (singChain (C := C) (R := R) X).X h) =
-    simplexCoprojection (C := C) (R := R) (h ▸ s) := by
-  subst h; simp
 
 /-- Functoriality of `simplexCoprojection`: the face map acts by precomposition
 on singular simplices through the coproduct structure. -/
