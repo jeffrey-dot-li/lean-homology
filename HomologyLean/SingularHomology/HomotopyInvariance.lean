@@ -730,7 +730,77 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
               Fin.val_cast] at h_val
             exact absurd (Fin.ext h_val) (Fin.succAbove_ne r k)))
       (fun μ r h => Shuffle.swapDiagonalSteps_ne μ (r.cast (by omega)) h)
-  · sorry
+  · rw [Preadditive.add_comp]
+    -- Split non-diagonal sum into left-type + right-type vertices.
+    -- isLeftType checks whether the step at (or just before) vertex r is a left step.
+    let isLeftType := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + q + 1 + 2)) =>
+      Shuffle.isLeftStep μ ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩
+    haveI isLeftType_dec : ∀ μ, DecidablePred (isLeftType μ) :=
+      fun μ r => Shuffle.isLeftStep_decidable μ _
+    conv_rhs =>
+      enter [2, x]
+      rw [(Finset.sum_filter_add_sum_filter_not
+        (Finset.univ.filter (fun r => ¬isDiag x r)) (isLeftType x) _).symm]
+    simp_rw [Finset.sum_add_distrib]
+    congr 1
+    · simp only [Preadditive.sum_comp, Preadditive.zsmul_comp]
+      simp only [eqToHom_refl, Category.comp_id]
+      rw [← Fintype.sum_prod_type']
+      rw [Finset.sum_sigma']
+      apply Finset.sum_nbij
+        (fun x => ⟨Shuffle.insertLeftStep x.2 x.1,
+          (Shuffle.insertLeftIndex x.2 x.1).cast (by omega)⟩)
+      · intro ⟨j, ν⟩ _
+        simp only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and]
+        exact ⟨Shuffle.insertLeftStep_not_diagonal ν j,
+               Shuffle.insertLeftStep_isLeftType ν j⟩
+      · intro ⟨j₁, ν₁⟩ _ ⟨j₂, ν₂⟩ _ h
+        rw [Sigma.mk.inj_iff] at h
+        obtain ⟨hμ, hr⟩ := h
+        have hr' : Shuffle.insertLeftIndex ν₁ j₁ = Shuffle.insertLeftIndex ν₂ j₂ := by
+          have heq := eq_of_heq hr
+          exact Fin.ext (by simp [Fin.ext_iff] at heq; exact heq)
+        obtain ⟨hj, hν⟩ := Shuffle.insertLeftStep_injective j₁ j₂ ν₁ ν₂ hμ hr'
+        exact Prod.ext hj hν
+      · intro ⟨μ, r⟩ hmem
+        simp only [Finset.mem_coe, Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter,
+          true_and] at hmem
+        obtain ⟨hnd, hlt⟩ := hmem
+        rcases Shuffle.nondiag_mem_insertLeft_or_insertRight μ (r.cast (by omega)) hnd with
+          ⟨j, ν, hμ_eq, hr_eq⟩ | ⟨k, ν, hμ_eq, hr_eq⟩
+        · refine ⟨(j, ν), Finset.mem_univ _, ?_⟩
+          apply Sigma.ext hμ_eq.symm
+          apply heq_of_eq; apply Fin.ext
+          simp [Fin.val_cast] at hr_eq ⊢; omega
+        · exfalso
+          have hnotleft := Shuffle.insertRightStep_not_isLeftType ν k
+          apply hnotleft
+          have hrv : r.val = (Shuffle.insertRightIndex ν k).val := by
+            simp [Fin.val_cast] at hr_eq; omega
+          subst hμ_eq
+          have : isLeftType (Shuffle.insertRightStep ν k) r = Shuffle.isLeftStep
+            (Shuffle.insertRightStep ν k) ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩ := rfl
+          rw [this] at hlt
+          convert hlt using 2; congr 1
+      · intro ⟨j, ν⟩ _
+        dsimp only
+        have hsign := Shuffle.sign_insertLeftStep ν j
+        congr 1
+        · -- Coefficient: use sign_insertLeftStep after showing Fin.cast doesn't change val
+          simp only [Fin.val_cast]
+          linarith
+        · -- Map: follows from shuffleStdSimplexMap_insertLeft_face
+          congr 1; congr 1
+          -- Goal: simplexProdMap ↑ν ≫ prod.map (δ j) 𝟙
+          --     = simplexProdMap ((insertLeftStep ν j).1.comp (δ (Fin.cast ...) ≫ eqToHom ...).toOrderHom)
+          -- RHS is definitionally toTop.map (δ _ ≫ eqToHom _) ≫ simplexProdMap (insertLeftStep ν j).1
+          conv_rhs => rw [← @simplexProdMap_comp _ _ _ _
+            (SimplexCategory.δ (Fin.cast _ (ν.insertLeftIndex j)) ≫ eqToHom _)
+            (ν.insertLeftStep j).1]
+          rw [Functor.map_comp, Category.assoc,
+            show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
+          exact (shuffleStdSimplexMap_insertLeft_face ν j).symm
+    · sorry
 /-! The chain-level cross product and homotopy invariance theorems
 are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
 
