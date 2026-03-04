@@ -24,6 +24,7 @@ import Mathlib.CategoryTheory.Monoidal.Mon_
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Topology.Category.TopCat.Limits.Products
 import HomologyLean.SingularHomology.Shuffle
+import HomologyLean.SingularHomology.SumInvolution
 
 noncomputable section
 
@@ -725,7 +726,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   -- swapDiagonalSteps swaps the two steps adjacent to a diagonal vertex,
   -- negating the sign while preserving the topological map. The paired terms cancel.
   convert (zero_add _) using 2
-  · exact sum_sum_involution_zero isDiag _
+  · exact SumInvolution.sum_sum_involution_zero isDiag _
       (fun μ r h => Shuffle.swapDiagonalSteps μ (r.cast (by omega)) h)
       (fun μ r h => Shuffle.swapDiagonalSteps_vertex μ (r.cast (by omega)) h)
       (fun μ r h => Shuffle.swapDiagonalSteps_involutive μ (r.cast (by omega)) h)

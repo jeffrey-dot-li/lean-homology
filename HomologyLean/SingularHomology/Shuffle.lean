@@ -440,6 +440,7 @@ private lemma insertLeftIndex_iff {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2
     aesop;
   · contrapose! h;
     exact le_trans ( Finset.card_le_card <| show Finset.filter ( fun x : Fin ( p + q + 1 ) => ( ν.1 x |>.1 : ℕ ) < j ) Finset.univ ⊆ Finset.Iio r from fun x hx => Finset.mem_Iio.mpr <| lt_of_not_ge fun hx' => by linarith [ Finset.mem_filter.mp hx, show ( ν.1 x |>.1 : ℕ ) ≥ ( ν.1 r |>.1 : ℕ ) by exact ν.1.monotone hx' |>.1 ] ) <| by simp +decide [ Finset.card_sdiff, Finset.card_range ] ;/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
+
 private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
     (r : Fin (p + q + 1)) :
     (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val := by
@@ -629,12 +630,176 @@ noncomputable def insertLeftStep {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)
         (insertLeftStepFun ν j b).1.val + (insertLeftStepFun ν j b).2.val := by rw [heq]
     exact Fin.ext (by omega)⟩
 
+/-- The underlying piecewise map for `insertRightStep`: before the insertion point,
+embed the original vertex via `succAbove k` on the second coordinate; at the
+insertion point, place `(t-k, k)`; after the insertion point, embed the
+shifted-back vertex via `succAbove k`. -/
+noncomputable def insertRightStepFun {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    Fin (p + (q + 1) + 1) → Index p × Index (q + 1) :=
+  let t := (insertRightIndex ν k).val
+  fun r =>
+    if h : r.val < t then
+      ((ν.1 ⟨r, by omega⟩).1, k.succAbove (ν.1 ⟨r, by omega⟩).2)
+    else if h2 : r.val = t then
+      (⟨r.val - k.val, by
+        have := insertRightIndex_le ν k; omega⟩, k)
+    else
+      ((ν.1 ⟨r - 1, by omega⟩).1, k.succAbove (ν.1 ⟨r - 1, by omega⟩).2)
+
+/-- Coordinate sum of the right-insertion piecewise map equals the position index. -/
+private lemma insertRightStepFun_coordSum {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
+    (r : Fin (p + (q + 1) + 1)) :
+    (insertRightStepFun ν k r).1.val + (insertRightStepFun ν k r).2.val = r.val := by
+  simp only [insertRightStepFun]
+  split_ifs with h1 h2
+  · have hsnd := (insertRightIndex_iff ν k ⟨r.val, by omega⟩).mpr h1
+    simp only [Fin.succAbove]
+    split
+    · simp only [Fin.val_castSucc]
+      have := coordSum_eq ν ⟨r.val, by omega⟩
+      simp at this; omega
+    · rename_i hn
+      exfalso
+      simp only [not_lt, Fin.le_def, Fin.val_castSucc] at hn
+      omega
+  · have hge := insertRightIndex_ge ν k
+    simp; omega
+  · have hsnd : ¬ (ν.1 ⟨r.val - 1, by omega⟩).2.val < k.val := by
+      rw [insertRightIndex_iff]; simp; omega
+    simp only [Fin.succAbove]
+    split
+    · rename_i hlt; exfalso; simp only [Fin.lt_def, Fin.val_castSucc] at hlt; omega
+    · simp only [Fin.val_succ]
+      have := coordSum_eq ν ⟨r.val - 1, by omega⟩
+      simp at this; omega
+
 /-- Insert a right step at face index `k`, turning a `(p, q)`-shuffle into a
 `(p, q+1)`-shuffle.  Applies `Fin.succAbove k` to the second coordinate and
 inserts a new right step where the second coordinate crosses `k`. -/
-def insertRightStep {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
-    Shuffle p (q + 1) := by
-  sorry
+noncomputable def insertRightStep {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    Shuffle p (q + 1) :=
+  ⟨⟨insertRightStepFun ν k, by
+    intro a b hab
+    simp only [Prod.le_def]
+    constructor
+    · -- First coordinate monotone
+      suffices hsuc : ∀ r : Fin (p + (q + 1)),
+          (insertRightStepFun ν k r.castSucc).1 ≤ (insertRightStepFun ν k r.succ).1 by
+        exact (Fin.monotone_iff_le_succ (f := fun r => (insertRightStepFun ν k r).1)).2 hsuc hab
+      intro r
+      simp only [insertRightStepFun]
+      split_ifs with h1 h2 h3 h4 h5
+      · exact (ν.1.monotone (Fin.castSucc_le_succ r)).1 -- cs < t, succ < t
+      · -- cs < t, succ = t: fst(ν r) ≤ r+1-k
+        simp only [Fin.val_castSucc, Fin.val_succ]
+        have hge := insertRightIndex_ge ν k
+        have hsv := Fin.val_succ r
+        have hsum := coordSum_eq ν ⟨r.val, by omega⟩
+        suffices h : k.val ≤ (ν.1 ⟨r.val, by omega⟩).2.val + 1 by
+          simp only [Fin.le_def] at hsum ⊢; omega
+        by_cases hr : r.val + 1 = p + q + 1
+        · have hlast : ν.1 ⟨r.val, by omega⟩ = (Fin.last p, Fin.last q) := by
+            have : (⟨r.val, by omega⟩ : Fin (p + q + 1)) = Fin.last (p + q) :=
+              Fin.ext (by simp [Fin.last]; omega)
+            rw [this]; exact Shuffle.apply_last ν
+          have hsnd : (ν.1 ⟨r.val, by omega⟩).2.val = q := by
+            rw [hlast]; simp [Fin.last]
+          rw [hsnd]; omega
+        · let r' : Fin (p + q + 1) := ⟨r.val + 1, by omega⟩
+          have hge_k : k.val ≤ (ν.1 r').2.val := by
+            by_contra hlt
+            push_neg at hlt
+            have h_iff := (insertRightIndex_iff ν k r').mp hlt
+            have ht : (insertRightIndex ν k).val = r.val + 1 := by
+              simp [Fin.val_succ] at hsv; omega
+            change r.val + 1 < _ at h_iff
+            omega
+          have hstep := shuffle_step ν ⟨r.val, by omega⟩
+          have hcs : (⟨r.val, by omega⟩ : Fin (p + q)).castSucc = (⟨r.val, by omega⟩ : Fin (p + q + 1)) :=
+            Fin.ext (by simp [Fin.castSucc])
+          have hsu : (⟨r.val, by omega⟩ : Fin (p + q)).succ = r' :=
+            Fin.ext (by simp [Fin.succ, r'])
+          rw [hcs, hsu] at hstep
+          rcases hstep with ⟨_, h1⟩ | ⟨_, h1⟩ <;> omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · -- castSucc = t, succ > t
+        simp
+        have hcs := coordSum_eq ν ⟨r.val, by omega⟩
+        have hcsv : (⟨r.val, by omega⟩ : Fin (p + q + 1)).val = r.val := rfl
+        suffices h : (ν.1 ⟨r.val, by omega⟩).2.val ≤ k.val by
+          have hre : (ν.1 r).1.val = (ν.1 ⟨r.val, by omega⟩).1.val := by congr 3
+          simp only [Fin.le_def] at hcs ⊢; omega
+        by_cases hr : r.val = 0
+        · have : (⟨r.val, by omega⟩ : Fin (p + q + 1)) = 0 := Fin.ext (by simp [hr])
+          rw [this, Shuffle.apply_zero]; simp
+        · let r' : Fin (p + q + 1) := ⟨r.val - 1, by omega⟩
+          have hr'lt : r'.val < (insertRightIndex ν k).val := by
+            simp [r', Fin.val_castSucc] at h4 ⊢; omega
+          have hsnd_lt : (ν.1 r').2.val < k.val :=
+            (insertRightIndex_iff ν k r').mpr hr'lt
+          have hstep := shuffle_step ν ⟨r.val - 1, by omega⟩
+          have hcs2 : (⟨r.val - 1, by omega⟩ : Fin (p + q)).castSucc = r' :=
+            Fin.ext (by simp [Fin.castSucc, r'])
+          have hsu2 : (⟨r.val - 1, by omega⟩ : Fin (p + q)).succ = ⟨r.val, by omega⟩ :=
+            Fin.ext (by simp [Fin.succ]; omega)
+          rw [hcs2, hsu2] at hstep
+          rcases hstep with ⟨_, h1⟩ | ⟨_, h1⟩ <;> omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · exact (ν.1.monotone (by simp [Fin.le_def, Fin.val_castSucc, Fin.val_succ])).1
+    · -- Second coordinate monotone
+      suffices hsuc : ∀ r : Fin (p + (q + 1)),
+          (insertRightStepFun ν k r.castSucc).2 ≤ (insertRightStepFun ν k r.succ).2 by
+        exact (Fin.monotone_iff_le_succ (f := fun r => (insertRightStepFun ν k r).2)).2 hsuc hab
+      intro r
+      simp only [insertRightStepFun]
+      split_ifs with h1 h2 h3 h4 h5
+      · exact (Fin.succAbove_le_succAbove_iff.mpr (ν.1.monotone (Fin.castSucc_le_succ r)).2) -- cs < t, succ < t
+      · -- cs < t, succ = t: succAbove(snd) ≤ k since snd < k
+        have hrcs : (⟨r.castSucc.val, by simp [Fin.val_castSucc]; omega⟩ : Fin (p + q + 1)) =
+            ⟨r.val, by omega⟩ := Fin.ext (by simp [Fin.val_castSucc])
+        have hsnd := (insertRightIndex_iff ν k ⟨r.val, by omega⟩).mpr h1
+        simp only [Fin.succAbove]; split
+        · simp only [Fin.le_def, Fin.val_castSucc]
+          have : (ν.1 ⟨r.castSucc.val, by simp [Fin.val_castSucc]; omega⟩).2.val =
+              (ν.1 ⟨r.val, by omega⟩).2.val := by rw [hrcs]
+          omega
+        · rename_i hn; exfalso
+          simp only [not_lt, Fin.le_def, Fin.val_castSucc] at hn
+          have : (ν.1 ⟨r.castSucc.val, by simp [Fin.val_castSucc]; omega⟩).2.val =
+              (ν.1 ⟨r.val, by omega⟩).2.val := by rw [hrcs]
+          omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · -- cs = t, succ > t: k ≤ succAbove(snd) since snd ≥ k
+        have hsnd : ¬ (ν.1 ⟨r.val, by omega⟩).2.val < k.val := by
+          rw [insertRightIndex_iff]; simp [Fin.val_castSucc] at h4; simp; omega
+        push_neg at hsnd
+        have heq : (⟨r.succ.val - 1, by omega⟩ : Fin (p + q + 1)) = ⟨r.val, by omega⟩ := by
+          ext; simp [Fin.val_succ]
+        rw [heq]
+        simp only [Fin.succAbove]
+        split
+        · rename_i hlt; exfalso; simp only [Fin.lt_def, Fin.val_castSucc] at hlt; omega
+        · simp only [Fin.le_def, Fin.val_succ]
+          simp only [Fin.val_castSucc] at h4
+          omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · have := Fin.val_succ r; have := Fin.val_castSucc r; omega
+      · exact (Fin.succAbove_le_succAbove_iff.mpr
+          (ν.1.monotone (by simp [Fin.le_def, Fin.val_castSucc, Fin.val_succ])).2)
+    ⟩, by
+    -- Injectivity: f(a) = f(b) → coordSum(f(a)) = coordSum(f(b)) → a = b
+    intro a b hab
+    have ha := insertRightStepFun_coordSum ν k a
+    have hb := insertRightStepFun_coordSum ν k b
+    have heq : insertRightStepFun ν k a = insertRightStepFun ν k b := hab
+    have : (insertRightStepFun ν k a).1.val + (insertRightStepFun ν k a).2.val =
+        (insertRightStepFun ν k b).1.val + (insertRightStepFun ν k b).2.val := by rw [heq]
+    exact Fin.ext (by omega)⟩
 
 /-- Inserting a left step and removing the inserted vertex recovers the original
 shuffle with `Fin.succAbove j` applied to the first coordinate.
@@ -778,6 +943,133 @@ lemma insertRightStep_not_isLeftType {p q : ℕ}
       ⟨min (insertRightIndex ν k).val ((p + 1) + (q + 1) - 1), by omega⟩ := by
   sorry
 
+/-- Extract the two facts from `isDiagonalVertex`: `0 < r` and `r < (p+1)+(q+1)`. -/
+private lemma isDiagonalVertex_bounds {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
+    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r) :
+    0 < r.val ∧ r.val < (p + 1) + (q + 1) := by
+  unfold isDiagonalVertex at hr
+  split_ifs at hr with h₁ h₂ <;> exact ⟨‹_›, ‹_›⟩
+
+/-- At a diagonal vertex with a left step at `r-1`, the shuffle step from
+`r-1` to `r` increments fst, giving `μ(r).1 ≥ 1`. -/
+private lemma diagonal_left_fst_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
+    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r)
+    (hL : isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
+    0 < (μ.1 r).1.val := by
+  have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
+  have hstep := shuffle_step μ ⟨r.val - 1, by omega⟩
+  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).castSucc =
+      (⟨r.val - 1, by omega⟩ : Index ((p + 1) + (q + 1))) :=
+    Fin.ext (by simp [Fin.castSucc])
+  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).succ = r :=
+    Fin.ext (by simp [Fin.succ]; omega)
+  rw [hcs, hsu] at hstep
+  unfold isLeftStep at hL; rw [hcs, hsu] at hL
+  rcases hstep with ⟨h1, _⟩ | ⟨h1, _⟩
+  · omega
+  · omega
+
+/-- At a diagonal vertex with a right step at `r-1`, the shuffle step from
+`r-1` to `r` increments snd, giving `μ(r).2 ≥ 1`. -/
+private lemma diagonal_right_snd_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
+    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r)
+    (hR : ¬isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
+    0 < (μ.1 r).2.val := by
+  have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
+  have hstep := shuffle_step μ ⟨r.val - 1, by omega⟩
+  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).castSucc =
+      (⟨r.val - 1, by omega⟩ : Index ((p + 1) + (q + 1))) :=
+    Fin.ext (by simp [Fin.castSucc])
+  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).succ = r :=
+    Fin.ext (by simp [Fin.succ]; omega)
+  rw [hcs, hsu] at hstep
+  unfold isLeftStep at hR; rw [hcs, hsu] at hR
+  rcases hstep with ⟨h1, _⟩ | ⟨_, h2⟩
+  · omega
+  · omega
+
+/-- The underlying function for `swapDiagonalSteps`: agrees with `μ` everywhere
+except at vertex `r`, where the step type is swapped.
+- LR diagonal (left then right): `μ(r)` becomes `(μ(r).1 - 1, μ(r).2 + 1)`
+- RL diagonal (right then left): `μ(r)` becomes `(μ(r).1 + 1, μ(r).2 - 1)` -/
+private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
+    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
+    Index ((p + 1) + (q + 1)) → Index (p + 1) × Index (q + 1) :=
+  fun i =>
+    if i = r then
+      have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
+      have hsum := coordSum_eq μ r
+      if hL : isLeftStep μ ⟨r.val - 1, by omega⟩ then
+        -- LR case: fst decrements, snd increments
+        -- fst ≥ 1 (step r-1 incremented fst) so fst - 1 is valid
+        have hfst_pos := diagonal_left_fst_pos hr hL
+        -- snd < q+1 because step r is right (snd increments at r),
+        -- so μ(r+1).2 > μ(r).2 and μ(r+1).2 ≤ q+1
+        have hsnd_lt : (μ.1 r).2.val < q + 1 := by
+          -- Step r is right (not left) in LR diagonal, so snd increments at r
+          unfold isDiagonalVertex at hr; simp [h₁, h₂] at hr
+          have hnotL : ¬isLeftStep μ ⟨r.val, h₂⟩ := by tauto
+          have hstep := shuffle_step μ ⟨r.val, h₂⟩
+          have hcs : (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).castSucc = r :=
+            Fin.ext (by simp [Fin.castSucc])
+          rw [hcs] at hstep
+          unfold isLeftStep at hnotL; rw [hcs] at hnotL
+          have hsucc_snd := (μ.1 (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).succ).2.isLt
+          rcases hstep with ⟨h1, _⟩ | ⟨_, h2⟩
+          · exfalso; exact hnotL (by omega)
+          · omega
+        (⟨(μ.1 r).1.val - 1, by omega⟩,
+         ⟨(μ.1 r).2.val + 1, by omega⟩)
+      else
+        -- RL case: fst increments, snd decrements
+        -- snd ≥ 1 (step r-1 incremented snd) so snd - 1 is valid
+        have hsnd_pos := diagonal_right_snd_pos hr (by exact hL)
+        -- fst < p+1 because step r is left (fst increments at r),
+        -- so μ(r+1).1 > μ(r).1 and μ(r+1).1 ≤ p+1
+        have hfst_lt : (μ.1 r).1.val < p + 1 := by
+          -- Step r is left in RL diagonal, so fst increments at r
+          unfold isDiagonalVertex at hr; simp [h₁, h₂] at hr
+          have hisL : isLeftStep μ ⟨r.val, h₂⟩ := by tauto
+          have hstep := shuffle_step μ ⟨r.val, h₂⟩
+          have hcs : (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).castSucc = r :=
+            Fin.ext (by simp [Fin.castSucc])
+          rw [hcs] at hstep
+          unfold isLeftStep at hisL; rw [hcs] at hisL
+          have hsucc_fst := (μ.1 (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).succ).1.isLt
+          rcases hstep with ⟨h1, _⟩ | ⟨h1, _⟩
+          · omega
+          · exfalso; exact absurd (by omega : (μ.1 r).1.val < _) (by omega)
+        (⟨(μ.1 r).1.val + 1, by omega⟩,
+         ⟨(μ.1 r).2.val - 1, by omega⟩)
+    else
+      μ.1 i
+
+/-- `swapDiagonalSteps_fun` preserves the coordinate sum: fst + snd = i for all i.
+At `i ≠ r` this is `coordSum_eq μ`. At `i = r` the ±1 adjustments cancel. -/
+private lemma swapDiagonalSteps_fun_coordSum {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) (i : Index ((p + 1) + (q + 1))) :
+    (swapDiagonalSteps_fun μ r hr i).1.val +
+      (swapDiagonalSteps_fun μ r hr i).2.val = i.val := by
+  sorry
+
+/-- `swapDiagonalSteps_fun` is monotone in the product order. Only the pairs
+`(r-1, r)` and `(r, r+1)` need checking — the two adjacent steps swap type
+(LR↔RL) but both remain valid (one coordinate +1, the other unchanged). -/
+private lemma swapDiagonalSteps_fun_monotone {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    Monotone (swapDiagonalSteps_fun μ r hr) := by
+  sorry
+
+/-- `swapDiagonalSteps_fun` is injective.  Follows from monotonicity +
+coordinate-sum preservation (same argument as for `insertLeftStep`). -/
+private lemma swapDiagonalSteps_fun_injective {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    Function.Injective (swapDiagonalSteps_fun μ r hr) := by
+  sorry
+
 /-- The sign-reversing involution on diagonal terms.  Given a `(p+1, q+1)`-shuffle
 `μ` and a diagonal vertex `r`, swap the steps adjacent to `r` (replacing an LR
 corner with RL or vice versa).  This produces a new shuffle `μ'` such that:
@@ -785,8 +1077,9 @@ corner with RL or vice versa).  This produces a new shuffle `μ'` such that:
 - `μ'.sign = -μ.sign` (opposite sign, from the inversion count change) -/
 def swapDiagonalSteps {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
     (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
-    Shuffle (p + 1) (q + 1) := by
-  sorry
+    Shuffle (p + 1) (q + 1) :=
+  ⟨⟨swapDiagonalSteps_fun μ r hr, swapDiagonalSteps_fun_monotone μ r hr⟩,
+   swapDiagonalSteps_fun_injective μ r hr⟩
 
 /-- The swap involution preserves the diagonal vertex property. -/
 lemma swapDiagonalSteps_vertex {p q : ℕ}
@@ -829,21 +1122,5 @@ lemma swapDiagonalSteps_ne {p q : ℕ}
   sorry
 
 end Shuffle
-
-/-- Double sum cancellation via a sign-reversing involution on the first index.
-Given a predicate `p` on `α × β`, a function `f : α → β → M`, and an involution
-`g : α → α` (depending on `b` and a proof of `p a b`) that negates `f` and preserves `p`,
-the filtered double sum vanishes. -/
-lemma sum_sum_involution_zero {α β M : Type*}
-    [Fintype α] [Fintype β] [AddCommGroup M]
-    (p : α → β → Prop) [∀ a, DecidablePred (p a)]
-    (f : α → β → M)
-    (g : (a : α) → (b : β) → p a b → α)
-    (hg_pred : ∀ a b h, p (g a b h) b)
-    (hg_invol : ∀ a b h, g (g a b h) b (hg_pred a b h) = a)
-    (hg_neg : ∀ a b h, f (g a b h) b = -f a b)
-    (hg_ne : ∀ a b h, g a b h ≠ a) :
-    (∑ a : α, Finset.sum (Finset.univ.filter (p a)) (f a)) = 0 := by
-  sorry
 
 end HomologyLean.SingularHomology
