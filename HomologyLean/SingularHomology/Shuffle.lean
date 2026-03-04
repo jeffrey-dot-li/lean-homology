@@ -361,33 +361,121 @@ instance isLeftStep_decidable {p q : ℕ} (μ : Shuffle p q) (r : Fin (p + q)) :
     Decidable (isLeftStep μ r) :=
   inferInstanceAs (Decidable (_ < _))
 
+/-! ##### Insertion indices -/
+
+/-- The vertex index in the `(p+1, q)`-shuffle's domain where the new left step
+was inserted. Removing this vertex via `δ` recovers the original shuffle.
+Equals the number of vertices of `ν` whose first coordinate is `< j`. -/
+def insertLeftIndex {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    Fin (p + q + 2) :=
+  ⟨(Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).1.val < j.val).card, by
+    exact Nat.lt_of_le_of_lt (Finset.card_filter_le _ _) (by simp)⟩
+
+/-- The vertex index where the new right step was inserted.
+Equals the number of vertices of `ν` whose second coordinate is `< k`. -/
+def insertRightIndex {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    Fin (p + q + 2) :=
+  ⟨(Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).2.val < k.val).card, by
+    exact Nat.lt_of_le_of_lt (Finset.card_filter_le _ _) (by simp)⟩
+
+/-! ##### Insertion helpers -/
+
+/-- The insertion index satisfies `t ≤ j + q`: vertices with fst < j have
+index ≤ (j-1) + q by `coordSum_eq`, so there are at most j + q of them. -/
+private lemma insertLeftIndex_le {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    (insertLeftIndex ν j).val ≤ j.val + q := by
+  simp only [insertLeftIndex]
+  -- Inject the filter into Finset.range (j+q) via Fin.val
+  calc (Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).1.val < j.val).card
+      = ((Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).1.val < j.val).image
+          Fin.val).card := (Finset.card_image_of_injective _ Fin.val_injective).symm
+    _ ≤ (Finset.range (j.val + q)).card := by
+          apply Finset.card_le_card; intro x hx
+          simp only [Finset.mem_image, Finset.mem_filter, Finset.mem_univ, true_and,
+            Finset.mem_range] at hx ⊢
+          obtain ⟨r, hr, rfl⟩ := hx
+          have := coordSum_eq ν r; have := (ν.1 r).2.isLt; omega
+    _ = j.val + q := Finset.card_range _
+
+/-- Symmetric bound: the right insertion index satisfies `t ≤ p + k`. -/
+private lemma insertRightIndex_le {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    (insertRightIndex ν k).val ≤ p + k.val := by
+  simp only [insertRightIndex]
+  calc (Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).2.val < k.val).card
+      = ((Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).2.val < k.val).image
+          Fin.val).card := (Finset.card_image_of_injective _ Fin.val_injective).symm
+    _ ≤ (Finset.range (p + k.val)).card := by
+          apply Finset.card_le_card; intro x hx
+          simp only [Finset.mem_image, Finset.mem_filter, Finset.mem_univ, true_and,
+            Finset.mem_range] at hx ⊢
+          obtain ⟨r, hr, rfl⟩ := hx
+          have := coordSum_eq ν r; have := (ν.1 r).1.isLt; omega
+    _ = p + k.val := Finset.card_range _
+
+/-- The filter `{r | fst(r) < j}` is a downward-closed initial segment:
+`fst(ν r) < j ↔ r.val < t` where `t = insertLeftIndex`. -/
+private lemma insertLeftIndex_iff {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2))
+    (r : Fin (p + q + 1)) :
+    (ν.1 r).1.val < j.val ↔ r.val < (insertLeftIndex ν j).val := by
+  sorry
+
+/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
+private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
+    (r : Fin (p + q + 1)) :
+    (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val := by
+  sorry
+
 /-! ##### Insertion maps (RHS → LHS direction) -/
+
+/-- The underlying piecewise map for `insertLeftStep`: before the insertion point,
+embed the original vertex via `succAbove j`; at the insertion point, place `(j, t-j)`;
+after the insertion point, embed the shifted-back vertex via `succAbove j`. -/
+noncomputable def insertLeftStepFun {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    Fin ((p + 1) + q + 1) → Index (p + 1) × Index q :=
+  let t := (insertLeftIndex ν j).val
+  have ht_lt : t < p + q + 2 := (insertLeftIndex ν j).isLt
+  have ht_le : t ≤ j.val + q := insertLeftIndex_le ν j
+  fun r =>
+    -- Before insertion: embed original vertex via succAbove j (preserves value since fst < j)
+    if h : r.val < t then
+      (j.succAbove (ν.1 ⟨r, by omega⟩).1, (ν.1 ⟨r, by omega⟩).2)
+    -- At insertion point: new left step with fst = j, snd = t - j
+    else if h2 : r.val = t then
+      (j, ⟨r.val - j.val, by omega⟩)
+    -- After insertion: embed shifted-back vertex via succAbove j (adds 1 since fst ≥ j)
+    else
+      (j.succAbove (ν.1 ⟨r - 1, by omega⟩).1, (ν.1 ⟨r - 1, by omega⟩).2)
+
+/-- Coordinate sum of the piecewise map equals the position index. -/
+private lemma insertLeftStepFun_coordSum {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2))
+    (r : Fin ((p + 1) + q + 1)) :
+    (insertLeftStepFun ν j r).1.val + (insertLeftStepFun ν j r).2.val = r.val := by
+  sorry
 
 /-- Insert a left step at face index `j`, turning a `(p, q)`-shuffle into a
 `(p+1, q)`-shuffle.  The original path from `(0,0)` to `(p, q)` is embedded
 into a path from `(0,0)` to `(p+1, q)` by applying `Fin.succAbove j` to the
 first coordinate and inserting a new left step where the first coordinate
 crosses `j`. -/
-def insertLeftStep {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
-    Shuffle (p + 1) q := by
-  sorry
-
-/-- The vertex index in the `(p+1, q)`-shuffle's domain where the new left step
-was inserted. Removing this vertex via `δ` recovers the original shuffle. -/
-def insertLeftIndex {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
-    Fin (p + q + 2) := by
-  sorry
+noncomputable def insertLeftStep {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    Shuffle (p + 1) q :=
+  ⟨⟨insertLeftStepFun ν j, by
+    -- Monotonicity: use coordSum to derive both coordinates weakly increasing
+    sorry⟩, by
+    -- Injectivity: f(a) = f(b) → coordSum(f(a)) = coordSum(f(b)) → a = b
+    intro a b hab
+    have ha := insertLeftStepFun_coordSum ν j a
+    have hb := insertLeftStepFun_coordSum ν j b
+    have heq : insertLeftStepFun ν j a = insertLeftStepFun ν j b := hab
+    have : (insertLeftStepFun ν j a).1.val + (insertLeftStepFun ν j a).2.val =
+        (insertLeftStepFun ν j b).1.val + (insertLeftStepFun ν j b).2.val := by rw [heq]
+    exact Fin.ext (by omega)⟩
 
 /-- Insert a right step at face index `k`, turning a `(p, q)`-shuffle into a
 `(p, q+1)`-shuffle.  Applies `Fin.succAbove k` to the second coordinate and
 inserts a new right step where the second coordinate crosses `k`. -/
 def insertRightStep {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
     Shuffle p (q + 1) := by
-  sorry
-
-/-- The vertex index where the new right step was inserted. -/
-def insertRightIndex {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
-    Fin (p + q + 2) := by
   sorry
 
 /-- Inserting a left step and removing the inserted vertex recovers the original
