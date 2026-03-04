@@ -50,7 +50,7 @@ abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
 Convenience notation for the standard simplex:
 - `Δ[p]` (no whitespace ambiguity).
 -/
-local notation "Δ[" p "]" => stdSimplex p
+notation "Δ[" p "]" => stdSimplex p
 abbrev SCF (R : C) : TopCat ⥤ ChainComplex C ℕ :=
   (singularChainComplexFunctor C).obj R
 
@@ -309,6 +309,48 @@ abbrev shuffleStdSimplexMap {p q : ℕ} (μ : Shuffle p q) :
 
 
 
+/-- Precomposing `insertLeftStep ν j` with `δ_{insertLeftIndex} ≫ eqToHom` gives the
+same result as applying `ν` with `succAbove j` on fst.  This bridges the categorical
+`δ ≫ eqToHom` composition with the `Fin`-level `insertLeftStep_face`. -/
+private lemma insertLeftStep_comp_δ {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2))
+    (i : Fin (p + q + 1)) :
+    (ν.insertLeftStep j).1
+      ((SimplexCategory.δ (ν.insertLeftIndex j) ≫
+        eqToHom (show SimplexCategory.mk (p + q + 1) = SimplexCategory.mk ((p + 1) + q)
+          from by congr 1; omega)).toOrderHom i) =
+    (j.succAbove (ν.1 i).1, (ν.1 i).2) := by
+  have hface := Shuffle.insertLeftStep_face ν j i
+  -- Bridge: the argument (δ t ≫ eqToHom _).toOrderHom i has the same Fin.val
+  -- as ⟨t.val, _⟩.succAbove (i.cast _), so insertLeftStep gives the same result.
+  suffices harg : ∀ (a b : Fin ((p + 1) + q + 1)), a.val = b.val →
+      (ν.insertLeftStep j).1 a = (ν.insertLeftStep j).1 b from
+    harg _ _ (by
+      -- Unfold (δ t ≫ eqToHom _).toOrderHom to Fin.cast ∘ Fin.succAbove
+      dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom]
+      simp only [SimplexCategory.eqToHom_toOrderHom]
+      dsimp [Fin.castOrderIso]
+      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_cast]
+      split_ifs <;>
+        simp_all [Fin.val_castSucc, Fin.val_succ, Fin.val_cast]) |>.trans hface
+  exact fun _ _ h => congr_arg _ (Fin.ext h)
+
+/-- Symmetric: precomposing `insertRightStep ν k` with `δ_{insertRightIndex} ≫ eqToHom`
+gives `ν` with `succAbove k` on snd. -/
+private lemma insertRightStep_comp_δ {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
+    (i : Fin (p + q + 1)) :
+    (ν.insertRightStep k).1
+      ((SimplexCategory.δ (ν.insertRightIndex k) ≫
+        eqToHom (show SimplexCategory.mk (p + q + 1) = SimplexCategory.mk (p + (q + 1))
+          from by congr 1)).toOrderHom i) =
+    ((ν.1 i).1, k.succAbove (ν.1 i).2) := by
+  have hface := Shuffle.insertRightStep_face ν k i
+  suffices harg : ∀ (a b : Fin (p + (q + 1) + 1)), a.val = b.val →
+      (ν.insertRightStep k).1 a = (ν.insertRightStep k).1 b from
+    harg _ _ (by
+      dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom]
+      rfl) |>.trans hface
+  exact fun _ _ h => congr_arg _ (Fin.ext h)
+
 /-- Face-shuffle factorization (left insertion):
 Inserting a left step into a `(p, q)`-shuffle `ν` at face index `j` and then
 removing the inserted vertex via `δ` recovers `ν ≫ prod.map (δⱼ) id`.
@@ -328,7 +370,15 @@ lemma shuffleStdSimplexMap_insertLeft_face {p q : ℕ}
       prod.map
         (SimplexCategory.toTop.map (SimplexCategory.δ j))
         (𝟙 _) := by
-  sorry
+  -- Fold eqToHom from TopCat into SimplexCategory, then reduce to OrderHom equality
+  simp only [← Category.assoc] at *
+  rw [← show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
+  rw [← Functor.map_comp]
+  rw [simplexProdMap_comp, simplexProdMap_comp_prod_map_toTop_left]
+  -- OrderHom equality: use insertLeftStep_comp_δ pointwise
+  congr 1; ext : 1; funext i
+  simp only [OrderHom.comp_coe, Function.comp_apply, OrderHom.coe_mk]
+  exact insertLeftStep_comp_δ ν j i
 
 /-- Face-shuffle factorization (right insertion):
 `δ_{insertRightIndex ν k} ≫ shuffleStdSimplexMap (insertRightStep ν k)
@@ -346,7 +396,12 @@ lemma shuffleStdSimplexMap_insertRight_face {p q : ℕ}
       prod.map
         (𝟙 _)
         (SimplexCategory.toTop.map (SimplexCategory.δ k)) := by
-  sorry
+  simp only [← Category.assoc] at *
+  rw [← show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
+  · rw [← Functor.map_comp, simplexProdMap_comp, simplexProdMap_comp_prod_map_toTop_right]
+    congr 1; ext : 1; funext i
+    simp only [OrderHom.comp_coe, Function.comp_apply, OrderHom.coe_mk]
+    exact insertRightStep_comp_δ ν k i
 
 attribute [simp] CategoryTheory.yoneda
 

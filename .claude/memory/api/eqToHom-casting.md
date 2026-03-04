@@ -76,18 +76,56 @@ For `SimplexCategory` (or any category with `OrderHom`-based morphisms), once yo
 
 **Key insight**: `simp` alone can't unfold everything. Some definitions (`Fin.succAboveOrderEmb`, `OrderEmbedding.ofStrictMono`) are `def`s, not `@[simp]` lemmas — they need `dsimp` for definitional reduction before `simp` can work on the result.
 
-**Simp lemma layers for SimplexCategory → Fin:**
+**`dsimp` vs `simp` — which tool for which layer (CRITICAL):**
 
-| Layer | Unfolds with |
-|-------|-------------|
-| `SimplexCategory.Hom` composition | `simp [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply]` |
-| `eqToHom` in SimplexCategory | `simp [SimplexCategory.eqToHom_toOrderHom]` (gives `Fin.castOrderIso`) |
-| `Fin.castOrderIso` | `simp [Fin.castOrderIso, OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, Fin.val_cast]` |
-| Face map (`δ`) | `simp [SimplexCategory.δ, SimplexCategory.Hom.toOrderHom_mk]` (gives `succAboveOrderEmb`) |
-| `Fin.succAboveOrderEmb` | **`dsimp [Fin.succAboveOrderEmb]`** (not simp!) then `simp [Fin.succAbove, Fin.lt_def, Fin.val_cast]` |
-| Final `Fin` values | `simp_all [Fin.val_castSucc, Fin.val_succ]` |
+`dsimp` unfolds `def`s by definitional reduction. `simp` applies rewrite rules (theorems with `@[simp]` or supplied explicitly). Using the wrong one silently does nothing.
 
-After fully unfolding, `split <;> split` on the `if` conditions, then `omega` closes matching cases and `exact absurd trivial ‹_›` closes contradictory ones (where `simp_all` may leave `¬True`).
+| Layer | Tool | Why |
+|-------|------|-----|
+| `SimplexCategory.Hom` composition | `dsimp [SimplexCategory.comp_toOrderHom]` | It's a `def` |
+| `eqToHom` in SimplexCategory | **`simp only [SimplexCategory.eqToHom_toOrderHom]`** | It's a **theorem**, not a def — `dsimp` silently fails! |
+| `Fin.castOrderIso` | `dsimp [Fin.castOrderIso]` | It's a `def` |
+| Face map (`δ`) | `dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb]` | Both are `def`s |
+| `Fin.succAbove` | `simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_cast]` | `Fin.succAbove` needs simp to unfold the `if` |
+| Final `Fin` values | `simp_all [Fin.val_castSucc, Fin.val_succ, Fin.val_cast]` | Clean up coercions for `omega` |
+
+**Working unfolding recipe** (tested on `δ ≫ eqToHom` compositions):
+```lean
+-- Step 1: dsimp for defs
+dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom]
+-- Step 2: simp for the theorem (MUST be simp, not dsimp!)
+simp only [SimplexCategory.eqToHom_toOrderHom]
+-- Step 3: dsimp for the OrderIso wrapper
+dsimp [Fin.castOrderIso]
+-- Step 4: simp to unfold succAbove and castSucc/succ
+simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_cast]
+-- Step 5: split on if-then-else, then close
+split_ifs <;> simp_all [Fin.val_castSucc, Fin.val_succ, Fin.val_cast]
+```
+
+After fully unfolding, `split_ifs` on the `if` conditions, then `omega` or `simp_all` closes each case.
+
+## Principle 6a: Bridge lemmas for `δ ≫ eqToHom` vs `Fin.succAbove ∘ Fin.cast`
+
+**Problem**: A combinatorial lemma (e.g., `insertLeftStep_face`) is stated using `Fin.succAbove` and `Fin.cast` directly, but the categorical goal has `(SimplexCategory.δ t ≫ eqToHom h).toOrderHom i`. These produce the **same `Fin.val`** but are **syntactically different `Fin` terms** — `Fin.cast (succAbove t i)` vs `succAbove (cast t) (cast i)`.
+
+**Solution**: Write a bridge lemma that translates between the categorical form and the combinatorial form. Pattern:
+
+```lean
+private lemma myLemma_comp_δ {p q : ℕ} (ν : ...) (j : ...) (i : Fin (p + q + 1)) :
+    f ((SimplexCategory.δ t ≫ eqToHom (by congr 1; omega)).toOrderHom i) =
+    <RHS from the combinatorial lemma> := by
+  have hface := combinatorial_lemma ν j i
+  suffices harg : ∀ (a b : Fin n), a.val = b.val → f a = f b from
+    harg _ _ (by
+      <unfolding recipe from Principle 6>
+    ) |>.trans hface
+  exact fun _ _ h => congr_arg _ (Fin.ext h)
+```
+
+**Key trick**: The `suffices ∀ a b, a.val = b.val → f a = f b` avoids needing to elaborate the `eqToHom` proof term in a `have` statement (which fails due to metavariable inference). It reduces the problem to showing two `Fin.val`s are equal, which the unfolding recipe + `omega` handles.
+
+**When to use this**: Whenever a proof needs to connect a `SimplexCategory` morphism composition (`δ ≫ eqToHom`) with a `Fin`-level operation (`succAbove`, `cast`), and there's already a combinatorial lemma stated in `Fin` terms.
 
 ## Principle 7: Proving the `eqToHom` proof term
 
@@ -96,6 +134,33 @@ When writing `eqToHom (by ...)`, the proof obligation is typically `F.obj X = F.
 - `congr 1` reduces `SimplexCategory.mk n = SimplexCategory.mk m` to `n = m`
 - Then `omega` or `rfl` closes it
 - Sometimes `congr 1` closes it outright (when the `Nat` equality is definitional). If `omega` then says "No goals to be solved", just remove `omega`.
+
+## Principle 8: `simplexProdMap` goals — full pipeline
+
+When the goal is `toTop.map (δ t) ≫ eqToHom _ ≫ simplexProdMap μ = simplexProdMap ν ≫ prod.map (toTop.map f) g`, use this pipeline:
+
+```lean
+-- 1. Left-associate to enable Functor.map_comp matching
+simp only [← Category.assoc] at *
+-- 2. Convert eqToHom from TopCat to SimplexCategory
+rw [← show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
+-- 3. Fold δ ≫ eqToHom into a single toTop.map
+rw [← Functor.map_comp]
+-- 4. Use simplexProdMap_comp to absorb the toTop.map into the OrderHom
+rw [simplexProdMap_comp, simplexProdMap_comp_prod_map_toTop_left]
+-- 5. Now the goal is an OrderHom equality — use a bridge lemma pointwise
+congr 1; ext : 1; funext i
+simp only [OrderHom.comp_coe, Function.comp_apply, OrderHom.coe_mk]
+exact myBridgeLemma ν j i
+```
+
+**Step 1 is critical**: `← Category.assoc` left-associates the composition so that `toTop.map (δ _) ≫ toTop.map (eqToHom _)` becomes `(toTop.map (δ _) ≫ toTop.map (eqToHom _))`, making `← Functor.map_comp` match.
+
+**`ext : 1; funext i` vs `ext i`**: For `OrderHom` equality, `ext i` goes all the way to `Fin.val` (too deep). Use `ext : 1` to get function equality, then `funext i` to go pointwise at the `Prod` level.
+
+## Pitfall: `SimplexCategory.len` is opaque to `omega`
+
+When `ext` destructs `⟨i, hi⟩ : Fin ((SimplexCategory.mk n).len + 1)`, the bound `hi` involves `.len` which `omega` can't reduce. Fix: `simp only [SimplexCategory.len_mk] at hi` to get `hi : i < n + 1`.
 
 ## Project-specific helper lemmas
 
