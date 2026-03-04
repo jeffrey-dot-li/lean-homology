@@ -3,6 +3,63 @@ This file was edited by Aristotle (https://aristotle.harmonic.fun).
 
 Lean version: leanprover/lean4:v4.24.0
 Mathlib version: f897ebcf72cd16f89ab4577d0c826cd14afaafc7
+This project request had uuid: 835e988f-99c7-4b44-a6a3-e4cd095f31dc
+
+To cite Aristotle, tag @Aristotle-Harmonic on GitHub PRs/issues, and add as co-author to commits:
+Co-authored-by: Aristotle (Harmonic) <aristotle-harmonic@harmonic.fun>
+
+The following was proved by Aristotle:
+
+- private lemma insertLeftIndex_ge {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    j.val ≤ (insertLeftIndex ν j).val
+
+- private lemma insertRightIndex_ge {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    k.val ≤ (insertRightIndex ν k).val
+
+- private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
+    (r : Fin (p + q + 1)) :
+    (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val
+
+- lemma shuffle_fst_succ_le {p q : ℕ} (ν : Shuffle p q) (i : Fin (p + q + 1))
+    (hi : i.val + 1 < p + q + 1) :
+    (ν.1 ⟨i.val + 1, by omega⟩).1.val ≤ (ν.1 ⟨i.val, i.isLt⟩).1.val + 1
+
+- lemma insertLeftStep_face {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
+    ∀ (k : Index (p + q)),
+      (insertLeftStep ν j).1 (Fin.succAbove
+        (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p + 1) + q + 1))
+        (k.cast (by omega))) =
+      (j.succAbove (ν.1 k).1, (ν.1 k).2)
+
+- lemma insertRightStep_face {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
+    ∀ (i : Index (p + q)),
+      (insertRightStep ν k).1 (Fin.succAbove
+        (⟨(insertRightIndex ν k).val, by omega⟩ : Fin (p + (q + 1) + 1))
+        (i.cast (by omega))) =
+      ((ν.1 i).1, k.succAbove (ν.1 i).2)
+
+- lemma insertLeftStep_injective {p q : ℕ}
+    (j₁ j₂ : Fin (p + 2)) (ν₁ ν₂ : Shuffle p q)
+    (hμ : insertLeftStep ν₁ j₁ = insertLeftStep ν₂ j₂)
+    (hr : insertLeftIndex ν₁ j₁ = insertLeftIndex ν₂ j₂) :
+    j₁ = j₂ ∧ ν₁ = ν₂
+
+- lemma insertRightStep_injective {p q : ℕ}
+    (k₁ k₂ : Fin (q + 2)) (ν₁ ν₂ : Shuffle p q)
+    (hμ : insertRightStep ν₁ k₁ = insertRightStep ν₂ k₂)
+    (hr : insertRightIndex ν₁ k₁ = insertRightIndex ν₂ k₂) :
+    k₁ = k₂ ∧ ν₁ = ν₂
+
+At Harmonic, we use a modified version of the `generalize_proofs` tactic.
+For compatibility, we include this tactic at the start of the file.
+If you add the comment "-- Harmonic `generalize_proofs` tactic" to your file, we will not do this.
+-/
+
+/-
+This file was edited by Aristotle (https://aristotle.harmonic.fun).
+
+Lean version: leanprover/lean4:v4.24.0
+Mathlib version: f897ebcf72cd16f89ab4577d0c826cd14afaafc7
 This project request had uuid: 50b54e27-aba5-4286-9db7-cdfc0d8f251f
 
 To cite Aristotle, tag @Aristotle-Harmonic on GitHub PRs/issues, and add as co-author to commits:
@@ -13,11 +70,13 @@ The following was proved by Aristotle:
 - lemma invCount_add_invCount_swap {p q : ℕ} (u : Shuffle p q) :
     u.invCount + (u.swap).invCount = p * q
 -/
-
+-- Harmonic `generalize_proofs` tactic
 import Mathlib.Tactic
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Order.Fin.Basic
 
+
+import Mathlib.Tactic.GeneralizeProofs
 
 noncomputable section
 
@@ -419,12 +478,35 @@ private lemma insertRightIndex_le {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2
 Proof: any r with r.val < j has fst(r) ≤ r < j, so the filter includes all r < j. -/
 private lemma insertLeftIndex_ge {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
     j.val ≤ (insertLeftIndex ν j).val := by
-  sorry
+  -- The set of indices where the first coordinate is less than $j$ contains at least the indices $0, 1, ..., j-1$.
+  have h_filter : Finset.filter (fun r : Fin (p + q + 1) => (ν.1 r).1.val < j.val) Finset.univ ⊇ Finset.univ.filter (fun r : Fin (p + q + 1) => r.val < j.val) := by
+    intro r hr;
+    have := coordSum_eq ν r;
+    grind;
+  refine' le_trans _ ( Finset.card_mono h_filter );
+  rw [ Finset.card_eq_of_bijective ];
+  use fun i hi => ⟨ i, by linarith [ Fin.is_lt j ] ⟩;
+  · aesop;
+  · aesop;
+  · aesop
 
 /-- Symmetric lower bound: the right insertion index satisfies `k ≤ t`. -/
 private lemma insertRightIndex_ge {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
     k.val ≤ (insertRightIndex ν k).val := by
-  sorry
+  -- Since `ν` is a monotone function, for any `r` with `r.val < k`, we have `ν.1 r ≤ r`. Therefore, the filter includes all `r < k`, so the cardinality is at least `k`.
+  have h_filter : ∀ r : Fin (p + q + 1), r.val < k.val → (ν.1 r).2.val < k.val := by
+    -- By the properties of ν, we know that the second coordinate of ν(r) is less than or equal to r.val.
+    have h_second_coord_le_r : ∀ r : Fin (p + q + 1), (ν.1 r).2.val ≤ r.val := by
+      exact fun r => by linarith [ coordSum_eq ν r ] ;
+    exact fun r hr => lt_of_le_of_lt ( h_second_coord_le_r r ) hr;
+  have h_filter_card : (Finset.univ.filter fun r : Fin (p + q + 1) => r.val < k.val).card ≤ (Finset.univ.filter fun r : Fin (p + q + 1) => (ν.1 r).2.val < k.val).card := by
+    exact Finset.card_le_card fun x hx => by aesop;
+  refine le_trans ?_ h_filter_card;
+  rw [ Finset.card_eq_of_bijective ];
+  use fun i hi => ⟨ i, by linarith [ Fin.is_lt k ] ⟩;
+  · aesop;
+  · aesop;
+  · aesop
 
 /-- The filter `{r | fst(r) < j}` is a downward-closed initial segment:
 `fst(ν r) < j ↔ r.val < t` where `t = insertLeftIndex`. -/
@@ -442,12 +524,23 @@ private lemma insertLeftIndex_iff {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2
       exact ⟨ fun x hx => h_filter hx, r, h, le_rfl ⟩;
     aesop;
   · contrapose! h;
-    exact le_trans ( Finset.card_le_card <| show Finset.filter ( fun x : Fin ( p + q + 1 ) => ( ν.1 x |>.1 : ℕ ) < j ) Finset.univ ⊆ Finset.Iio r from fun x hx => Finset.mem_Iio.mpr <| lt_of_not_ge fun hx' => by linarith [ Finset.mem_filter.mp hx, show ( ν.1 x |>.1 : ℕ ) ≥ ( ν.1 r |>.1 : ℕ ) by exact ν.1.monotone hx' |>.1 ] ) <| by simp +decide [ Finset.card_sdiff, Finset.card_range ] ;/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
+    exact le_trans ( Finset.card_le_card <| show Finset.filter ( fun x : Fin ( p + q + 1 ) => ( ν.1 x |>.1 : ℕ ) < j ) Finset.univ ⊆ Finset.Iio r from fun x hx => Finset.mem_Iio.mpr <| lt_of_not_ge fun hx' => by linarith [ Finset.mem_filter.mp hx, show ( ν.1 x |>.1 : ℕ ) ≥ ( ν.1 r |>.1 : ℕ ) by exact ν.1.monotone hx' |>.1 ] ) <| by simp +decide [ Finset.card_sdiff, Finset.card_range ] ;
+
+/-- Symmetric: `snd(ν r) < k ↔ r.val < insertRightIndex`. -/
 
 private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
     (r : Fin (p + q + 1)) :
     (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val := by
-  sorry
+  convert insertLeftIndex_iff ( ν.swap ) k ( Fin.cast ( by omega ) r ) using 1;
+  unfold Shuffle.insertRightIndex Shuffle.swap Shuffle.insertLeftIndex; simp +decide [ Fin.val_add, Nat.mod_eq_of_lt ] ;
+  rw [ Finset.card_filter, Finset.card_filter ] ; ring!;
+  convert Iff.rfl using 3 ; ring!;
+  · grind;
+  · simp +decide [ add_comm, Fin.cast ];
+    congr! 3;
+    congr! 2;
+    congr! 2;
+    exact?
 
 /-! ##### Insertion maps (RHS → LHS direction) -/
 
@@ -456,7 +549,14 @@ indices can increase by at most 1. -/
 lemma shuffle_fst_succ_le {p q : ℕ} (ν : Shuffle p q) (i : Fin (p + q + 1))
     (hi : i.val + 1 < p + q + 1) :
     (ν.1 ⟨i.val + 1, by omega⟩).1.val ≤ (ν.1 ⟨i.val, i.isLt⟩).1.val + 1 := by
-  sorry
+  -- By definition of `Shuffle`, we know that the first component is strictly increasing.
+  have h_strict_mono : ∀ r : Fin (p + q), (ν.1 (Fin.castSucc r)).fst.val + 1 ≥ (ν.1 (Fin.succ r)).fst.val := by
+    intro r
+    have := coordSum_eq ν (Fin.castSucc r)
+    have := coordSum_eq ν (Fin.succ r)
+    simp at *;
+    linarith [ show ( ν.1 ( Fin.castSucc r ) |>.2 : ℕ ) ≤ ( ν.1 ( Fin.succ r ) |>.2 : ℕ ) from by exact ( ν.1.monotone ( Nat.le_succ _ ) ) |>.2 ];
+  exact h_strict_mono ⟨ i, by linarith ⟩
 
 /-- The underlying piecewise map for `insertLeftStep`: before the insertion point,
 embed the original vertex via `succAbove j`; at the insertion point, place `(j, t-j)`;
@@ -506,7 +606,6 @@ private lemma insertLeftStepFun_coordSum {p q : ℕ} (ν : Shuffle p q) (j : Fin
     · simp only [Fin.val_succ]
       have := coordSum_eq ν ⟨r.val - 1, by omega⟩
       simp at this; omega
-
 
 /-- Insert a left step at face index `j`, turning a `(p, q)`-shuffle into a
 `(p+1, q)`-shuffle.  The original path from `(0,0)` to `(p, q)` is embedded
@@ -813,7 +912,18 @@ lemma insertLeftStep_face {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
         (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p + 1) + q + 1))
         (k.cast (by omega))) =
       (j.succAbove (ν.1 k).1, (ν.1 k).2) := by
-  sorry
+  unfold HomologyLean.SingularHomology.Shuffle.insertLeftStep;
+  intro k
+  unfold HomologyLean.SingularHomology.Shuffle.insertLeftStepFun
+  simp [Fin.succAbove] at *;
+  split_ifs <;> simp_all +decide [ Fin.castSucc, Fin.succ ];
+  · exact absurd ‹_› ( ne_of_lt ‹_› );
+  · exact absurd ‹_› ( not_le_of_gt ‹_› );
+  · exact False.elim <| ‹¬_› <| Nat.lt_of_succ_lt ‹_›;
+  · split_ifs <;> simp_all +decide [ Fin.ext_iff, Fin.val_add ];
+    · have := insertLeftIndex_ge ν j; have := insertLeftIndex_le ν j; simp_all +decide [ Fin.le_iff_val_le_val ] ; omega;
+    · have := insertLeftIndex_iff ν j k; simp_all +decide [ Fin.le_def ] ;
+      grind
 
 /-- Inserting a right step and removing the inserted vertex recovers the original
 shuffle with `Fin.succAbove k` applied to the second coordinate. -/
@@ -823,7 +933,16 @@ lemma insertRightStep_face {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
         (⟨(insertRightIndex ν k).val, by omega⟩ : Fin (p + (q + 1) + 1))
         (i.cast (by omega))) =
       ((ν.1 i).1, k.succAbove (ν.1 i).2) := by
-  sorry
+  intro i
+  generalize_proofs at *;
+  unfold HomologyLean.SingularHomology.Shuffle.insertRightStep; simp +decide [ Fin.succAbove ] ;
+  unfold HomologyLean.SingularHomology.Shuffle.insertRightStepFun; split_ifs <;> simp_all +decide [ Fin.ext_iff, Fin.val_add ] ;
+  all_goals split_ifs <;> simp_all +decide [ Fin.succAbove ] ;
+  any_goals split_ifs <;> simp_all +decide [ Fin.castSucc, Fin.succ ] ; omega;
+  any_goals linarith [ show ( i : ℕ ) < ν.insertRightIndex k from by assumption ] ;
+  · exact False.elim <| ‹¬Fin.castSucc i < ν.insertRightIndex k› <| Nat.lt_of_succ_lt ‹_›;
+  · have := Fin.le_iff_val_le_val.mp ‹_›; simp_all +decide [ Fin.ext_iff ] ; omega;
+  · exact absurd ‹_› ( by linarith [ show ( i : ℕ ) + 1 > ( ν.insertRightIndex k : ℕ ) from by linarith [ show ( i : ℕ ) ≥ ( ν.insertRightIndex k : ℕ ) from by assumption ] ] ) ;
 
 /-- The insert-left map `(j, ν) ↦ (insertLeftStep ν j, insertLeftIndex ν j)` is
 injective: distinct `(j, ν)` pairs produce distinct `(μ, vertex)` pairs. -/
@@ -832,7 +951,21 @@ lemma insertLeftStep_injective {p q : ℕ}
     (hμ : insertLeftStep ν₁ j₁ = insertLeftStep ν₂ j₂)
     (hr : insertLeftIndex ν₁ j₁ = insertLeftIndex ν₂ j₂) :
     j₁ = j₂ ∧ ν₁ = ν₂ := by
-  sorry
+  have h_eq : ν₁.insertLeftStep j₁ = ν₂.insertLeftStep j₂ → j₁ = j₂ := by
+    intro h_eq
+    have h_eq_fun : ∀ r : Fin (p + 1 + q + 1), (insertLeftStepFun ν₁ j₁ r).1 = (insertLeftStepFun ν₂ j₂ r).1 := by
+      intro r
+      have := congr_arg (fun f => f.1 r) h_eq
+      generalize_proofs at *; (
+      exact congr_arg Prod.fst this
+      skip)
+    generalize_proofs at *; (
+    have := h_eq_fun ⟨(insertLeftIndex ν₁ j₁).val, by
+      exact Nat.lt_succ_of_le ( by linarith [ Fin.is_lt ( ν₁.insertLeftIndex j₁ ) ] ) ;⟩
+    generalize_proofs at *; (
+    unfold insertLeftStepFun at this; aesop;))
+  generalize_proofs at *; exact ⟨h_eq hμ, by
+    have := insertLeftStep_face ν₁ j₁; have := insertLeftStep_face ν₂ j₂; aesop;⟩;
 
 /-- The insert-right map is injective. -/
 lemma insertRightStep_injective {p q : ℕ}
@@ -840,7 +973,12 @@ lemma insertRightStep_injective {p q : ℕ}
     (hμ : insertRightStep ν₁ k₁ = insertRightStep ν₂ k₂)
     (hr : insertRightIndex ν₁ k₁ = insertRightIndex ν₂ k₂) :
     k₁ = k₂ ∧ ν₁ = ν₂ := by
-  sorry
+  -- By comparing the coordinates of the last elements, we can conclude that k₁ = k₂.
+  have hk : k₁ = k₂ := by
+    unfold Shuffle.insertRightStep at hμ;
+    simp_all +decide [ Fin.ext_iff, Shuffle.insertRightStepFun ];
+    replace hμ := congr_fun hμ ( ν₂.insertRightIndex k₂ ) ; aesop;
+  have := insertRightStep_face ν₁ k₁; have := insertRightStep_face ν₂ k₁; aesop;
 
 /-- Sign relation for left insertion:
 `(insertLeftStep ν j).sign * (-1)^(insertLeftIndex ν j) = (-1)^j * ν.sign`. -/
