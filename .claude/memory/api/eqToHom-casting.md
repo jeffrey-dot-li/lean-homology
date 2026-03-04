@@ -16,6 +16,8 @@ Then fold adjacent `F.map` applications with `← Functor.map_comp` to consolida
 
 **Why this works**: `eqToHom` in `D` is opaque — `simp` can't see through `ConcreteCategory.hom`, `congr` produces `HEq` across different types. But in `C`, morphisms are often data (finite maps, order-preserving functions) where `ext` + `omega` can close things.
 
+**Pitfall — going pointwise in the wrong category**: If you `ext` in `TopCat` (e.g., `ext ⟨x, hx⟩ i`) instead of retreating to `SimplexCategory` first, you enter a world of `ConcreteCategory.hom`, `ContinuousMap.coe_mk`, `FunOnFinite.linearMap`, `Finsupp.mapDomain`, etc. that is nearly impossible to close. Always retreat to the source category *before* going pointwise. Extract a bridge lemma in `SimplexCategory` (where `ext + omega` works cleanly), then use functoriality (`eqToHom_map`) to lift the result. See Principle 9 for the full pattern.
+
 ## Principle 2: Absorb `eqToHom` into data at the boundary
 
 Don't let `eqToHom` propagate into the middle of a complex proof. Write small helper lemmas (proved by `subst; simp`) that absorb it at the interface:
@@ -158,6 +160,26 @@ exact myBridgeLemma ν j i
 
 **`ext : 1; funext i` vs `ext i`**: For `OrderHom` equality, `ext i` goes all the way to `Fin.val` (too deep). Use `ext : 1` to get function equality, then `funext i` to go pointwise at the `Prod` level.
 
+## Principle 9: Re-fold after `dsimp` — the `change F.map _ = _` pattern
+
+**Problem**: You `dsimp` a functor application to access inner structure (e.g., to `rw [prod.lift_snd]` inside a `shuffleStdSimplexMap`). After the rewrite, the goal is a concrete `D`-morphism (e.g., `TopCat.uliftFunctor.map (TopCat.ofHom { toFun := stdSimplex.map ..., ... }) = eqToHom ⋯`). Now you're trapped in the concrete category — `Finsupp.mapDomain`, `FunOnFinite.linearMap`, etc. — and the proof becomes extremely painful.
+
+**Solution**: Immediately re-fold back to functor form with `change`:
+
+```lean
+dsimp [shuffleStdSimplexMap, simplexProdMap]  -- expand to access inner structure
+rw [CategoryTheory.Limits.prod.lift_snd]       -- apply the rewrite you needed
+change SimplexCategory.toTop.map _ = eqToHom _ -- RE-FOLD back to functor form
+rw [bridge_lemma_at_SimplexCategory_level]     -- work in the source category
+exact eqToHom_map _ _                          -- functoriality closes it
+```
+
+**Why `change` works**: Even though `dsimp` expanded `toTop.map f` into its concrete definition, the expanded form is still *definitionally equal* to `toTop.map f`. So `change` can re-introduce the `F.map` wrapper at zero cost.
+
+**When to use this**: Whenever you `dsimp` a `F.map(...)` to access something inside (e.g., a product lift component), and the remaining goal is an equality in the expanded concrete form. The re-fold lets you escape back to functor-level reasoning.
+
+**Companion pattern — bridge lemma for the non-eqToHom side**: The concrete morphism you re-folded into `F.map(f)` may itself need a bridge lemma showing `f = eqToHom(...)` in the source category `C`. For example, `snd_comp_default_shuffle_eq_eqToHom` proves the snd projection of the default `(0,n)`-shuffle is `eqToHom` in `SimplexCategory`. These are proved by `ext + omega` / `dsimp` at the `Fin` level (Principle 6).
+
 ## Pitfall: `SimplexCategory.len` is opaque to `omega`
 
 When `ext` destructs `⟨i, hi⟩ : Fin ((SimplexCategory.mk n).len + 1)`, the bound `hi` involves `.len` which `omega` can't reduce. Fix: `simp only [SimplexCategory.len_mk] at hi` to get `hi : i < n + 1`.
@@ -169,6 +191,7 @@ When `ext` destructs `⟨i, hi⟩ : Fin ((SimplexCategory.mk n).len + 1)`, the b
 | `simplexCoprojection_comp_eqToHom` | Absorbs `eqToHom` on chain group into transport on the simplex |
 | `cast_singularSimplex_down` | Converts `(h ▸ ⟪f⟫ₛ).down` into `eqToHom _ ≫ f` |
 | `cast_ulift_toSSet_down` | Earlier version of `cast_singularSimplex_down` |
+| `snd_comp_default_shuffle_eq_eqToHom` | `snd ∘ default (Shuffle 0 n) = eqToHom` in SimplexCategory |
 
 ## Meta-lesson: when one side of a symmetry is trivial and the other isn't
 
