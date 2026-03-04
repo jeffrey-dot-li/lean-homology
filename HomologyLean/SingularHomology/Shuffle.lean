@@ -980,8 +980,214 @@ lemma insertRightStep_injective {p q : ℕ}
     replace hμ := congr_fun hμ ( ν₂.insertRightIndex k₂ ) ; aesop;
   have := insertRightStep_face ν₁ k₁; have := insertRightStep_face ν₂ k₁; aesop;
 
+/-! ##### Helper lemmas for `sign_insertLeftStep`
+
+The proof reduces to an inversion-count identity: inserting a left step at
+position `j` adds exactly `t - j` to the inversion count, where
+`t = insertLeftIndex ν j`. We split the `invCount` sum at `t` using
+`Fin.sum_univ_succAbove`, match the non-inserted terms against `invCount ν`,
+and compute the contribution of the inserted step directly. -/
+
+/-- The inserted step is a left step: the first coordinate increases from `j`
+to `succAbove j (ν.1 t).1 > j` at the insertion vertex. -/
+private lemma insertLeftStep_isLeftStep_at {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2))
+    (ht : (insertLeftIndex ν j).val < p + 1 + q) :
+    isLeftStep (insertLeftStep ν j) ⟨(insertLeftIndex ν j).val, ht⟩ := by
+  -- Unfold to: j < j.succAbove (ν.1 ⟨t, ...⟩).fst
+  unfold isLeftStep; simp +decide [insertLeftStep, insertLeftStepFun]
+  -- Vertex t has fst ≥ j (it's the first vertex not in the filter {fst < j})
+  have hfst : ¬ (ν.1 ⟨(insertLeftIndex ν j).val, by omega⟩).1.val < j.val := by
+    intro h
+    have := (insertLeftIndex_iff ν j ⟨(insertLeftIndex ν j).val, by omega⟩).mp h
+    simp at this
+  -- succAbove j fst = fst.succ when fst ≥ j, so j < fst + 1
+  simp only [Fin.succAbove]
+  split
+  · exfalso; simp [Fin.lt_def] at *; omega
+  · simp [Fin.lt_def, Fin.val_succ] at *; omega
+
+/-- The second coordinate at the insertion point equals `t - j`. -/
+private lemma insertLeftStep_snd_at {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2)) :
+    ((insertLeftStep ν j).1 ⟨(insertLeftIndex ν j).val, by omega⟩).2.val =
+    (insertLeftIndex ν j).val - j.val := by
+  simp +decide [insertLeftStep, insertLeftStepFun]
+
+/-- The `invCount` term at the insertion point contributes `t - j`:
+`if isLeftStep μ t then μ(t).snd else 0 = t - j`. -/
+private lemma insertLeftStep_invCount_term_at {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2))
+    (ht : (insertLeftIndex ν j).val < p + 1 + q) :
+    (if ((insertLeftStep ν j).1 (Fin.castSucc ⟨(insertLeftIndex ν j).val, ht⟩)).1 <
+        ((insertLeftStep ν j).1 (Fin.succ ⟨(insertLeftIndex ν j).val, ht⟩)).1
+     then ((insertLeftStep ν j).1 (Fin.castSucc ⟨(insertLeftIndex ν j).val, ht⟩)).2.val
+     else 0) =
+    (insertLeftIndex ν j).val - j.val := by
+  split_ifs with h
+  · exact insertLeftStep_snd_at ν j
+  · exact absurd (insertLeftStep_isLeftStep_at ν j ht) h
+
+/-- Each non-inserted step of `insertLeftStep ν j` has the same `invCount`
+contribution as the corresponding step of `ν`. For step `i` of `ν`, the
+matching step in the new shuffle is `i` if `i < t`, or `i + 1` if `i ≥ t`
+(where `t = insertLeftIndex ν j`).
+
+**Proof sketch** (three cases by position of `i` relative to `t`):
+- **i+1 < t** (both endpoints in 'before' region): `insertLeftStepFun` applies
+  `succAbove j` to both fst coords. `Fin.succAbove_lt_succAbove_iff` shows
+  the fst comparison is preserved. The snd coord is unchanged.
+- **i < t ≤ i+1** (castSucc in 'before', succ at insertion point): The new
+  fst comparison is `succAbove(j, ν(i).fst) < j`. Since `ν(i).fst < j`
+  (by `insertLeftIndex_iff`), `succAbove = castSucc`, so the condition
+  reduces to `ν(i).fst < j`. The original condition `ν(i).fst < ν(i+1).fst`
+  is equivalent since `ν(i).fst < j ≤ ν(i+1).fst`. Snd is unchanged.
+- **i ≥ t** (both endpoints in 'after' region): `insertLeftStepFun` shifts
+  by -1, mapping back to indices `i` and `i+1` of ν. Same argument via
+  `succAbove` preserving ordering. Snd unchanged.
+
+The main difficulty is Fin proof-irrelevance: `split_ifs` creates many
+branches where `⟨i.val, proof₁⟩` and `i.castSucc` need to be identified.
+Use `congr 3; ext; simp [fin_val_castSucc]` to close the `.2.val` goals,
+and `Fin.succAbove_lt_succAbove_iff` + `convert` for the condition goals.
+`Fin.lt_def` loops with `simp` — avoid it or use `- Fin.lt_def`. -/
+private lemma insertLeftStep_invCount_term_skip {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2))
+    (i : Fin (p + q)) :
+    let t := (insertLeftIndex ν j).val
+    let r : Fin (p + 1 + q) :=
+      if i.val < t then ⟨i.val, by omega⟩ else ⟨i.val + 1, by omega⟩
+    (if ((insertLeftStep ν j).1 r.castSucc).1 <
+        ((insertLeftStep ν j).1 r.succ).1
+     then ((insertLeftStep ν j).1 r.castSucc).2.val
+     else 0) =
+    (if (ν.1 (Fin.castSucc i)).1 < (ν.1 (Fin.succ i)).1
+     then (ν.1 (Fin.castSucc i)).2.val
+     else 0) := by
+  sorry
+
+/-- **Key inversion-count identity** (additive form, avoiding ℕ subtraction):
+`invCount(insertLeftStep ν j) + j = invCount(ν) + insertLeftIndex(ν, j)`.
+
+Proof sketch: split the invCount sum for the new shuffle at the insertion
+index `t`. The term at `t` contributes `t - j`
+(by `insertLeftStep_invCount_term_at`). Each remaining step `r ≠ t` bijects
+with a step of `ν` having the same contribution
+(by `insertLeftStep_invCount_term_skip`). -/
+private lemma invCount_insertLeftStep_add {p q : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2)) :
+    (insertLeftStep ν j).invCount + j.val =
+    ν.invCount + (insertLeftIndex ν j).val := by
+  set μ := insertLeftStep ν j
+  have hge : j.val ≤ (insertLeftIndex ν j).val := insertLeftIndex_ge ν j
+  have hle : (insertLeftIndex ν j).val ≤ j.val + q := insertLeftIndex_le ν j
+  -- Key: rewrite p+1+q as (p+q)+1 to use Fin.sum_univ_succAbove
+  -- This is valid because p + 1 + q = (p + q) + 1 definitionally in Lean's kernel?
+  -- No — but we can cast via finCongr.
+  -- The insertion index as a Fin ((p+q)+1), if in range
+  -- Since t ≤ j + q ≤ (p+1) + q = p + 1 + q, and p + 1 + q = (p + q) + 1,
+  -- we have t ≤ (p+q) + 1. But we need t < (p+q) + 1, i.e., t ≤ p + q.
+  -- When t = (p+q)+1, the insertion is at the very end.
+  -- Actually, Fin.sum_univ_succAbove splits Fin (n+1) at ANY element of Fin (n+1),
+  -- so we just need t < p + 1 + q. This might not hold when t = p+q+1 = p+1+q.
+  -- Use Finset approach instead: extract element from univ, biject rest.
+  simp only [invCount]
+  -- Use Finset.sum_erase_add to extract one element
+  by_cases ht_in : (insertLeftIndex ν j).val < p + 1 + q
+  · -- Main case: t is a valid step index
+    set t : Fin (p + 1 + q) := ⟨(insertLeftIndex ν j).val, ht_in⟩
+    -- Extract term at t: ∑ = f(t) + (∑ over univ \ {t})
+    rw [← Finset.add_sum_erase _ _ (Finset.mem_univ t)]
+    -- f(t) = t - j by insertLeftStep_invCount_term_at
+    rw [insertLeftStep_invCount_term_at ν j ht_in]
+    -- Biject remaining terms with invCount(ν) via skip map
+    have hskip := insertLeftStep_invCount_term_skip ν j
+    suffices h : ∑ x ∈ Finset.univ.erase t,
+        (if (μ.1 x.castSucc).1 < (μ.1 x.succ).1 then (μ.1 x.castSucc).2.val else 0) =
+      ∑ r : Fin (p + q),
+        (if (ν.1 r.castSucc).1 < (ν.1 r.succ).1 then (ν.1 r.castSucc).2.val else 0) by omega
+    -- φ(i) = if i.val < t then ⟨i, _⟩ else ⟨i+1, _⟩
+    let φ : Fin (p + q) → Fin (p + 1 + q) :=
+      fun i => if h : i.val < (insertLeftIndex ν j).val
+        then ⟨i.val, by omega⟩ else ⟨i.val + 1, by omega⟩
+    apply (Finset.sum_nbij φ _ _ _ _).symm
+    · -- maps into erase t
+      intro i _; simp only [Finset.mem_erase, Finset.mem_univ, and_true, φ]
+      intro heq
+      have : (if h : i.val < (insertLeftIndex ν j).val then (⟨i.val, by omega⟩ : Fin (p+1+q))
+        else ⟨i.val + 1, by omega⟩).val = t.val := congr_arg Fin.val heq
+      have ht_val : t.val = (insertLeftIndex ν j).val := rfl
+      split_ifs at this with h <;> simp at this <;> omega
+    · -- injective
+      intro a _ b _ hab
+      have : (φ a).val = (φ b).val := congr_arg Fin.val hab
+      simp only [φ] at this
+      ext
+      split_ifs at this with ha hb <;> simp at this <;> omega
+    · -- surjective onto erase t
+      intro r hr
+      simp [Finset.mem_erase, Finset.mem_univ, and_true] at hr
+      have hr_ne : r.val ≠ (insertLeftIndex ν j).val := fun h => hr (Fin.ext h)
+      by_cases hrlt : r.val < (insertLeftIndex ν j).val
+      · exact ⟨⟨r.val, by omega⟩, Finset.mem_coe.mpr (Finset.mem_univ _), by
+          show φ ⟨r.val, by omega⟩ = r
+          simp only [φ, hrlt, dite_true];⟩
+      · exact ⟨⟨r.val - 1, by omega⟩, Finset.mem_coe.mpr (Finset.mem_univ _), by
+          show φ ⟨r.val - 1, by omega⟩ = r
+          simp only [φ]; split_ifs with h; · exfalso; omega
+          · exact Fin.ext (by simp; omega)⟩
+    · -- pointwise equality: fν(i) = fμ(φ(i))
+      intro i _; exact (hskip i).symm
+  · -- Boundary case: t = p + 1 + q (insertion at the very end, j = p+1)
+    have hfmu : (if (μ.1 (Fin.castSucc ⟨p + q, by omega⟩)).1 < (μ.1 (Fin.succ ⟨p + q, by omega⟩)).1
+      then (μ.1 (Fin.castSucc ⟨p + q, by omega⟩)).2.val else 0) = q := by sorry
+    set s : Fin (p + 1 + q) := ⟨p + q, by omega⟩
+    rw [← Finset.add_sum_erase _ _ (Finset.mem_univ s), hfmu]
+    have hskip := insertLeftStep_invCount_term_skip ν j
+    suffices h : ∑ x ∈ Finset.univ.erase s,
+        (if (μ.1 x.castSucc).1 < (μ.1 x.succ).1 then (μ.1 x.castSucc).2.val else 0) =
+      ∑ r : Fin (p + q),
+        (if (ν.1 r.castSucc).1 < (ν.1 r.succ).1 then (ν.1 r.castSucc).2.val else 0) by omega
+    let φ : Fin (p + q) → Fin (p + 1 + q) :=
+      fun i => if h : i.val < (insertLeftIndex ν j).val
+        then ⟨i.val, by omega⟩ else ⟨i.val + 1, by omega⟩
+    apply (Finset.sum_nbij φ _ _ _ _).symm
+    · -- maps into erase s
+      intro i _; simp only [Finset.mem_erase, Finset.mem_univ, and_true, φ]
+      intro heq
+      have : (if h : i.val < (insertLeftIndex ν j).val then (⟨i.val, by omega⟩ : Fin (p+1+q))
+        else ⟨i.val + 1, by omega⟩).val = s.val := congr_arg Fin.val heq
+      have hs_val : s.val = p + q := rfl
+      split_ifs at this with h <;> simp at this <;> omega
+    · -- injective
+      intro a _ b _ hab
+      have : (φ a).val = (φ b).val := congr_arg Fin.val hab
+      simp only [φ] at this
+      ext
+      split_ifs at this with ha hb <;> simp at this <;> omega
+    · -- surjective onto erase s
+      intro r hr
+      simp [Finset.mem_erase, Finset.mem_univ, and_true] at hr
+      have hr_ne : r.val ≠ p + q := fun h => hr (Fin.ext h)
+      by_cases hrlt : r.val < (insertLeftIndex ν j).val
+      · exact ⟨⟨r.val, by omega⟩, Finset.mem_coe.mpr (Finset.mem_univ _), by
+          show φ ⟨r.val, by omega⟩ = r
+          simp only [φ, hrlt, dite_true]⟩
+      · exact ⟨⟨r.val - 1, by omega⟩, Finset.mem_coe.mpr (Finset.mem_univ _), by
+          show φ ⟨r.val - 1, by omega⟩ = r
+          simp only [φ]; split_ifs with h; · exfalso; omega
+          · exact Fin.ext (by simp; omega)⟩
+    · -- pointwise equality
+      intro i _; exact (hskip i).symm
+
 /-- Sign relation for left insertion:
-`(insertLeftStep ν j).sign * (-1)^(insertLeftIndex ν j) = (-1)^j * ν.sign`. -/
+`(insertLeftStep ν j).sign * (-1)^(insertLeftIndex ν j) = (-1)^j * ν.sign`.
+
+Derived from `invCount_insertLeftStep_add` via exponent arithmetic:
+the identity `invCount(μ) + j = invCount(ν) + t` gives
+`(-1)^(invCount(μ) + j) = (-1)^(invCount(ν) + t)`, hence
+`sign(μ) * (-1)^j = sign(ν) * (-1)^t`, and multiplying both sides
+by `(-1)^(j+t)` (using `(-1)^(2k) = 1`) yields the result. -/
 lemma sign_insertLeftStep {p q : ℕ}
     (ν : Shuffle p q) (j : Fin (p + 2)) :
     (insertLeftStep ν j).sign * (-1 : ℤ) ^ (insertLeftIndex ν j).val =
