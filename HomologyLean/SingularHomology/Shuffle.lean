@@ -1064,7 +1064,72 @@ private lemma insertLeftStep_invCount_term_skip {p q : ℕ}
     (if (ν.1 (Fin.castSucc i)).1 < (ν.1 (Fin.succ i)).1
      then (ν.1 (Fin.castSucc i)).2.val
      else 0) := by
-  sorry
+  set t := (insertLeftIndex ν j).val
+  by_cases h1 : i.val + 1 < t
+  · -- Case 1: i+1 < t (both endpoints in 'before' region)
+    simp only [show i.val < t from by omega]
+    simp only [if_true, insertLeftStep, insertLeftStepFun, OrderHom.coe_mk]
+    have hcs_val : (⟨↑i, (by omega : ↑i < p + 1 + q)⟩ : Fin (p + 1 + q)).castSucc.val = i.val := by
+      simp [Fin.val_mk]
+    have hsu_val : (⟨↑i, (by omega : ↑i < p + 1 + q)⟩ : Fin (p + 1 + q)).succ.val = i.val + 1 := by
+      simp [Fin.val_mk]
+    split_ifs <;> try omega
+    all_goals simp only [] at *
+    -- Goal 1: .2 values match (Fin proof-irrelevance)
+    · congr 2;
+    -- Goal 2: contradiction (succAbove preserves ordering)
+    · exfalso; rename_i h_sa h_not
+      exact h_not (Fin.succAbove_lt_succAbove_iff.mp (by convert h_sa using 2))
+    -- Goal 3: contradiction (same)
+    · exfalso; rename_i h_sa h_orig
+      exact h_sa (Fin.succAbove_lt_succAbove_iff.mpr (by convert h_orig using 2))
+  · by_cases h2 : i.val < t
+    · -- Case 2: i < t ≤ i+1 (castSucc before, succ at insertion point)
+      simp only [h2]
+      simp only [if_true, insertLeftStep, insertLeftStepFun, OrderHom.coe_mk]
+      have hcs_val : (⟨↑i, (by omega : ↑i < p + 1 + q)⟩ : Fin (p + 1 + q)).castSucc.val = i.val := by
+        simp [Fin.val_mk]
+      have hsu_val : (⟨↑i, (by omega : ↑i < p + 1 + q)⟩ : Fin (p + 1 + q)).succ.val = i.val + 1 := by
+        simp [Fin.val_succ, Fin.val_mk]
+      split_ifs <;> try omega
+      all_goals simp only [] at *
+      · congr 2;
+      · exfalso; rename_i h_sa h_not
+        simp only [hcs_val, hsu_val] at *
+        apply h_not
+        -- (↑ν i.castSucc).1.val < j.val since i < t, and (↑ν i.succ).1.val ≥ j.val since ¬(i+1 < t)
+        have heq1 : (⟨i.val, (by omega : i.val < p + q + 1)⟩ : Fin (p + q + 1)) = i.castSucc := by
+          ext; simp
+        have heq2 : (⟨i.val + 1, (by omega : i.val + 1 < p + q + 1)⟩ : Fin (p + q + 1)) = i.succ := by
+          ext; simp [Fin.val_succ]
+        have h_cs_lt := (insertLeftIndex_iff ν j ⟨i.val, by omega⟩).mpr (by simp; omega)
+        have h_su_ge := mt (insertLeftIndex_iff ν j ⟨i.val + 1, by omega⟩).mp (by simp; omega)
+        rw [heq1] at h_cs_lt; rw [heq2] at h_su_ge
+        push_neg at h_su_ge
+        exact Fin.lt_def.mpr (by omega)
+      · exfalso; rename_i h_sa h_orig
+        simp only [hcs_val, hsu_val] at *
+        apply h_sa
+        rw [Fin.succAbove_lt_iff_castSucc_lt]
+        have heq1 : (⟨i.val, (by omega : i.val < p + q + 1)⟩ : Fin (p + q + 1)) = i.castSucc := by
+          ext; simp
+        have h_cs_lt := (insertLeftIndex_iff ν j ⟨i.val, by omega⟩).mpr (by simp; omega)
+        rw [heq1] at h_cs_lt
+        exact Fin.mk_lt_mk.mpr h_cs_lt
+    · -- Case 3: i ≥ t (both endpoints in 'after' region)
+      simp only [show ¬(i.val < t) from h2]
+      simp only [if_false, insertLeftStep, insertLeftStepFun, OrderHom.coe_mk]
+      have hcs_val : (⟨↑i + 1, (by omega : ↑i + 1 < p + 1 + q)⟩ : Fin (p + 1 + q)).castSucc.val = i.val + 1 := by
+        simp [Fin.val_mk]
+      have hsu_val : (⟨↑i + 1, (by omega : ↑i + 1 < p + 1 + q)⟩ : Fin (p + 1 + q)).succ.val = i.val + 2 := by
+        simp [Fin.val_succ, Fin.val_mk]
+      split_ifs <;> try omega
+      all_goals simp only [] at *
+      · congr 2;
+      · exfalso; rename_i h_sa h_not
+        exact h_not (Fin.succAbove_lt_succAbove_iff.mp (by convert h_sa using 2))
+      · exfalso; rename_i h_sa h_orig
+        exact h_sa (Fin.succAbove_lt_succAbove_iff.mpr (by convert h_orig using 2))
 
 /-- **Key inversion-count identity** (additive form, avoiding ℕ subtraction):
 `invCount(insertLeftStep ν j) + j = invCount(ν) + insertLeftIndex(ν, j)`.
@@ -1140,7 +1205,31 @@ private lemma invCount_insertLeftStep_add {p q : ℕ}
       intro i _; exact (hskip i).symm
   · -- Boundary case: t = p + 1 + q (insertion at the very end, j = p+1)
     have hfmu : (if (μ.1 (Fin.castSucc ⟨p + q, by omega⟩)).1 < (μ.1 (Fin.succ ⟨p + q, by omega⟩)).1
-      then (μ.1 (Fin.castSucc ⟨p + q, by omega⟩)).2.val else 0) = q := by sorry
+      then (μ.1 (Fin.castSucc ⟨p + q, by omega⟩)).2.val else 0) = q := by
+      have ht_eq : (insertLeftIndex ν j).val = p + 1 + q := by omega
+      simp only [μ, insertLeftStep, insertLeftStepFun, OrderHom.coe_mk]
+      split_ifs with h1 h2 h3 h4 h5 h6 <;> simp_all [fin_val_castSucc, Fin.val_succ] <;> try omega
+      -- Remaining: "before" branch for castSucc, "at" branch for succ
+      have hlast : ν.1 ⟨p + q, by omega⟩ = (Fin.last p, Fin.last q) := by
+        have : (⟨p + q, (by omega : p + q < p + q + 1)⟩ : Fin (p + q + 1)) = Fin.last (p + q) :=
+          Fin.ext (by simp [Fin.last])
+        rw [this]; exact Shuffle.apply_last ν
+      simp only [hlast, Fin.last]
+      · exfalso; simp at h2; omega
+      · have heq : (⟨p + q, (by omega : p + q < p + q + 1)⟩ : Fin (p + q + 1)) = Fin.last (p + q) :=
+          Fin.ext (by simp [Fin.last])
+        have h := Shuffle.apply_last ν; rw [← heq] at h
+        show (ν.1 ⟨p + q, _⟩).2.val = q
+        rw [show (ν.1 ⟨p + q, _⟩).2 = (Fin.last q) from congr_arg Prod.snd h]
+        simp [Fin.last]
+      · exfalso
+        have heq : (⟨p + q, (by omega : p + q < p + q + 1)⟩ : Fin (p + q + 1)) = Fin.last (p + q) :=
+          Fin.ext (by simp [Fin.last])
+        have hlast' := Shuffle.apply_last ν; rw [← heq] at hlast'
+        simp only [hlast', Fin.last] at h5
+        have : j.succAbove ⟨p, by omega⟩ < j := by
+          rw [Fin.succAbove_lt_iff_castSucc_lt]; simp [Fin.lt_def]; omega
+        exact not_le.mpr this h5
     set s : Fin (p + 1 + q) := ⟨p + q, by omega⟩
     rw [← Finset.add_sum_erase _ _ (Finset.mem_univ s), hfmu]
     have hskip := insertLeftStep_invCount_term_skip ν j
@@ -1199,6 +1288,48 @@ lemma sign_insertLeftStep {p q : ℕ}
     (j.val + ν.invCount) + 2 * ((insertLeftIndex ν j).val - j.val) from by omega]
   rw [pow_add, pow_mul, neg_one_sq, one_pow, mul_one]
 
+
+
+/-- Right insertion index equals left insertion index on the swapped shuffle. -/
+private lemma insertRightIndex_eq_swap {p q : ℕ}
+    (ν : Shuffle p q) (k : Fin (q + 2)) :
+    (insertRightIndex ν k).val = (insertLeftIndex (ν.swap) k).val := by
+  simp only [insertRightIndex, insertLeftIndex]
+  have : (Finset.univ.filter fun r : Fin (q + p + 1) =>
+      ((ν.swap).1 r).1.val < k.val) =
+    (Finset.univ.filter fun r : Fin (p + q + 1) =>
+      (ν.1 r).2.val < k.val).map (Fin.castOrderIso (by omega)).toEquiv.toEmbedding := by
+    ext x; simp [Finset.mem_filter, swap, Fin.castOrderIso]
+  rw [this, Finset.card_map]
+
+/-- Right insertion is left insertion on the swapped shuffle. -/
+private lemma insertRightStep_eq_swap {p q : ℕ}
+    (ν : Shuffle p q) (k : Fin (q + 2)) :
+    (insertRightStep ν k).swap = insertLeftStep (ν.swap) k := by
+  have hidx := insertRightIndex_eq_swap ν k
+  apply Subtype.ext; ext r
+  all_goals {
+    simp only [swap, insertRightStep, insertLeftStep, insertRightStepFun, insertLeftStepFun,
+      OrderHom.coe_mk, Fin.castOrderIso, Prod.swap]
+    -- The Fin.cast on r preserves .val, so both dite conditions key on r.val vs t
+    -- where t = insertRightIndex = insertLeftIndex (by hidx)
+    have hcast : (Fin.cast (by omega : q + 1 + p + 1 = p + (q + 1) + 1) r).val = r.val := by
+      simp [Fin.cast]
+    set t := (insertRightIndex ν k).val with ht_def
+    set s := (insertLeftIndex (ν.swap) k).val with hs_def
+    have hts : t = s := hidx
+    simp only [swap, insertRightStep, insertLeftStep, insertRightStepFun, insertLeftStepFun,
+      OrderHom.coe_mk, Fin.castOrderIso, Prod.swap, insertRightIndex, insertLeftIndex] at *
+    split_ifs <;> simp_all [Fin.cast, Fin.val_mk] <;> try rfl <;> try omega
+    all_goals (try (congr 1; ext; simp [Fin.cast]; omega))
+    · rename_i h1 h2
+      simp [Fin.cast] at h1 h2
+      exfalso; linarith [ht_def]
+    all_goals (rename_i h1 h2 h3; simp [Fin.cast] at h1 h2 h3; exfalso; try ( linarith [ht_def]))
+    all_goals (exfalso; try omega)
+  }
+
+
 /-- Sign relation for right insertion:
 `(insertRightStep ν k).sign * (-1)^(insertRightIndex ν k) =
  (-1)^p * (-1)^k * ν.sign`. -/
@@ -1206,7 +1337,24 @@ lemma sign_insertRightStep {p q : ℕ}
     (ν : Shuffle p q) (k : Fin (q + 2)) :
     (insertRightStep ν k).sign * (-1 : ℤ) ^ (insertRightIndex ν k).val =
     (-1 : ℤ) ^ p * ((-1 : ℤ) ^ k.val * ν.sign) := by
-  sorry
+  have h1 := sign_eq_negOnePow_mul_swap_sign (insertRightStep ν k)
+  have h2 := insertRightStep_eq_swap ν k
+  have h3 := insertRightIndex_eq_swap ν k
+  have h4 := sign_insertLeftStep (ν.swap) k
+  have h5 := sign_eq_negOnePow_mul_swap_sign ν
+  rw [h1, h2, h3, h5]
+  -- LHS: (-1)^(p*(q+1)) * sign * (-1)^idx
+  -- RHS: (-1)^p * ((-1)^k * ((-1)^(p*q) * swap_sign))
+  -- Use h4: sign * (-1)^idx = (-1)^k * swap_sign
+  -- Then LHS = (-1)^(p*(q+1)) * (-1)^k * swap_sign
+  -- RHS = (-1)^(p + p*q) * (-1)^k * swap_sign, and p*(q+1) = p + p*q
+  calc (-1 : ℤ) ^ (p * (q + 1)) *
+      (insertLeftStep (ν.swap) k).sign * (-1) ^ (insertLeftIndex (ν.swap) k).val
+      = (-1) ^ (p * (q + 1)) *
+        ((insertLeftStep (ν.swap) k).sign * (-1) ^ (insertLeftIndex (ν.swap) k).val) := by ring
+    _ = (-1) ^ (p * (q + 1)) * ((-1) ^ k.val * (ν.swap).sign) := by rw [h4]
+    _ = (-1) ^ p * ((-1) ^ k.val * ((-1) ^ (p * q) * (ν.swap).sign)) := by
+        rw [show p * (q + 1) = p * q + p from by ring, pow_add]; ring
 
 /-! ##### Diagonal cancellation
 
@@ -1243,7 +1391,28 @@ lemma insertLeftStep_not_diagonal {p q : ℕ}
     (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
     ¬isDiagonalVertex (insertLeftStep ν j)
       ((insertLeftIndex ν j).cast (by omega)) := by
-  sorry
+  by_contra h_contra
+  generalize_proofs at *;
+  unfold Shuffle.isDiagonalVertex at h_contra
+  generalize_proofs at *;
+  split_ifs at h_contra ; simp_all +decide [ Shuffle.isLeftStep ];
+  cases h : ( ν.insertLeftIndex j : ℕ ) <;> simp_all +decide [ Fin.castSucc, Fin.succ ];
+  · aesop;
+  · unfold Shuffle.insertLeftStep at * ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
+    unfold Shuffle.insertLeftStepFun at * ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
+    cases h_contra <;> simp_all +decide [ Fin.succAbove ];
+    · split_ifs at * <;> simp_all +decide [ Fin.lt_iff_val_lt_val, Fin.le_iff_val_le_val ];
+      · rename_i k hk₁ hk₂ hk₃ hk₄ hk₅ hk₆
+        generalize_proofs at *; (
+        have := insertLeftIndex_iff ν j ⟨ hk₄ + 1, by linarith ⟩ ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;);
+      · grind;
+      · grind;
+      · linarith! [ ν.1.monotone ( show ⟨ ‹_›, by linarith ⟩ ≤ ⟨ ‹_› + 1, by linarith ⟩ from Nat.le_succ _ ) ];
+    · split_ifs at * <;> simp_all +decide [ Fin.le_iff_val_le_val, Fin.lt_iff_val_lt_val ] ; omega;
+      · linarith! [ Fin.is_lt j ] ;
+      · linarith! [ ν.1.monotone ( show ⟨ ‹_›, by linarith ⟩ ≤ ⟨ ‹_› + 1, by linarith ⟩ from Nat.le_succ _ ) ] ;
+      · have := insertLeftIndex_iff ν j ⟨ ‹_›, by omega ⟩ ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
+        linarith! [ Fin.is_lt j ] ;
 
 /-- Right insertion always produces a non-diagonal vertex: the two steps
 adjacent to the inserted vertex are both right steps (RR pattern). -/
@@ -1251,7 +1420,18 @@ lemma insertRightStep_not_diagonal {p q : ℕ}
     (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
     ¬isDiagonalVertex (insertRightStep ν k)
       ((insertRightIndex ν k).cast (by omega)) := by
-  sorry
+  unfold Shuffle.isDiagonalVertex; simp +decide [ Shuffle.insertRightStep ] ;
+  unfold Shuffle.isLeftStep; intros; simp_all +decide [ Shuffle.insertRightStepFun ] ;
+  split_ifs at * <;> simp_all +decide [ Fin.ext_iff, Fin.val_add, Nat.mod_eq_of_lt ];
+  all_goals erw [ Fin.lt_iff_val_lt_val ] at *; simp_all +decide [ Fin.val_add, Nat.mod_eq_of_lt ] ;
+  any_goals omega;
+  · constructor <;> intro h <;> have := ν.1.monotone ( show ⟨ ( ν.insertRightIndex k : ℕ ) - 1, by omega ⟩ ≤ ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ from Nat.sub_le _ _ ) <;> simp_all +decide [ Fin.le_iff_val_le_val ] ;
+    · have := insertRightIndex_iff ν k ⟨ ( ν.insertRightIndex k : ℕ ) - 1, by omega ⟩ ; simp_all +decide [ Fin.ext_iff, Fin.val_add, Nat.mod_eq_of_lt ] ;
+      have := coordSum_eq ν ⟨ ( ν.insertRightIndex k : ℕ ) - 1, by omega ⟩ ; have := coordSum_eq ν ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ ; simp_all +decide [ Fin.ext_iff, Fin.val_add, Nat.mod_eq_of_lt ] ; omega;
+    · have := coordSum_eq ν ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ ; simp_all +decide [ Fin.add_def, Nat.mod_eq_of_lt ] ;
+      have := ( insertRightIndex_iff ν k ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ ) ; simp_all +decide [ Fin.lt_iff_val_lt_val ] ;
+      omega;
+  · exact absurd ‹_› ( not_le_of_gt ( Nat.pred_lt ( ne_bot_of_gt ‹_› ) ) )
 
 /-- Every non-diagonal vertex of a `(p+1,q+1)`-shuffle is in the image of
 either `insertLeftStep` (from a `(p, q+1)`-shuffle and face index `j`) or
