@@ -2320,13 +2320,180 @@ lemma swapDiagonalSteps_same_map {p q n : ℕ}
   · exact congr_arg Fin.val ( congr_arg Prod.snd ( h_swap_fun i ) )
 
 
-/-- The swap negates the signed coefficient. -/
+/-- The sum `invCount(μ') + invCount(μ)` is odd, where `μ' = swapDiagonalSteps μ r hr`.
+
+Proof sketch: rewrite both invCounts via `invCount_eq_sum_mul_diff` as sums over
+`Fin ((p+1)+(q+1))`.  The swap only changes `μ.1` at position `r`, so the only
+affected summands are at `s = ⟨r.val - 1, _⟩` (where `Fin.succ s = r`) and
+`s = ⟨r.val, _⟩` (where `Fin.castSucc s = r`).  All other summands are equal
+for `μ` and `μ'`, so they contribute an even amount to the combined sum.
+
+For the two affected summands, set `y := (μ.1 ⟨r-1⟩).2.val`.  In the LR case
+(step `r-1` is Left): the four terms are `y, 0, 0, y+1`, summing to `2y+1`.
+In the RL case (step `r-1` is Right): the four terms are `0, y, y+1, 0`,
+also summing to `2y+1`.  Hence the total is even + odd = odd. -/
+private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
+    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (hr : isDiagonalVertex μ r) :
+    Odd ((swapDiagonalSteps μ r hr).invCount + μ.invCount) := by
+  rw [Shuffle.invCount_eq_sum_mul_diff, Shuffle.invCount_eq_sum_mul_diff,
+    ← Finset.sum_add_distrib]
+  let rm1 : Fin ((p + 1) + (q + 1)) := ⟨r.val - 1, by
+    have := isDiagonalVertex_bounds hr; omega⟩
+  let r' : Fin ((p + 1) + (q + 1)) := ⟨r.val, by
+    have := isDiagonalVertex_bounds hr; omega⟩
+  have hne : rm1 ≠ r' := by
+    simp only [rm1, r', ne_eq, Fin.mk.injEq]
+    have := isDiagonalVertex_bounds hr; omega
+  rw [← Finset.sum_sdiff (s₁ := {rm1, r'}) (Finset.subset_univ _),
+      Finset.sum_pair hne]
+  have h_eq : ∀ x ∈ Finset.univ \ ({rm1, r'} : Finset _),
+      ((μ.swapDiagonalSteps r hr).1 x.castSucc).2.val *
+          (((μ.swapDiagonalSteps r hr).1 x.succ).1.val -
+            ((μ.swapDiagonalSteps r hr).1 x.castSucc).1.val) +
+        (μ.1 x.castSucc).2.val * ((μ.1 x.succ).1.val - (μ.1 x.castSucc).1.val) =
+      2 * ((μ.1 x.castSucc).2.val * ((μ.1 x.succ).1.val - (μ.1 x.castSucc).1.val)) := by
+    intro x hx
+    simp only [Finset.mem_sdiff, Finset.mem_univ, Finset.mem_insert,
+      Finset.mem_singleton, true_and, not_or] at hx
+    rw [swapDiagonalSteps_apply_ne μ r hr x.castSucc (by
+          intro h; exact absurd (Fin.ext (show x.val = r'.val by
+            have := congr_arg Fin.val h
+            simpa using this) : x = r') hx.2),
+        swapDiagonalSteps_apply_ne μ r hr x.succ (by
+          intro h; exact absurd (Fin.ext (show x.val = rm1.val by
+            have := congr_arg Fin.val h
+            simp only [Fin.val_succ] at this
+            change x.val = r.val - 1; omega) : x = rm1) hx.1)]
+    ring
+  rw [Finset.sum_congr rfl h_eq, ← Finset.mul_sum]
+  apply Even.add_odd (even_two_mul _)
+  rw [swapDiagonalSteps_apply_ne μ r hr rm1.castSucc (by
+        simp only [rm1, ne_eq, Fin.ext_iff, Fin.val_castSucc]
+        have := isDiagonalVertex_bounds hr; omega),
+      swapDiagonalSteps_apply_ne μ r hr r'.succ (by
+        simp only [r', ne_eq, Fin.ext_iff, Fin.val_succ]
+        omega)]
+  by_cases hL : isLeftStep μ ⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩
+  · have hrm1_succ : rm1.succ = r := Fin.ext (by simp [rm1]; have := isDiagonalVertex_bounds hr; omega)
+    have hr'_castSucc : r'.castSucc = r := Fin.ext (by simp [r'])
+    rw [hrm1_succ, hr'_castSucc, swapDiagonalSteps_apply_r_of_left μ r hr hL]
+    have hstep_rm1 := shuffle_step μ ⟨r.val - 1, by
+      have := isDiagonalVertex_bounds hr; omega⟩
+    have hcs_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).castSucc = rm1.castSucc := by
+      ext; simp [rm1, Fin.val_castSucc]
+    have hsucc_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).succ = r := by
+      ext; simp [Fin.val_succ]; have := isDiagonalVertex_bounds hr; omega
+    rw [hcs_rm1, hsucc_rm1] at hstep_rm1
+    have hfst : (μ.1 rm1.castSucc).1.val + 1 = (μ.1 r).1.val := by
+      rcases hstep_rm1 with ⟨h1, _⟩ | ⟨h1, h2⟩
+      · exact h1
+      · exfalso; unfold isLeftStep at hL; rw [hcs_rm1, hsucc_rm1] at hL; omega
+    have hsnd : (μ.1 rm1.castSucc).2.val = (μ.1 r).2.val := by
+      rcases hstep_rm1 with ⟨_, h2⟩ | ⟨h1, _⟩
+      · exact h2
+      · exfalso; unfold isLeftStep at hL; rw [hcs_rm1, hsucc_rm1] at hL; omega
+    -- Step r is Right (diagonal: r-1 is Left, r is Right), so fst doesn't change
+    have hstep_r := shuffle_step μ ⟨r.val, by
+      have := isDiagonalVertex_bounds hr; omega⟩
+    have hcs_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).castSucc = r := Fin.ext (by simp)
+    have hsucc_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).succ = r'.succ := Fin.ext (by simp [r', Fin.val_succ])
+    rw [hcs_r, hsucc_r] at hstep_r
+    have hnotL_r : ¬isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
+      unfold isDiagonalVertex at hr
+      simp [(isDiagonalVertex_bounds hr).1, (isDiagonalVertex_bounds hr).2] at hr
+      tauto
+    have hfst_r : (μ.1 r'.succ).1.val = (μ.1 r).1.val := by
+      rcases hstep_r with ⟨h1, _⟩ | ⟨h1, _⟩
+      · exfalso; unfold isLeftStep at hnotL_r; rw [hcs_r, hsucc_r] at hnotL_r
+        exact hnotL_r (by omega)
+      · omega
+    simp only [Prod.fst, Prod.snd, Fin.val_mk] at *
+    -- Substitute: fst diff at rm1 is 0 and 1; fst diff at r' is 1 and 0
+    have h1 : (μ.1 r).1.val - 1 - (μ.1 rm1.castSucc).1.val = 0 := by omega
+    have h2 : (μ.1 r).1.val - (μ.1 rm1.castSucc).1.val = 1 := by omega
+    have h3 : (μ.1 r'.succ).1.val - ((μ.1 r).1.val - 1) = 1 := by
+      have := diagonal_left_fst_pos hr hL; omega
+    have h4 : (μ.1 r'.succ).1.val - (μ.1 r).1.val = 0 := by omega
+    rw [h1, h2, h3, h4]
+    simp only [Nat.mul_zero, Nat.mul_one, Nat.zero_add, Nat.add_zero]
+    rw [← hsnd]
+    exact ⟨(μ.1 rm1.castSucc).2.val, by omega⟩
+  · have hrm1_succ : rm1.succ = r := Fin.ext (by
+      simp [rm1]; have := isDiagonalVertex_bounds hr; omega)
+    have hr'_castSucc : r'.castSucc = r := Fin.ext (by simp [r'])
+    rw [hrm1_succ, hr'_castSucc, swapDiagonalSteps_apply_r_of_right μ r hr hL]
+    have hstep_rm1 := shuffle_step μ ⟨r.val - 1, by
+      have := isDiagonalVertex_bounds hr; omega⟩
+    have hcs_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).castSucc = rm1.castSucc := by
+      ext; simp [rm1]
+    have hsucc_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).succ = r := by
+      ext; simp; have := isDiagonalVertex_bounds hr; omega
+    rw [hcs_rm1, hsucc_rm1] at hstep_rm1
+    have hfst : (μ.1 rm1.castSucc).1.val = (μ.1 r).1.val := by
+      rcases hstep_rm1 with ⟨h1, _⟩ | ⟨h1, _⟩
+      · exfalso; unfold isLeftStep at hL; rw [hcs_rm1, hsucc_rm1] at hL
+        exact hL (by omega)
+      · exact h1
+    have hsnd : (μ.1 rm1.castSucc).2.val + 1 = (μ.1 r).2.val := by
+      rcases hstep_rm1 with ⟨h1, _⟩ | ⟨_, h2⟩
+      · exfalso; unfold isLeftStep at hL; rw [hcs_rm1, hsucc_rm1] at hL
+        exact hL (by omega)
+      · exact h2
+    have hstep_r := shuffle_step μ ⟨r.val, by
+      have := isDiagonalVertex_bounds hr; omega⟩
+    have hcs_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).castSucc = r := Fin.ext (by simp)
+    have hsucc_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
+        Fin ((p + 1) + (q + 1))).succ = r'.succ := Fin.ext (by simp [r'])
+    rw [hcs_r, hsucc_r] at hstep_r
+    have hisL_r : isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
+      unfold isDiagonalVertex at hr
+      simp [(isDiagonalVertex_bounds hr).1, (isDiagonalVertex_bounds hr).2] at hr
+      tauto
+    have hfst_r : (μ.1 r'.succ).1.val = (μ.1 r).1.val + 1 := by
+      rcases hstep_r with ⟨h1, _⟩ | ⟨h1, _⟩
+      · omega
+      · exfalso; unfold isLeftStep at hisL_r; rw [hcs_r, hsucc_r] at hisL_r; omega
+    simp only [Prod.fst, Prod.snd, Fin.val_mk] at *
+    have h1 : (μ.1 r).1.val + 1 - (μ.1 rm1.castSucc).1.val = 1 := by omega
+    have h2 : (μ.1 r).1.val - (μ.1 rm1.castSucc).1.val = 0 := by omega
+    have h3 : (μ.1 r'.succ).1.val - ((μ.1 r).1.val + 1) = 0 := by omega
+    have h4 : (μ.1 r'.succ).1.val - (μ.1 r).1.val = 1 := by omega
+    rw [h1, h2, h3, h4]
+    simp only [Nat.mul_zero, Nat.mul_one, Nat.zero_add, Nat.add_zero]
+    rw [← hsnd]
+    exact ⟨(μ.1 rm1.castSucc).2.val, by omega⟩
+
+/-- The swap negates the signed coefficient.
+
+Derives from `swapDiagonalSteps_invCount_sum_odd`: since the invCount sum is
+odd, `(-1)^invCount' * (-1)^invCount = -1`, and multiplying both sides by
+`(-1)^invCount` (which squares to 1) gives `(-1)^invCount' = -(-1)^invCount`. -/
 lemma swapDiagonalSteps_neg_sign {p q : ℕ}
     (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
     (hr : isDiagonalVertex μ r) :
     (swapDiagonalSteps μ r hr).sign  =
     -(μ.sign) := by
-  sorry
+  unfold sign
+  have key : (-1 : ℤ) ^ (swapDiagonalSteps μ r hr).invCount *
+      (-1 : ℤ) ^ μ.invCount = -1 := by
+    rw [← pow_add]; exact Odd.neg_one_pow (swapDiagonalSteps_invCount_sum_odd μ r hr)
+  have sq : (-1 : ℤ) ^ μ.invCount * (-1 : ℤ) ^ μ.invCount = 1 := by
+    rw [← mul_pow]; norm_num
+  calc (-1 : ℤ) ^ (swapDiagonalSteps μ r hr).invCount
+      = _ * 1 := (mul_one _).symm
+    _ = _ * ((-1) ^ μ.invCount * (-1) ^ μ.invCount) := by rw [sq]
+    _ = (_ * (-1) ^ μ.invCount) * (-1) ^ μ.invCount := by
+        rw [mul_assoc]
+    _ = -1 * (-1) ^ μ.invCount := by rw [key]
+    _ = -((-1) ^ μ.invCount) := neg_one_mul _
 
 /-- The swap involution is never the identity: swapping two steps of different
 type always produces a distinct shuffle. -/
