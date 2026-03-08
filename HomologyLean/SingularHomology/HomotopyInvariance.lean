@@ -662,29 +662,16 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
   -- Finish by rewriting the LHS using `hmap` and `hprod`.
   simp [hmap, hprod]
 
-/-- Composing `.d i j` with an `eqToHom` on the codomain gives `.d i j'`
-where `j'` is the transported index. -/
-lemma HomologicalComplex.d_comp_eqToHom
-    {ι : Type*} {c : ComplexShape ι} {A : Type*} [Category A] [HasZeroMorphisms A]
-    (K : HomologicalComplex A c) {i j j' : ι} (h : j = j') :
-    K.d i j ≫ eqToHom (congrArg K.X h) = K.d i j' := by
-  subst h; simp
-
-/-- Composing an `eqToHom` on the domain with `.d` gives `.d i' j`. -/
-lemma HomologicalComplex.eqToHom_comp_d
-    {ι : Type*} {c : ComplexShape ι} {A : Type*} [Category A] [HasZeroMorphisms A]
-    (K : HomologicalComplex A c) {i i' j : ι} (h : i = i') :
-    eqToHom (congrArg K.X h) ≫ K.d i' j = K.d i j := by
-  subst h; simp
-
 /-- The boundary map of `singChain` equals the alternating face map differential.
 This avoids unfolding `singChain`/`SCF` through deep functor composition. -/
-lemma singChain_d_eq_alternatingFaceMapObjD (X : TopCat.{v}) (n : ℕ) :
-    (singChain (C := C) (R := R) X).d (n + 1) n =
+lemma singChain_d_eq_alternatingFaceMapObjD (X : TopCat.{v}) (n : ℕ) {m : ℕ} (hm : m = n + 1) :
+    (singChain (C := C) (R := R) X).d m n =
+    eqToHom (congrArg (singChain (C := C) (R := R) X).X hm) ≫
     AlternatingFaceMapComplex.objD
       (((SimplicialObject.whiskering (Type v) C).obj
         ((sigmaConst (C := C)).obj R)).obj (TopCat.toSSet.obj X)) n := by
-  simp only [singChain]
+  subst hm
+  simp only [eqToHom_refl, Category.id_comp, singChain]
   dsimp [singularChainComplexFunctor, SSet.singularChainComplexFunctor]
   rw [alternatingFaceMapComplex_obj_d]
   rfl
@@ -780,32 +767,8 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             ⟪𝟙 Δ[p + 1]⟫ₛ
             ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ := by
   simp only [universalSimplexCrossProduct, Preadditive.sum_comp, Preadditive.zsmul_comp]
-  apply (cancel_mono (eqToHom (congrArg (singChain (C := C) (R := R)
-    (Δ[p + 1] ⨯ Δ[q + 1])).X (show p + (q + 1) = p + q + 1 from by omega)))).mp
-  simp_rw [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
-  have hd_eq : (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-      (p + 1 + (q + 1)) (p + (q + 1)) ≫
-      eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
-        (show p + (q + 1) = p + q + 1 from by omega)) =
-    (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-      (p + 1 + (q + 1)) (p + q + 1) :=
-    HomologicalComplex.d_comp_eqToHom _ (show p + (q + 1) = p + q + 1 from by omega)
-  simp_rw [show ∀ (f : R ⟶ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
-      (p + 1 + (q + 1))),
-      f ≫ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-        (p + 1 + (q + 1)) (p + (q + 1)) ≫
-        eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
-          (show p + (q + 1) = p + q + 1 from by omega)) =
-      f ≫ (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-        (p + 1 + (q + 1)) (p + q + 1) from
-    fun f => by rw [hd_eq]]
-  have hrel : (p + 1 + (q + 1) : ℕ) = (p + q + 1) + 1 := by omega
-  conv_lhs => rw [show (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-      (p + 1 + (q + 1)) (p + q + 1) =
-      eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X hrel) ≫
-      (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + q + 1) + 1) (p + q + 1) from
-    (HomologicalComplex.eqToHom_comp_d _ hrel).symm]
-  rw [singChain_d_eq_alternatingFaceMapObjD]
+  have hrel : (p + 1 + (q + 1) : ℕ) = (p + (q + 1)) + 1 := by omega
+  rw [singChain_d_eq_alternatingFaceMapObjD _ _ hrel]
   simp only [AlternatingFaceMapComplex.objD]
   simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
   -- Step 1: Functoriality — rewrite coprojection ≫ eqToHom ≫ δ as coprojection(δ ∘ σ)
@@ -839,7 +802,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   simp only [prod.map_map, Category.comp_id]
   conv_rhs =>
     -- First sum: 𝟙 ≫ toTop.map (δ x) → toTop.map (δ x) in left face
-    enter [1, 1, 2, x, 2, 2, x_1, 2, 1, 1, 2, 1]
+    enter [1, 2, x, 2, 2, x_1, 2, 1, 1, 2, 1]
     erw [Category.id_comp]
   -- (Previously rewrote 𝟙 ≫ δ x in the second sum's prod.map, but after the n-param
   -- refactor the 𝟙 is inside the ▸-transport and no longer composes with δ x directly.)
@@ -848,8 +811,8 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   -- Step 4: Split inner sum into diagonal + non-diagonal vertices.
   -- The inner sum is over Fin (p+q+1+2) but isDiagonalVertex expects Index ((p+1)+(q+1)),
   -- so we cast via Fin.cast.
-  let isDiag := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + q + 1 + 2)) =>
-    Shuffle.isDiagonalVertex μ (r.cast (show p + q + 1 + 2 = (p + 1) + (q + 1) + 1 from by omega))
+  let isDiag := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + (q + 1) + 2)) =>
+    Shuffle.isDiagonalVertex μ (r.cast (show p + (q + 1) + 2 = (p + 1) + (q + 1) + 1 from by omega))
   haveI isDiag_dec : ∀ μ, DecidablePred (isDiag μ) :=
     fun μ r => Shuffle.isDiagonalVertex_decidable μ _
   conv_lhs =>
@@ -882,8 +845,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
               Fin.val_cast] at h_val
             exact absurd (Fin.ext h_val) (Fin.succAbove_ne r k)))
       (fun μ r h => Shuffle.swapDiagonalSteps_ne μ (r.cast (by omega)) h)
-  · rw [Preadditive.add_comp]
-    -- Split non-diagonal sum into left-type + right-type vertices.
+  · -- Split non-diagonal sum into left-type + right-type vertices.
     -- isLeftType checks whether the step at (or just before) vertex r is a left step.
     let isLeftType := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + q + 1 + 2)) =>
       Shuffle.isLeftStep μ ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩
@@ -895,9 +857,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         (Finset.univ.filter (fun r => ¬isDiag x r)) (isLeftType x) _).symm]
     simp_rw [Finset.sum_add_distrib]
     congr 1
-    · simp only [Preadditive.sum_comp, Preadditive.zsmul_comp]
-      simp only [eqToHom_refl, Category.comp_id]
-      rw [← Fintype.sum_prod_type']
+    · rw [← Fintype.sum_prod_type']
       rw [Finset.sum_sigma']
       apply Finset.sum_nbij
         (fun x => ⟨Shuffle.insertLeftStep x.2 x.1,
@@ -953,9 +913,6 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             show SimplexCategory.toTop.map (eqToHom _) = eqToHom _ from eqToHom_map _ _]
           exact (shuffleStdSimplexMap_insertLeft_face ν j).symm
     · -- Right-type case: analogous to left-type via insertRightStep/insertRightIndex
-      -- Step 1: Push eqToHom through the sums
-      simp only [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
-      simp only [eqToHom_refl, Category.comp_id]
       rw [← Fintype.sum_prod_type']
       rw [Finset.sum_sigma']
       apply Finset.sum_nbij
