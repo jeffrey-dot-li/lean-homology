@@ -1501,7 +1501,162 @@ lemma nondiag_mem_insertLeft_or_insertRight {p q : ℕ}
           sorry
       sorry
     · sorry -- RR case: both steps are right steps → right insertion
-  · sorry -- r = last (boundary)
+  · -- r = last boundary case: r.val = (p+1)+(q+1)
+    have hrlast : r.val = (p + 1) + (q + 1) := by omega
+    by_cases hL : isLeftStep ⟨val, property⟩ ⟨(p + 1) + (q + 1) - 1, by omega⟩
+    · -- last step is left → left insertion at j = Fin.last (p+1)
+      left; refine ⟨Fin.last (p + 1), ?_⟩
+      have hcslast : (val ⟨(p+1)+(q+1), by omega⟩).1.val +
+          (val ⟨(p+1)+(q+1), by omega⟩).2.val = (p+1)+(q+1) :=
+        coordSum_eq ⟨val, property⟩ ⟨(p+1)+(q+1), by omega⟩
+      have hvallast_1 : (val ⟨(p+1)+(q+1), by omega⟩).1.val = p + 1 := by
+        have h1 := (val ⟨(p+1)+(q+1), by omega⟩).1.isLt
+        have h2 := (val ⟨(p+1)+(q+1), by omega⟩).2.isLt; omega
+      have hvallast_2 : (val ⟨(p+1)+(q+1), by omega⟩).2.val = q + 1 := by omega
+      have hfst_lt : ∀ (i : Fin (p + (q + 1) + 1)),
+          (val ⟨i.val, by omega⟩).1.val < p + 1 := by
+        intro i
+        have hmon : val ⟨i.val, by omega⟩ ≤ val ⟨(p+1)+(q+1) - 1, by omega⟩ :=
+          val.monotone (Fin.mk_le_mk.mpr (by omega))
+        simp only [Prod.le_def, Fin.le_def] at hmon
+        have hL' : (val ⟨(p+1)+(q+1) - 1, by omega⟩).1.val <
+            (val ⟨(p+1)+(q+1), by omega⟩).1.val := by
+          unfold isLeftStep at hL; dsimp at hL
+          convert hL using 2 <;> congr 1 <;> ext <;> simp
+        omega
+      let νOH : Fin (p + (q + 1) + 1) →o (Index p × Index (q + 1)) :=
+        ⟨fun i => (⟨(val ⟨i.val, by omega⟩).1.val, by
+                    have := hfst_lt i; omega⟩,
+                   (val ⟨i.val, by omega⟩).2), by
+          intro a b hab
+          simp only [Prod.le_def, Fin.le_def]
+          have hmab : val ⟨a.val, by omega⟩ ≤ val ⟨b.val, by omega⟩ :=
+            val.monotone (Fin.mk_le_mk.mpr (by omega))
+          simp only [Prod.le_def, Fin.le_def] at hmab
+          constructor <;> omega⟩
+      have νInj : Function.Injective νOH := by
+        intro a b hab
+        simp only [νOH, OrderHom.coe_mk, Prod.mk.injEq, Fin.ext_iff] at hab
+        have heq : val ⟨a.val, by omega⟩ = val ⟨b.val, by omega⟩ :=
+          Prod.ext (Fin.ext (by omega)) (Fin.ext (by omega))
+        exact Fin.ext (by have := property heq; simp [Fin.ext_iff] at this; omega)
+      refine ⟨νOH, νInj, ?eq_insert, ?idx_eq⟩
+      case eq_insert =>
+        have htlast : (insertLeftIndex ⟨νOH, νInj⟩ (Fin.last (p + 1))).val =
+            (p + 1) + (q + 1) := by
+          simp only [insertLeftIndex, Fin.val_last]
+          have : ∀ x : Fin (p + (q + 1) + 1), ↑(νOH x).1 < p + 1 :=
+            fun x => Nat.lt_of_lt_of_le (νOH x).1.isLt (by omega)
+          rw [Finset.filter_true_of_mem (fun x _ => this x), Finset.card_univ,
+            Fintype.card_fin]
+          omega
+        apply Subtype.ext; apply OrderHom.ext; funext i
+        change val i = insertLeftStepFun ⟨νOH, νInj⟩ (Fin.last (p + 1)) i
+        unfold insertLeftStepFun
+        by_cases hi : i.val < (p + 1) + (q + 1)
+        · rw [dif_pos (by omega)]
+          simp only [νOH, OrderHom.coe_mk]
+          refine Prod.ext (Fin.ext ?_) rfl
+          simp only [Fin.succAbove, Fin.lt_def, Fin.val_last]
+          split
+          · simp [Fin.val_castSucc]
+          · rename_i hge
+            simp [Fin.val_succ] at hge ⊢
+            have h1 : ↑(val i).1 < p + 1 := hfst_lt ⟨i.val, by omega⟩
+            omega
+        · rw [dif_neg (by omega)]
+          have hilast : i.val = (p + 1) + (q + 1) := by omega
+          rw [dif_pos (by omega)]
+          have hi_eq : i = ⟨(p+1)+(q+1), by omega⟩ := Fin.ext hilast
+          simp only [hi_eq]
+          refine Prod.ext (Fin.ext ?_) (Fin.ext ?_)
+          · simp [Fin.val_last]; exact hvallast_1
+          · simp [Fin.val_last]; omega
+      case idx_eq =>
+        simp only [insertLeftIndex, Fin.val_last, hrlast]
+        have : ∀ x : Fin (p + (q + 1) + 1), ↑(νOH x).1 < p + 1 :=
+          fun x => Nat.lt_of_lt_of_le (νOH x).1.isLt (by omega)
+        rw [Finset.filter_true_of_mem (fun x _ => this x), Finset.card_univ,
+          Fintype.card_fin]
+        omega
+    · -- last step is right → right insertion at k = Fin.last (q+1)
+      right; refine ⟨Fin.last (q + 1), ?_⟩
+      have hcslast : (val ⟨(p+1)+(q+1), by omega⟩).1.val +
+          (val ⟨(p+1)+(q+1), by omega⟩).2.val = (p+1)+(q+1) :=
+        coordSum_eq ⟨val, property⟩ ⟨(p+1)+(q+1), by omega⟩
+      have hvallast_1 : (val ⟨(p+1)+(q+1), by omega⟩).1.val = p + 1 := by
+        have h1 := (val ⟨(p+1)+(q+1), by omega⟩).1.isLt
+        have h2 := (val ⟨(p+1)+(q+1), by omega⟩).2.isLt; omega
+      have hvallast_2 : (val ⟨(p+1)+(q+1), by omega⟩).2.val = q + 1 := by omega
+      have hsnd_lt : ∀ (i : Fin ((p + 1) + q + 1)),
+          (val ⟨i.val, by omega⟩).2.val < q + 1 := by
+        intro i
+        have hmon : val ⟨i.val, by omega⟩ ≤ val ⟨(p+1)+(q+1) - 1, by omega⟩ :=
+          val.monotone (Fin.mk_le_mk.mpr (by omega))
+        simp only [Prod.le_def, Fin.le_def] at hmon
+        have hstep := shuffle_step ⟨val, property⟩
+          ⟨(p+1)+(q+1) - 1, by omega⟩
+        have hR' : (val ⟨(p+1)+(q+1) - 1, by omega⟩).2.val <
+            (val ⟨(p+1)+(q+1), by omega⟩).2.val := by
+          rcases hstep with ⟨h1, _⟩ | ⟨_, h2⟩
+          · exfalso; unfold isLeftStep at hL; exact hL (by dsimp at h1 ⊢; omega)
+          · dsimp at h2 ⊢; omega
+        omega
+      let νOH : Fin ((p + 1) + q + 1) →o (Index (p + 1) × Index q) :=
+        ⟨fun i => ((val ⟨i.val, by omega⟩).1,
+                   ⟨(val ⟨i.val, by omega⟩).2.val, by
+                    have := hsnd_lt i; omega⟩), by
+          intro a b hab
+          simp only [Prod.le_def, Fin.le_def]
+          have hmab : val ⟨a.val, by omega⟩ ≤ val ⟨b.val, by omega⟩ :=
+            val.monotone (Fin.mk_le_mk.mpr (by omega))
+          simp only [Prod.le_def, Fin.le_def] at hmab
+          constructor <;> omega⟩
+      have νInj : Function.Injective νOH := by
+        intro a b hab
+        simp only [νOH, OrderHom.coe_mk, Prod.mk.injEq, Fin.ext_iff] at hab
+        have heq : val ⟨a.val, by omega⟩ = val ⟨b.val, by omega⟩ :=
+          Prod.ext (Fin.ext (by omega)) (Fin.ext (by omega))
+        exact Fin.ext (by have := property heq; simp [Fin.ext_iff] at this; omega)
+      refine ⟨νOH, νInj, ?eq_insert, ?idx_eq⟩
+      case eq_insert =>
+        have htlast : (insertRightIndex ⟨νOH, νInj⟩ (Fin.last (q + 1))).val =
+            (p + 1) + (q + 1) := by
+          simp only [insertRightIndex, Fin.val_last]
+          have : ∀ x : Fin ((p + 1) + q + 1), ↑(νOH x).2 < q + 1 :=
+            fun x => Nat.lt_of_lt_of_le (νOH x).2.isLt (by omega)
+          rw [Finset.filter_true_of_mem (fun x _ => this x), Finset.card_univ,
+            Fintype.card_fin]
+          omega
+        apply Subtype.ext; apply OrderHom.ext; funext i
+        change val i = insertRightStepFun ⟨νOH, νInj⟩ (Fin.last (q + 1)) i
+        unfold insertRightStepFun
+        by_cases hi : i.val < (p + 1) + (q + 1)
+        · rw [dif_pos (by omega)]
+          simp only [νOH, OrderHom.coe_mk]
+          refine Prod.ext rfl (Fin.ext ?_)
+          simp only [Fin.succAbove, Fin.lt_def, Fin.val_last]
+          split
+          · simp [Fin.val_castSucc]
+          · rename_i hge
+            simp [Fin.val_succ] at hge ⊢
+            have h1 : ↑(val i).2 < q + 1 := hsnd_lt ⟨i.val, by omega⟩
+            omega
+        · rw [dif_neg (by omega)]
+          have hilast : i.val = (p + 1) + (q + 1) := by omega
+          rw [dif_pos (by omega)]
+          have hi_eq : i = ⟨(p+1)+(q+1), by omega⟩ := Fin.ext hilast
+          simp only [hi_eq]
+          refine Prod.ext (Fin.ext ?_) (Fin.ext ?_)
+          · simp [Fin.val_last]; exact hvallast_1
+          · simp [Fin.val_last]; omega
+      case idx_eq =>
+        simp only [insertRightIndex, Fin.val_last, hrlast]
+        have : ∀ x : Fin ((p + 1) + q + 1), ↑(νOH x).2 < q + 1 :=
+          fun x => Nat.lt_of_lt_of_le (νOH x).2.isLt (by omega)
+        rw [Finset.filter_true_of_mem (fun x _ => this x), Finset.card_univ,
+          Fintype.card_fin]
+        omega
   · -- r = 0 boundary case
     have hr0 : r.val = 0 := by omega
     by_cases hL : isLeftStep ⟨val, property⟩ ⟨0, by omega⟩
@@ -1586,7 +1741,82 @@ lemma nondiag_mem_insertLeft_or_insertRight {p q : ℕ}
         intro x _
         simp only [νOH, OrderHom.coe_mk, Fin.val_mk, Fin.val_zero]
         omega
-    · sorry -- first step is right
+    · -- first step is right → right insertion at k = 0
+      right; refine ⟨0, ?_⟩
+      -- ν is the "tail": ν(i) = (μ(i+1).1, μ(i+1).2 - 1)
+      -- First step being right means μ(0).2 = 0 and μ(1).2 = 1
+      -- so μ(i).2 ≥ 1 for i ≥ 1, making the subtraction safe.
+      have hcs0 : (val ⟨0, by omega⟩).1.val + (val ⟨0, by omega⟩).2.val = 0 :=
+        coordSum_eq ⟨val, property⟩ ⟨0, by omega⟩
+      have hval0_1 : (val ⟨0, by omega⟩).1.val = 0 := by omega
+      have hval0_2 : (val ⟨0, by omega⟩).2.val = 0 := by omega
+      have hR : (val ⟨0, by omega⟩).2.val < (val ⟨1, by omega⟩).2.val := by
+        have hstep := shuffle_step ⟨val, property⟩ ⟨0, by omega⟩
+        unfold isLeftStep at hL
+        rcases hstep with ⟨h1, _⟩ | ⟨_, h2⟩
+        · exfalso; exact hL (by dsimp at h1 ⊢; omega)
+        · dsimp at h2 ⊢; omega
+      have hsnd_pos : ∀ (i : Fin ((p + 1) + q + 1)), 1 ≤ (val ⟨i.val + 1, by omega⟩).2.val := by
+        intro i
+        have hmon : val ⟨1, by omega⟩ ≤ val ⟨i.val + 1, by omega⟩ :=
+          val.monotone (by simp [Fin.le_def])
+        simp only [Prod.le_def, Fin.le_def] at hmon; omega
+      -- Build the sub-shuffle: ν(i) = (μ(i+1).1, μ(i+1).2 - 1)
+      let νOH : Fin ((p + 1) + q + 1) →o (Index (p + 1) × Index q) :=
+        ⟨fun i => ((val ⟨i.val + 1, by omega⟩).1,
+                   ⟨(val ⟨i.val + 1, by omega⟩).2.val - 1, by omega⟩), by
+          intro a b hab
+          simp only [Prod.le_def, Fin.le_def]
+          have hmab : val ⟨a.val + 1, by omega⟩ ≤ val ⟨b.val + 1, by omega⟩ :=
+            val.monotone (Fin.mk_le_mk.mpr (by omega))
+          simp only [Prod.le_def, Fin.le_def] at hmab
+          constructor <;> omega⟩
+      have νInj : Function.Injective νOH := by
+        intro a b hab
+        simp only [νOH, OrderHom.coe_mk, Prod.mk.injEq, Fin.ext_iff] at hab
+        have ha := hsnd_pos a; have hb := hsnd_pos b
+        have heq : val ⟨a.val + 1, by omega⟩ = val ⟨b.val + 1, by omega⟩ :=
+          Prod.ext (Fin.ext (by omega)) (Fin.ext (by omega))
+        exact Fin.ext (by have := property heq; simp [Fin.ext_iff] at this; omega)
+      let ν : Shuffle (p + 1) q := ⟨νOH, νInj⟩
+      refine ⟨νOH, νInj, ?eq_insert, ?idx_eq⟩
+      case eq_insert =>
+        have ht0 : (insertRightIndex ⟨νOH, νInj⟩ 0).val = 0 := by
+          simp only [insertRightIndex, Fin.val_zero]
+          apply Finset.card_eq_zero.mpr
+          rw [Finset.filter_eq_empty_iff]
+          intro x _
+          simp only [νOH, OrderHom.coe_mk, Fin.val_mk]
+          omega
+        apply Subtype.ext; apply OrderHom.ext; funext i
+        change val i = insertRightStepFun ⟨νOH, νInj⟩ 0 i
+        unfold insertRightStepFun
+        rw [dif_neg (by omega : ¬(i.val < (insertRightIndex ⟨νOH, νInj⟩ 0).val))]
+        by_cases hi : i.val = 0
+        · rw [dif_pos (by omega)]
+          have hi0 : i = ⟨0, by omega⟩ := Fin.ext hi
+          simp only [hi0, Fin.val_zero, Nat.sub_zero]
+          exact Prod.ext (Fin.ext hval0_1) (Fin.ext hval0_2)
+        · rw [dif_neg (by omega)]
+          simp only [νOH, OrderHom.coe_mk]
+          have hsp := hsnd_pos ⟨i.val - 1, by omega⟩
+          have him1v : i.val - 1 + 1 = i.val := by omega
+          have hval_eq : val ⟨i.val - 1 + 1, by omega⟩ = val i :=
+            congrArg val (Fin.ext him1v)
+          simp only [hval_eq]
+          refine Prod.ext rfl (Fin.ext ?_)
+          simp only [Fin.succAbove, Fin.lt_def, Fin.val_zero]
+          split
+          · rename_i hlt; simp [fin_val_castSucc] at hlt
+          · simp only [Fin.val_succ, Fin.val_mk]
+            simp only [hval_eq] at hsp; omega
+      case idx_eq =>
+        simp only [insertRightIndex, hr0]
+        apply Finset.card_eq_zero.mpr
+        rw [Finset.filter_eq_empty_iff]
+        intro x _
+        simp only [νOH, OrderHom.coe_mk, Fin.val_mk, Fin.val_zero]
+        omega
 
 /- The images of `insertLeftStep` and `insertRightStep` are disjoint:
 no `(p+1,q+1)`-shuffle with a given vertex index can arise from both
