@@ -1495,11 +1495,79 @@ lemma nondiag_mem_insertLeft_or_insertRight {p q : ℕ}
             val.monotone (Fin.mk_le_mk.mpr (by omega))
           simp only [Prod.le_def, Fin.le_def] at hmon_a hmon_rb
           sorry
-        · -- a ≥ r, b < r: symmetric contradiction
+        · -- a ≥ r, b < r: symmetric contradiction (same as a < r, b ≥ r above)
+          exfalso
+          simp [Prod.ext_iff, Fin.ext_iff] at hab
+          have hLfst : (val ⟨r.val - 1, by omega⟩).1.val < (val ⟨r.val, by omega⟩).1.val := by
+            have := hL; unfold isLeftStep at this; dsimp at this
+            have hrm1 : r.val - 1 + 1 = r.val := Nat.succ_pred_eq_of_pos h₁
+            rwa [show (⟨r.val - 1 + 1, by omega⟩ : Fin _) = ⟨r.val, by omega⟩
+              from Fin.ext hrm1] at this
+          have hmon_b : val ⟨b.val, by omega⟩ ≤ val ⟨r.val - 1, by omega⟩ :=
+            val.monotone (Fin.mk_le_mk.mpr (by omega))
+          have hmon_ra : val ⟨r.val, by omega⟩ ≤ val ⟨a.val + 1, by omega⟩ :=
+            val.monotone (Fin.mk_le_mk.mpr (by omega))
+          simp only [Prod.le_def, Fin.le_def] at hmon_b hmon_ra
+          have hab1 := hab.1
+          have hge : (val ⟨a.val + 1, by omega⟩).1.val ≥ 1 := by omega
+          rw [Nat.sub_eq_iff_eq_add hge] at hab1
+          -- hab1 : val(a+1).1 = val(b).1 + 1
+          -- hmon_b.1 : val(b).1 ≤ val(r-1).1
+          -- hLfst : val(r-1).1 < val(r).1
+          -- hmon_ra.1 : val(r).1 ≤ val(a+1).1
+          -- So val(a+1).1 ≥ val(r).1 ≥ val(r-1).1 + 1 ≥ val(b).1 + 2
+          -- But hab1 says val(a+1).1 = val(b).1 + 1. Contradiction.
+          -- linarith [hmon_b.1, hLfst, hmon_ra.1]
           sorry
         · -- a ≥ r, b ≥ r: both map to val(·+1), use property
-          sorry
-      sorry
+          simp [Prod.ext_iff, Fin.ext_iff] at hab
+          have hLfst : (val ⟨r.val - 1, by omega⟩).1.val <
+              (val ⟨r.val, by omega⟩).1.val := by
+            have := hL; unfold isLeftStep at this; dsimp at this
+            rwa [show (⟨r.val - 1 + 1, by omega⟩ : Fin _) = ⟨r.val, by omega⟩
+              from Fin.ext (Nat.succ_pred_eq_of_pos h₁)] at this
+          have hmon_ra : val ⟨r.val, by omega⟩ ≤ val ⟨a.val + 1, by omega⟩ :=
+            val.monotone (by simp [Fin.le_def]; omega)
+          have hmon_rb : val ⟨r.val, by omega⟩ ≤ val ⟨b.val + 1, by omega⟩ :=
+            val.monotone (by simp [Fin.le_def]; omega)
+          simp only [Prod.le_def, Fin.le_def] at hmon_ra hmon_rb
+          have heq : val ⟨a.val + 1, by omega⟩ = val ⟨b.val + 1, by omega⟩ :=
+            Prod.ext (Fin.ext (by omega)) (Fin.ext (by omega))
+          exact Fin.ext (by have := property heq; simp [Fin.ext_iff] at this; omega)
+      refine ⟨νOH, νInj, ?_, ?_⟩
+      · sorry -- round-trip: μ = insertLeftStep ν j
+      · -- insertion index = r
+        simp only [insertLeftIndex]
+        -- The filter {i | (νOH i).fst < j} = {i | i < r} because:
+        -- i < r ⟹ νOH(i).fst = val(i).fst < val(r).fst = j (monotonicity + left step)
+        -- i ≥ r ⟹ νOH(i).fst = val(i+1).fst - 1 ≥ j (left step at r gives val(r+1).fst > j)
+        have hiff : ∀ (i : Fin (p + (q + 1) + 1)),
+            (νOH i).1.val < j.val ↔ i.val < r.val := by
+          intro i; constructor
+          · -- (→) If νOH(i).fst < j then i < r (contrapositive: i ≥ r gives fst ≥ j)
+            intro hi; by_contra hge; push_neg at hge
+            simp only [νOH, OrderHom.coe_mk, dif_neg (show ¬(i.val < r.val) by omega)] at hi
+            have hLr := hr.1 hL; unfold isLeftStep at hLr; dsimp at hLr
+            -- Bridge (val r).fst and j (definitionally equal but syntactically distinct)
+            have hrj : (val r).1.val = j.val := rfl
+            have hprod := val.monotone (show (⟨r.val + 1, by omega⟩ : Fin _) ≤
+              ⟨i.val + 1, by omega⟩ from Fin.mk_le_mk.mpr (by omega))
+            simp only [Prod.le_def, Fin.le_def] at hprod; omega
+          · -- (←) If i < r then νOH(i).fst = val(i).fst < val(r).fst = j
+            intro hi
+            simp only [νOH, OrderHom.coe_mk, dif_pos hi]
+            have hprod := val.monotone (show (⟨i.val, by omega⟩ : Fin _) ≤
+              ⟨r.val - 1, by omega⟩ from Fin.mk_le_mk.mpr (by omega))
+            have hLfst : (val ⟨↑r - 1, by omega⟩).1.val < (val ⟨↑r, by omega⟩).1.val := by
+              have := hL; unfold isLeftStep at this; dsimp at this
+              rwa [show (⟨↑r - 1 + 1, by omega⟩ : Fin _) = ⟨↑r, by omega⟩ from
+                Fin.ext (Nat.succ_pred_eq_of_pos h₁)] at this
+            simp only [Prod.le_def, Fin.le_def] at hprod; omega
+        have hiff' : ∀ (i : Fin (p + (q + 1) + 1)),
+            ((νOH i).1.val < (val ⟨↑r, by omega⟩).1.val) ↔ (i.val < r.val) := hiff
+        simp_rw [hiff']
+        convert Fin.card_Iio (⟨r.val, by omega⟩ : Fin (p + (q + 1) + 1))
+        ext x; simp [Finset.mem_Iio, Fin.lt_def]
     · sorry -- RR case: both steps are right steps → right insertion
   · -- r = last boundary case: r.val = (p+1)+(q+1)
     have hrlast : r.val = (p + 1) + (q + 1) := by omega
