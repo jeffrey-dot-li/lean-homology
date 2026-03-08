@@ -1841,7 +1841,9 @@ private lemma swapDiagonalSteps_fun_local_bounds {p q : ℕ}
         -- By definition of swapDiagonalSteps_fun, we know that μ(r) is equal to (μ(r-1).fst + 1, μ(r-1).snd).
         have h_mu_r : μ.1 r = (⟨(μ.1 ⟨r.val - 1, by
           exact?⟩).1.val + 1, by
-          exact Nat.lt_succ_of_le ( Nat.le_trans ( Nat.succ_le_of_lt hL ) ( Nat.le_of_lt_succ ( by simp ) ) )⟩, ⟨(μ.1 ⟨r.val - 1, by
+          exact Nat.lt_succ_of_le ( Nat.le_trans ( Nat.succ_le_of_lt hL ) ( Nat.le_of_lt_succ ( by simp only [Fin.succ_mk,
+            Nat.succ_eq_add_one, Fin.is_lt] ) ) ) ⟩,
+            ⟨(μ.1 ⟨r.val - 1, by
           exact?⟩).2.val, by
           grind⟩) := by
           all_goals generalize_proofs at *;
@@ -1916,13 +1918,18 @@ private lemma swapDiagonalSteps_fun_local_bounds {p q : ℕ}
           -- By definition of swapDiagonalSteps_fun, when i = r and hL is false, we have:
           simp [swapDiagonalSteps_fun, hL];
           generalize_proofs at *;
-          grind
+          -- `grind` fails: the goal is a stuck `match` on a conjunction proof term
+          -- that `grind` can't reduce. `split` evaluates the match, then both sides
+          -- have equal `val`s so `Fin.ext rfl` closes each component.
+          split; exact Prod.ext (Fin.ext rfl) (Fin.ext rfl)
         generalize_proofs at *;
         constructor <;> simp_all +decide [ Prod.le_def ];
         · exact Nat.le_succ_of_le ( μ.1.monotone ( Nat.pred_le _ ) |> And.left );
-        · constructor <;> norm_num [ Fin.le_iff_val_le_val ] at * ; omega;
-          exact μ.1.monotone ( Nat.le_succ_of_le ( Nat.pred_le _ ) ) |>.2
-          skip
+        · constructor
+          · simp only [Fin.le_iff_val_le_val]; omega
+          -- `by omega` alone fails: omega doesn't reduce `Fin.le` to `val ≤ val`,
+          -- so we `simp [Fin.le_def]` first to expose the ℕ comparison.
+          · exact μ.1.monotone (show _ ≤ _ by simp [Fin.le_def]; omega) |>.2
 
 end AristotleLemmas
 
@@ -2139,7 +2146,7 @@ lemma swapDiagonalSteps_flip_curr {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
           · rw [ Fin.lt_iff_val_lt_val, Fin.le_iff_val_le_val ] ; simp +arith +decide [ * ];
             constructor <;> intro <;> norm_cast at * <;> simp_all +decide [ Nat.succ_le_iff ];
             · unfold isDiagonalVertex at hr; simp_all +decide [ Nat.succ_le_iff ] ;
-              exact le_of_not_gt fun h => h.not_le <| by have := shuffle_step μ ⟨ r, by linarith ⟩ ; unfold isLeftStep at hr; aesop;
+              exact le_of_not_gt fun h => h.not_ge <| by have := shuffle_step μ ⟨ r, by linarith ⟩ ; unfold isLeftStep at hr; aesop;
             · unfold isDiagonalVertex at hr; simp_all +decide [ Nat.succ_le_iff ] ;
               exact absurd ‹_› ( not_le_of_gt hr.2 );
           · exact swapDiagonalSteps_apply_ne _ _ _ _ ( ne_of_gt ( Nat.lt_succ_self _ ) );
@@ -2274,15 +2281,28 @@ lemma swapDiagonalSteps_involutive {p q : ℕ}
   · -- By definition of swapDiagonalSteps, we know that applying it twice returns the original shuffle.
     have h_swap : ∀ i : Index ((p + 1) + (q + 1)), (swapDiagonalSteps (swapDiagonalSteps μ r hr) r (swapDiagonalSteps_vertex μ r hr)).1 i = μ.1 i := by
       intro i; by_cases hi : i = r <;> simp +decide [ hi, swapDiagonalSteps_apply_ne_r ] ;
-      rw [ swapDiagonalSteps_val_r, swapDiagonalSteps_val_r ];
-      rotate_left;
-      exact ⟨ r.val - 1, by have := isDiagonalVertex_bounds hr; omega ⟩;
-      exact?;
-      exact ⟨ r.val - 1, by have := isDiagonalVertex_bounds hr; omega ⟩;
-      · rfl;
-      · split_ifs <;> simp_all +decide [ swapDiagonalSteps_isLeftStep_toggle ];
-        · exact Prod.ext rfl ( Fin.ext <| Nat.sub_add_cancel <| Nat.pos_of_ne_zero <| by have := diagonal_right_snd_pos hr ‹_›; aesop );
-        · exact Prod.ext ( Fin.ext <| Nat.sub_add_cancel <| Nat.pos_of_ne_zero <| by have := diagonal_left_fst_pos hr ‹_›; aesop ) rfl;
+      let rm1 : Fin ((p + 1) + (q + 1)) := ⟨r.val - 1, by
+        have := isDiagonalVertex_bounds hr
+        omega⟩
+      have h₁ := swapDiagonalSteps_val_r μ r hr rm1 rfl
+      have h₂ := swapDiagonalSteps_val_r (swapDiagonalSteps μ r hr) r (swapDiagonalSteps_vertex μ r hr) rm1 rfl
+      have htoggle : isLeftStep (swapDiagonalSteps μ r hr) rm1 ↔ ¬ isLeftStep μ rm1 := by
+        simpa [rm1] using swapDiagonalSteps_isLeftStep_toggle μ r hr
+      by_cases hL : isLeftStep μ rm1
+      · have hS : ¬ isLeftStep (swapDiagonalSteps μ r hr) rm1 := by
+          exact fun hs => (htoggle.mp hs) hL
+        rw [h₂]
+        simp [rm1, hL, hS, h₁]
+        exact Prod.ext (Fin.ext <| Nat.sub_add_cancel <| Nat.pos_of_ne_zero <| by
+          have := diagonal_left_fst_pos hr (by simpa [rm1] using hL)
+          aesop) rfl
+      · have hS : isLeftStep (swapDiagonalSteps μ r hr) rm1 := by
+          exact htoggle.mpr hL
+        rw [h₂]
+        simp [rm1, hL, hS, h₁]
+        exact Prod.ext rfl (Fin.ext <| Nat.sub_add_cancel <| Nat.pos_of_ne_zero <| by
+          have := diagonal_right_snd_pos hr (by simpa [rm1] using hL)
+          aesop)
     aesop;
   · rfl
 
