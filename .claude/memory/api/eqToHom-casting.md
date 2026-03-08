@@ -57,6 +57,28 @@ slice_lhs 1 2 =>
   rw [show eqToHom _ = F.map (eqToHom ...) from (eqToHom_map _ _).symm, ← Functor.map_comp]
 ```
 
+## Principle 4a: `slice_lhs => tactic =>` to escape conv mode
+
+**Problem**: After `cast_down` or other rewrites introduce `eqToHom` with `(SimplexCategory.toTop.obj ∘ SimplexCategory.mk)` in the type annotations, `rw [H]` inside a `slice_lhs` block fails — the types in the composition chain don't match `H`'s LHS syntactically (e.g., `Δ[0 + n]` vs `(SimplexCategory.toTop.obj ∘ SimplexCategory.mk) (0 + n)`).
+
+**Solution**: Use `tactic =>` inside the slice to switch from conv mode to tactic mode. Then use `change` to state the equality you want to prove, and prove it with normal tactics:
+
+```lean
+slice_lhs 2 3 => tactic =>
+  -- State the equality in your preferred form (change matches up to defeq)
+  change shuffleStdSimplexMap default ≫ prod.snd = eqToHom (by simp)
+  -- Now prove it with normal tactics (same body as the have H proof)
+  dsimp [shuffleStdSimplexMap, simplexProdMap]
+  rw [CategoryTheory.Limits.prod.lift_snd]
+  change SimplexCategory.toTop.map _ = eqToHom _
+  rw [snd_comp_default_shuffle_eq_eqToHom]
+  exact eqToHom_map _ _
+```
+
+**Why this works**: `tactic =>` switches from the conv DSL (which only allows rewriting the focal expression) to the full tactic language. `change` then lets you restate the goal in a form where all the types are concrete and familiar, avoiding the syntactic mismatch entirely. This eliminates the need for a separate `have H` + `rw [H]` pattern.
+
+**When to use**: Whenever `rw [H]` inside a `slice_lhs`/`slice_rhs` block fails with "Did not find an occurrence of the pattern" despite the math being correct.
+
 ## Principle 5: Peeling off functors with `congr 1`
 
 After folding to `F.map(f) ≫ g = F.map(f') ≫ g`:

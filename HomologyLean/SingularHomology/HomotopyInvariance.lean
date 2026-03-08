@@ -207,14 +207,6 @@ lemma cast_ulift_toSSet_down {p q n : ℕ} (h : p + q = n + 1)
   intro f
   simp
 
-/-- General version of `cast_ulift_toSSet_down` for arbitrary equality `h : n = m`. -/
-lemma cast_singularSimplex_down {n m : ℕ} (h : n = m)
-    (X : TopCat.{v})
-    (f : stdSimplex.{v} n ⟶ X) :
-    (show SingularSimplex X m from h ▸ ⟪f⟫ₛ).down =
-    eqToHom (congrArg (SimplexCategory.toTop.obj ∘ SimplexCategory.mk) h.symm) ≫ f := by
-  subst h; simp
-
 /-- Moving `SimplicialObject.δ` through a cast and `simplexProdMap`:
 the face map acts by precomposition (via `eqToHom` and the face `OrderHom`). -/
 lemma δ_cast_simplexProdMap {p q n : ℕ} (h : p + q = n + 1)
@@ -406,14 +398,18 @@ lemma shuffleStdSimplexMap_insertRight_face {p q : ℕ}
 attribute [simp] CategoryTheory.yoneda
 
 /-- Given a p-simplex σ in X, a q-simplex τ in Y, and a (p,q)-shuffle μ,
-produce a (p+q)-simplex in X × Y by combining σ and τ according to μ.
+produce an n-simplex in X × Y (where n = p + q) by combining σ and τ according to μ.
 
 Geometrically: μ determines a maximal simplex in the standard triangulation
 of Δ^p × Δ^q; this maps it into X × Y using σ on the first factor and τ
-on the second. -/
-def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
+on the second.
+
+The `n` parameter with proof `hn : n = p + q` allows callers to work at a
+chosen index without `eqToHom` casts. The `subst` is confined here at the leaf. -/
+def shuffleSimplex {X Y : TopCat.{v}} {p q n : ℕ} (hn : n = p + q)
     (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
-    SingularSimplex (X ⨯ Y) (p + q) := by
+    SingularSimplex (X ⨯ Y) n := by
+  subst hn
   unfold SingularSimplex
   refine .up ?_
   simp only [yoneda, Functor.op_obj, SimplexCategory.toTop_obj, SimplexCategory.len_mk]
@@ -421,26 +417,29 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q : ℕ}
   refine shuffleStdSimplexMap (p := p) (q := q) μ ≫ ?_
   apply prod.map s.down t.down
 
-def universalSimplexCrossProduct (p q : ℕ) :
-    R ⟶ (singChain (R := R) (X := (Δ[p] ⨯ Δ[q]))).X (p + q) := by
-  -- simp [singularSimplexEquivΔ]
-  exact ∑ μ : Shuffle p q, μ.sign • simplexCoprojection
-    (shuffleSimplex ⟪𝟙 stdSimplex.{v} p ⟫ₛ ⟪𝟙 stdSimplex.{v} q⟫ₛ μ)
+/-- The universal simplex-level cross product on the standard simplices.
+
+The `n` parameter with proof `hn : n = p + q` lets downstream code (especially
+the Leibniz rule) work at a chosen chain-complex index without `eqToHom` casts. -/
+def universalSimplexCrossProduct (p q : ℕ) {n : ℕ} (hn : n = p + q) :
+    R ⟶ (singChain (R := R) (X := (Δ[p] ⨯ Δ[q]))).X n :=
+  ∑ μ : Shuffle p q, μ.sign • simplexCoprojection
+    (shuffleSimplex hn ⟪𝟙 stdSimplex.{v} p ⟫ₛ ⟪𝟙 stdSimplex.{v} q⟫ₛ μ)
 
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
 Given a p-simplex s in X and a q-simplex t in Y, produce a morphism
-`R ⟶ C_{p+q}(X × Y; R)` (i.e., a "chain" in the abstract categorical sense)
-as the signed sum `∑_μ sign(μ) · ι(shuffleSimplex s t μ)` where ι denotes
-the coprojection into the free module. -/
-def simplexCrossProduct {X Y : TopCat.{v}} {p q : ℕ}
+`R ⟶ C_n(X × Y; R)` (where `n = p + q`) as the signed sum
+`∑_μ sign(μ) · ι(shuffleSimplex s t μ)` where ι denotes the coprojection
+into the free module.
+
+The `n` parameter with proof `hn : n = p + q` avoids `eqToHom` casts
+when `p + q` is not definitionally equal to the desired index. -/
+def simplexCrossProduct {X Y : TopCat.{v}} {p q n : ℕ} (hn : n = p + q)
     (s : SingularSimplex X p) (t : SingularSimplex Y q) :
-    R ⟶ (singChain (R := R) (X ⨯ Y)).X (p + q) := by
-  -- simp [singularSimplexEquivΔ]
-  refine universalSimplexCrossProduct p q ≫ ?_
-  -- Push the chain on `Δ[p] ⨯ Δ[q]` forward along the map induced by `s` and `t`.
-  -- The map `Δ[p] ⨯ Δ[q] ⟶ X ⨯ Y` is `prod.map s.down t.down`.
-  exact ((SCF R).map (prod.map s.down t.down)).f (p + q)
+    R ⟶ (singChain (R := R) (X ⨯ Y)).X n :=
+  universalSimplexCrossProduct p q hn ≫
+    ((SCF R).map (prod.map s.down t.down)).f n
 
 /-- For `q = 0`, the cross product of an `n`-simplex `s` in `X` with a `0`-simplex `c`
 in `Y` reduces to a single product simplex `t ↦ (s(t), c(*))`.
@@ -510,7 +509,7 @@ instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
 
 lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
-    simplexCrossProduct (C := C) (R := R) s c =
+    simplexCrossProduct (C := C) (R := R) rfl s c =
     simplexCoprojection
       ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ := by
   simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
@@ -571,25 +570,15 @@ private lemma snd_comp_default_shuffle_eq_eqToHom (n : ℕ) :
   dsimp [Fin.castOrderIso, SimplexCategory.Hom.toOrderHom, OrderHom.snd,
     default, Unique_Shuffle_0_n]
 
-/-- Transport lemma: coprojection composed with `eqToHom` on the chain group
-equals coprojection of the transported simplex. -/
-lemma simplexCoprojection_comp_eqToHom {X : TopCat.{v}} {n m : ℕ} (h : n = m)
-    (s : SingularSimplex X n) :
-    simplexCoprojection (C := C) (R := R) s ≫
-      eqToHom (congrArg (singChain (C := C) (R := R) X).X h) =
-    simplexCoprojection (C := C) (R := R) (h ▸ s) := by
-  subst h; simp
-
 /-- For `p = 0`, the cross product of a `0`-simplex `c` in `X` with an `n`-simplex `s`
 in `Y` reduces to a single product simplex `t ↦ (c(*), s(t))`.
 
 There is a unique `(0, n)`-shuffle with sign `1`, so the shuffle sum collapses. -/
 lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
     (c : SingularSimplex X 0) (s : SingularSimplex Y n) :
-    simplexCrossProduct (C := C) (R := R) c s =
+    simplexCrossProduct (C := C) (R := R) (show n = 0 + n by omega) c s =
     simplexCoprojection
-      ⟪prod.lift (SimplexCategory.toTop.map default ≫ c.down) s.down⟫ₛ ≫
-    eqToHom (by simp) := by
+      ⟪prod.lift (SimplexCategory.toTop.map default ≫ c.down) s.down⟫ₛ := by
   simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
   have hd : (default : Shuffle 0 n).sign = 1 := by
     dsimp [Shuffle.sign, Shuffle.invCount]
@@ -602,19 +591,24 @@ lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
     exact congrArg (fun x => (-1 : ℤ) ^ x) hz
   rw [hd]
   simp
-  -- Absorb eqToHom into the coprojection on the RHS
-  rw [simplexCoprojection_comp_eqToHom (show n = 0 + n from by omega)]
   dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
   erw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp
   apply congrArg
   apply ULift.ext
   dsimp [TopCat.toSSet]
-  erw [cast_singularSimplex_down (show n = 0 + n from by omega)]
+  -- Variant of cast_singularSimplex_down matching the anonymous-constructor form in the goal
+  have cast_down : ∀ {Z : TopCat.{v}} {a b : ℕ} (h : a = b) (f : Δ[b] ⟶ Z),
+      (h ▸ ({ down := f } : SingularSimplex Z b) : SingularSimplex Z a).down =
+      eqToHom (congrArg (SimplexCategory.toTop.obj ∘ SimplexCategory.mk) h) ≫ f := by
+    intro Z a b h f; subst h; simp
+  rw [cast_down (show n = 0 + n from by omega)
+    (shuffleStdSimplexMap (p := 0) (q := n) default)]
   apply CategoryTheory.Limits.prod.hom_ext
   · -- fst component
-    erw [Category.assoc, CategoryTheory.Limits.prod.map_fst, ← Category.assoc]
-    conv_rhs => rw [Category.assoc, CategoryTheory.Limits.prod.lift_fst, ← Category.assoc]
+    simp only [Category.assoc]
+    rw [prod.map_fst, prod.lift_fst]
+    rw [← Category.assoc, ← Category.assoc]
     congr 1
     ext x
     have h_sub : Subsingleton ↑(TopCat.uliftFunctor.obj
@@ -631,24 +625,24 @@ lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
       rw [hz, h1, h2]
     exact Subsingleton.elim _ _
   · -- snd component
-    erw [Category.assoc, CategoryTheory.Limits.prod.map_snd, ← Category.assoc]
-    conv_rhs => rw [Category.assoc, CategoryTheory.Limits.prod.lift_snd]
-    have H : shuffleStdSimplexMap (p := 0) (q := n) default ≫ prod.snd = eqToHom (by simp) := by
+    simp only [Category.assoc]
+    rw [prod.map_snd, prod.lift_snd]
+    slice_lhs 2 3 => tactic =>
+      change shuffleStdSimplexMap default ≫ prod.snd = eqToHom (by simp)
       dsimp [shuffleStdSimplexMap, simplexProdMap]
       rw [CategoryTheory.Limits.prod.lift_snd]
-      -- Re-fold the dsimp-expanded form back to toTop.map, then retreat to SimplexCategory
       change SimplexCategory.toTop.map _ = eqToHom _
       rw [snd_comp_default_shuffle_eq_eqToHom]
       exact eqToHom_map _ _
-    congr 1
+    rw [← Category.assoc, eqToHom_trans, eqToHom_refl, Category.id_comp]
 
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
-    (f : X ⟶ X') (g : Y ⟶ Y') (p q : ℕ) (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
-    simplexCrossProduct (R := R) (p := p) (q := q)
-        ⟪s⟫ₛ ⟪t⟫ₛ ≫
-      ((SCF R).map (prod.map f g)).f (p + q) =
-    simplexCrossProduct (R := R) (X := X') (Y := Y') (p := p) (q := q)
-      ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ := by
+    (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ} (hn : n = p + q)
+    (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
+    simplexCrossProduct (R := R) hn ⟪s⟫ₛ ⟪t⟫ₛ ≫
+      ((SCF R).map (prod.map f g)).f n =
+    simplexCrossProduct (R := R) hn ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ := by
+  subst hn
   classical
   unfold simplexCrossProduct
   -- Reduce to functoriality of the induced map on chains.
@@ -766,26 +760,25 @@ of face-map cross products (the "universal Leibniz rule"):
 ```
   universalSimplexCrossProduct (p+1) (q+1) ≫ ∂ =
     ∑ j, (-1)^j · simplexCrossProduct (δ_j) (id) +
-    (-1)^{p+1} · ∑ j, (-1)^j · simplexCrossProduct (id) (δ_j) ≫ eqToHom ...
+    (-1)^{p+1} · ∑ j, (-1)^j · simplexCrossProduct (id) (δ_j)
 ```
-The `eqToHom` accounts for `(p+1) + q = p + (q+1)`. -/
+Both RHS sums target the same chain-complex degree `p + (q + 1)` via different `hn` proofs,
+eliminating the `eqToHom` cast that was needed when the codomain was fixed at `p + q`. -/
 theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
-    universalSimplexCrossProduct (C := C) (R := R) (p + 1) (q + 1) ≫
+    universalSimplexCrossProduct (C := C) (R := R) (p + 1) (q + 1) (hn := rfl) ≫
       (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
-        (p + 1 + (q + 1)) (p + (q + 1)) =
+        ((p + 1) + (q + 1)) (p + (q + 1)) =
     ∑ j : Fin (p + 2),
       ((-1 : ℤ) ^ (j : ℕ)) •
-        simplexCrossProduct (C := C) (R := R)
+        simplexCrossProduct (C := C) (R := R) rfl
           ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ
           ⟪𝟙 Δ[q + 1]⟫ₛ +
     ((-1 : ℤ) ^ (p + 1)) •
       ∑ j : Fin (q + 2),
         ((-1 : ℤ) ^ (j : ℕ)) •
-          simplexCrossProduct (C := C) (R := R)
+          simplexCrossProduct (C := C) (R := R) (by omega)
             ⟪𝟙 Δ[p + 1]⟫ₛ
-            ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ ≫
-          eqToHom (congrArg (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).X
-            (by omega)) := by
+            ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ := by
   simp only [universalSimplexCrossProduct, Preadditive.sum_comp, Preadditive.zsmul_comp]
   apply (cancel_mono (eqToHom (congrArg (singChain (C := C) (R := R)
     (Δ[p + 1] ⨯ Δ[q + 1])).X (show p + (q + 1) = p + q + 1 from by omega)))).mp
@@ -848,9 +841,8 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
     -- First sum: 𝟙 ≫ toTop.map (δ x) → toTop.map (δ x) in left face
     enter [1, 1, 2, x, 2, 2, x_1, 2, 1, 1, 2, 1]
     erw [Category.id_comp]
-  conv_rhs =>
-    enter [1, 2, 2, 2, x, 2, 2, x_1, 2, 1, 1, 1, 2, 2]
-    erw [Category.id_comp]
+  -- (Previously rewrote 𝟙 ≫ δ x in the second sum's prod.map, but after the n-param
+  -- refactor the 𝟙 is inside the ▸-transport and no longer composes with δ x directly.)
   -- Step 4: Collapse LHS double sum ∑ μ, μ.sign • ∑ r, (-1)^r • ... into ∑ (μ,r), (μ.sign * (-1)^r) • ...
   simp_rw [Finset.smul_sum, smul_smul]
   -- Step 4: Split inner sum into diagonal + non-diagonal vertices.
@@ -1008,17 +1000,18 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         congr 1
         · -- Coefficient
           simp only [Fin.val_cast]; linarith
-        · -- Map: LHS = coprojection ⟪f⟫ₛ ≫ eqToHom _; RHS = coprojection ⟪g⟫ₛ
-          -- Use simplexCoprojection_comp_eqToHom to absorb the eqToHom into a transport on the simplex
-          rw [simplexCoprojection_comp_eqToHom (by omega : (p + 1) + q = p + (q + 1))]
+        · -- Map: show the two simplices are equal
           congr 1
-          -- Goal: h ▸ ⟪f⟫ₛ = ⟪g⟫ₛ where f and g are TopCat morphisms
-          -- Unwrap ULift and transport to get a categorical equality of TopCat morphisms
           apply ULift.ext
-          simp only [cast_singularSimplex_down (by omega : (p + 1) + q = p + (q + 1)),
-            SingularSimplex.ofΔ_down]
-          -- The left case had no eqToHom because (p+1)+q matches definitionally.
-          -- Here (p+1)+q ≠ p+(q+1) definitionally, so an eqToHom appears.
+          simp only [SingularSimplex.ofΔ_down]
+          -- Rewrite (h ▸ { down := f }).down to eqToHom _ ≫ f
+          have cast_down : ∀ {Z : TopCat.{v}} {a b : ℕ} (h : a = b) (f : Δ[b] ⟶ Z),
+              (h ▸ ({ down := f } : SingularSimplex Z b) : SingularSimplex Z a).down =
+              eqToHom (congrArg (SimplexCategory.toTop.obj ∘ SimplexCategory.mk) h) ≫ f := by
+            intro Z a b h f; subst h; simp
+          rw [cast_down] <;> [skip; omega]
+          -- Simplify prod.map 𝟙 𝟙 ≫ prod.map 𝟙 (δ k) → prod.map 𝟙 (δ k) and reassociate
+          simp only [Category.assoc, prod.map_map, Category.id_comp, Category.comp_id]
           -- Unfold RHS via simplexProdMap_comp to match the face lemma pattern
           conv_rhs => rw [← @simplexProdMap_comp _ _ _ _
             (SimplexCategory.δ (Fin.cast _ (ν.insertRightIndex k)) ≫ eqToHom _)
