@@ -877,9 +877,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
       (fun μ r h => by
         dsimp only
         have hsign := Shuffle.swapDiagonalSteps_neg_sign μ (r.cast (by omega)) h
-        rw [show (r.cast (by omega : p + q + 1 + 2 = (p + 1) + (q + 1) + 1)).val = r.val
-          from rfl] at hsign
-        rw [hsign, neg_smul]
+        rw [hsign, neg_mul, neg_smul]
         -- Map part: the swap doesn't change the underlying map away from
         -- the diagonal vertex. δ r avoids r, so the compositions agree.
         congr 1; congr 1; congr 1; congr 1; congr 1
