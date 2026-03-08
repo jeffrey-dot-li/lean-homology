@@ -17,7 +17,7 @@ Topic / proof sketch: $ARGUMENTS
 2. Work **interactively** with the user to decompose the proof into lemmas.
 3. Write all declarations with `sorry` proofs — **no filled proofs in this mode**.
 4. Each lemma should be **provable independently in ~30 lines or fewer**.
-5. Verify each `sorry`'d statement compiles with `lean_diagnostic_messages` before moving on.
+5. Verify each `sorry`'d statement compiles with `lean_diagnostic_messages` (use `severity="error"`) before moving on. Warnings about `sorry` and linter noise are expected — only errors matter.
 6. Present the full dependency structure: which lemmas feed into which.
 
 ## Decomposition principle

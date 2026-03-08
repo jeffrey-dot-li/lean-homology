@@ -4,6 +4,7 @@
       "type": "stdio",
       "command": "uvx",
       "args": [
+        "--from", "git+https://github.com/jeffrey-dot-li/lean-lsp-mcp@feat/diagnostic-severity-filter",
         "lean-lsp-mcp"
       ],
       "env": {}

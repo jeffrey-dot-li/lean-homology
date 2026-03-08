@@ -125,6 +125,10 @@ First, make a trivial Lean MCP call (e.g. `lean_diagnostic_messages` on the targ
 
 **`lean_diagnostic_messages`**: Get compiler errors and warnings
 - Filter by line range to focus on specific proof sections
+- **Use `severity` to filter**: `"error"`, `"warning"`, `"info"`, or `"hint"`. Omit for all levels.
+  - **During proof filling** (`/fill-sorry`, `/interactive`, `/draft`): use `severity="error"` — you only care whether it compiles. Warnings and infos (linter, "Try this") are noise that bloats context.
+  - **During refactoring** (`/refactor`): omit `severity` or use `severity="warning"` — you want lint-clean output too.
+  - **For "Try this" suggestions**: use `severity="info"` after `simp?`/`exact?`/`apply?`/`decide?` to retrieve suggestions without the warning clutter. Also useful for reading `#check`/`#print`/`#eval`/`#print axioms` output, which are all info-level.
 - Check after every significant edit to catch type errors early
 - **Always use this instead of `getDiagnostics`** — the IDE diagnostics tool returns cspell and other non-Lean noise that pollutes context
 

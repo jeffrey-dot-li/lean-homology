@@ -13,7 +13,7 @@ Target: $ARGUMENTS
 
 1. Read the current proof and understand it with `lean_goal` at key positions.
 2. Propose a specific refactoring to the user before applying it.
-3. Apply the change and **immediately verify** with `lean_diagnostic_messages`.
+3. Apply the change and **immediately verify** with `lean_diagnostic_messages` (no severity filter — check both errors and warnings for lint-clean output).
 4. If the refactor breaks the proof, **revert** and try a different approach.
 5. Work **one change at a time** — never batch multiple refactors before verifying.
 6. After each successful change, show the user the before/after.

@@ -14,16 +14,17 @@ Target: $ARGUMENTS
 1. **Check memory first** — read `proof-patterns.md` and `pitfalls.md` for strategies relevant to this proof shape.
 2. Read the lemma and use `lean_goal` at the `sorry` to understand the proof state.
 3. Try simple tactics first via `lean_multi_attempt`: `["simp", "ring", "omega", "exact?", "aesop"]`.
+   - To retrieve "Try this" suggestions from `simp?`/`exact?`/`apply?`, use `lean_diagnostic_messages` with `severity="info"` on the relevant line — the suggestions are info-level diagnostics.
 4. If those fail, **simplify the goal first** before searching Mathlib:
    - Try `simp`, `dsimp`, `ext`, `change` to make the goal more concrete
    - Check `lean_goal` — often the simplified goal suggests the next step
    - Use `simpa using h` to see if existing hypotheses close it after simplification
 5. Only search Mathlib (`lean_state_search`, `lean_leansearch`, `lean_loogle`) when you have a **specific** lemma shape in mind, not as a fishing expedition.
 6. Build the proof incrementally — add tactics one at a time. **After every edit:**
-   - First, check `lean_diagnostic_messages` on the edited line(s) (`start_line`/`end_line`) to confirm no errors. `lean_goal` succeeding does NOT mean the tactic compiled — a failing tactic (e.g., "`simp` made no progress") still shows a goal on the next line (the unchanged one).
+   - First, check `lean_diagnostic_messages` with `severity="error"` on the edited line(s) (`start_line`/`end_line`) to confirm no errors. Warnings/infos are noise during proof filling — ignore them. `lean_goal` succeeding does NOT mean the tactic compiled — a failing tactic (e.g., "`simp` made no progress") still shows a goal on the next line (the unchanged one).
    - Then, check `lean_goal` after the tactic to see the new proof state.
    - If diagnostics show an error, **revert the edit** before trying something else.
-7. **Verify completion** with `lean_diagnostic_messages` on the full lemma. No errors = done.
+7. **Verify completion** with `lean_diagnostic_messages` (with `severity="error"`) on the full lemma. No errors = done.
 8. If stuck after several attempts, report the remaining goal state to the user and ask for guidance.
 
 ## Core principle: EXTRACT, don't inline
