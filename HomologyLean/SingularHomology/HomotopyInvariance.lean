@@ -406,8 +406,9 @@ on the second.
 
 The `n` parameter with proof `hn : n = p + q` allows callers to work at a
 chosen index without `eqToHom` casts. The `subst` is confined here at the leaf. -/
-def shuffleSimplex {X Y : TopCat.{v}} {p q n : ℕ} (hn : n = p + q)
-    (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q) :
+def shuffleSimplex {X Y : TopCat.{v}} {p q n : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) (μ : Shuffle p q)
+    (hn : n = p + q := by omega) :
     SingularSimplex (X ⨯ Y) n := by
   subst hn
   unfold SingularSimplex
@@ -421,10 +422,10 @@ def shuffleSimplex {X Y : TopCat.{v}} {p q n : ℕ} (hn : n = p + q)
 
 The `n` parameter with proof `hn : n = p + q` lets downstream code (especially
 the Leibniz rule) work at a chosen chain-complex index without `eqToHom` casts. -/
-def universalSimplexCrossProduct (p q : ℕ) {n : ℕ} (hn : n = p + q) :
+def universalSimplexCrossProduct (p q : ℕ) {n : ℕ} (hn : n = p + q := by omega) :
     R ⟶ (singChain (R := R) (X := (Δ[p] ⨯ Δ[q]))).X n :=
   ∑ μ : Shuffle p q, μ.sign • simplexCoprojection
-    (shuffleSimplex hn ⟪𝟙 stdSimplex.{v} p ⟫ₛ ⟪𝟙 stdSimplex.{v} q⟫ₛ μ)
+    (shuffleSimplex ⟪𝟙 stdSimplex.{v} p ⟫ₛ ⟪𝟙 stdSimplex.{v} q⟫ₛ μ hn)
 
 /-- The simplex-level cross product: the signed formal sum over all shuffles.
 
@@ -435,8 +436,9 @@ into the free module.
 
 The `n` parameter with proof `hn : n = p + q` avoids `eqToHom` casts
 when `p + q` is not definitionally equal to the desired index. -/
-def simplexCrossProduct {X Y : TopCat.{v}} {p q n : ℕ} (hn : n = p + q)
-    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+def simplexCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q)
+    (hn : n = p + q := by omega) :
     R ⟶ (singChain (R := R) (X ⨯ Y)).X n :=
   universalSimplexCrossProduct p q hn ≫
     ((SCF R).map (prod.map s.down t.down)).f n
@@ -509,7 +511,7 @@ instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
 
 lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
-    simplexCrossProduct (C := C) (R := R) rfl s c =
+    simplexCrossProduct (C := C) (R := R) s c =
     simplexCoprojection
       ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ := by
   simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
@@ -576,7 +578,7 @@ in `Y` reduces to a single product simplex `t ↦ (c(*), s(t))`.
 There is a unique `(0, n)`-shuffle with sign `1`, so the shuffle sum collapses. -/
 lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
     (c : SingularSimplex X 0) (s : SingularSimplex Y n) :
-    simplexCrossProduct (C := C) (R := R) (show n = 0 + n by omega) c s =
+    simplexCrossProduct (C := C) (R := R) c s =
     simplexCoprojection
       ⟪prod.lift (SimplexCategory.toTop.map default ≫ c.down) s.down⟫ₛ := by
   simp [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
@@ -637,11 +639,12 @@ lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
     rw [← Category.assoc, eqToHom_trans, eqToHom_refl, Category.id_comp]
 
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj R]
-    (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ} (hn : n = p + q)
-    (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y) :
-    simplexCrossProduct (R := R) hn ⟪s⟫ₛ ⟪t⟫ₛ ≫
+    (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ}
+    (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y)
+    (hn : n = p + q := by omega) :
+    simplexCrossProduct (R := R) ⟪s⟫ₛ ⟪t⟫ₛ hn ≫
       ((SCF R).map (prod.map f g)).f n =
-    simplexCrossProduct (R := R) hn ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ := by
+    simplexCrossProduct (R := R) ⟪s ≫ f⟫ₛ ⟪t ≫ g⟫ₛ hn := by
   subst hn
   classical
   unfold simplexCrossProduct
@@ -752,18 +755,18 @@ of face-map cross products (the "universal Leibniz rule"):
 Both RHS sums target the same chain-complex degree `p + (q + 1)` via different `hn` proofs,
 eliminating the `eqToHom` cast that was needed when the codomain was fixed at `p + q`. -/
 theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
-    universalSimplexCrossProduct (C := C) (R := R) (p + 1) (q + 1) (hn := rfl) ≫
+    universalSimplexCrossProduct (C := C) (R := R) (p + 1) (q + 1) ≫
       (singChain (C := C) (R := R) (Δ[p + 1] ⨯ Δ[q + 1])).d
         ((p + 1) + (q + 1)) (p + (q + 1)) =
     ∑ j : Fin (p + 2),
       ((-1 : ℤ) ^ (j : ℕ)) •
-        simplexCrossProduct (C := C) (R := R) rfl
+        simplexCrossProduct (C := C) (R := R)
           ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ
           ⟪𝟙 Δ[q + 1]⟫ₛ +
     ((-1 : ℤ) ^ (p + 1)) •
       ∑ j : Fin (q + 2),
         ((-1 : ℤ) ^ (j : ℕ)) •
-          simplexCrossProduct (C := C) (R := R) (by omega)
+          simplexCrossProduct (C := C) (R := R)
             ⟪𝟙 Δ[p + 1]⟫ₛ
             ⟪SimplexCategory.toTop.map (SimplexCategory.δ j)⟫ₛ := by
   simp only [universalSimplexCrossProduct, Preadditive.sum_comp, Preadditive.zsmul_comp]
