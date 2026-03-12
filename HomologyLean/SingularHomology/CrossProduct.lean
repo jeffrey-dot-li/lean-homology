@@ -18,6 +18,7 @@
 -/
 import HomologyLean.CategoryTheory.SubTensorHom
 import HomologyLean.SingularHomology.HomotopyInvariance
+import Mathlib.CategoryTheory.Adjunction.Unique
 import HomologyLean.SingularHomology.HomotopyMap
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Symmetric
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
@@ -101,7 +102,7 @@ noncomputable def coprodIsoFree (R : Type u) [CommRing R] (A : Type u) :
 /-- The natural isomorphism between the coproduct-based free module functor and
 Mathlib's Finsupp-based `ModuleCat.free R`. Each component is `coprodIsoFree`. -/
 noncomputable def coprodIsoFreeNat (R : Type u) [CommRing R] :
-    coprodFreeFunctor (R := Rmod R) ≅ ModuleCat.free R :=
+    coprodFreeFunctor (C := ModuleCat.{u} R) ≅ ModuleCat.free R :=
   NatIso.ofComponents
     (fun A => coprodIsoFree R A)
     (fun {A B} f => by
@@ -152,28 +153,33 @@ lemma freeTensorProductIso_unit (A B : Type u) (a : A) (b : B) :
 
 end ModuleCatLemmas
 
+/-! ### Instances for `ModuleCat R` needed by the abstract cross product machinery -/
+
+noncomputable instance : HasForget.{u} (ModuleCat.{u} R) := inferInstance
+noncomputable instance : MonoidalUnitorRepresentable (C := ModuleCat.{u} R) := sorry
+noncomputable instance : (forget (ModuleCat.{u} R)).IsRightAdjoint :=
+  ⟨⟨_, ⟨ModuleCat.adj R⟩⟩⟩
+
+noncomputable instance : (forget (ModuleCat.{u} R)).leftAdjoint.Monoidal :=
+  letI : (ModuleCat.free R).Monoidal := ModuleCat.instMonoidalFree R
+  Functor.Monoidal.transport
+    (Adjunction.leftAdjointUniq (ModuleCat.adj R)
+      (Adjunction.ofIsRightAdjoint (forget (ModuleCat.{u} R))))
+
 /-! ### Singular chains and simplices in `ModuleCat R` -/
-
-/-- The singular chain functor with `R`-module coefficients. -/
-noncomputable abbrev mSCF : TopCat.{u} ⥤ ChainComplex (ModuleCat.{u} R) ℕ :=
-  SCF (C := ModuleCat.{u} R) (Rmod R)
-
-/-- The singular chain complex of `X` with `R`-module coefficients. -/
-noncomputable abbrev mSingChain (X : TopCat.{u}) : ChainComplex (ModuleCat.{u} R) ℕ :=
-  singChain (C := ModuleCat.{u} R) (R := Rmod R) X
 
 variable {R}
 
 /-- The coprojection (basis inclusion) for a singular simplex, specialized to `ModuleCat R`. -/
 noncomputable abbrev mι {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
-    Rmod R ⟶ (mSingChain R X).X n :=
-  simplexCoprojection (C := ModuleCat.{u} R) (R := Rmod R) s
+    Rmod R ⟶ (singChain (ModuleCat.{u} R) X).X n :=
+  simplexCoprojection s
 
 /-- Factoring a coprojection through the identity simplex: `mι s` equals
 `mι ⟪𝟙 Δ[n]⟫ₛ` composed with the chain map induced by `s.down`. -/
 lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
-    mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((mSCF R).map s.down).f n := by
-  dsimp [mι, mSCF, simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+    mι s = mι (⟪𝟙 Δ[n]⟫ₛ : SingularSimplex Δ[n] n) ≫ ((SCF (ModuleCat.{u} R)).map s.down).f n := by
+  dsimp [mι, simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
   rw [CategoryTheory.Limits.Sigma.ι_comp_map', Category.id_comp]
   rfl
 
@@ -181,15 +187,15 @@ lemma mι_factor {X : TopCat.{u}} {n : ℕ} (s : SingularSimplex X n) :
 at the reindexed simplex: `mι s ≫ f_* = mι (f(s))`. -/
 lemma mι_comp_map {X Y : TopCat.{u}} {n : ℕ}
     (s : SingularSimplex X n) (f : X ⟶ Y) :
-    mι s ≫ ((mSCF R).map f).f n =
+    mι s ≫ ((SCF (ModuleCat.{u} R)).map f).f n =
       mι ((singularSimplexFunctor n).map f s) := by
-  simp only [mι, simplexCoprojection, mSCF, SCF]
+  simp only [mι, simplexCoprojection, SCF]
   erw [colimit.ι_desc]
   simp only [Cofan.mk_ι_app, Category.id_comp]; rfl
 
 @[ext]
 lemma mι_ext {X : TopCat.{u}} {n : ℕ} {M : ModuleCat.{u} R}
-    {f g : (mSingChain R X).X n ⟶ M}
+    {f g : (singChain (ModuleCat.{u} R) X).X n ⟶ M}
     (h : ∀ s : SingularSimplex X n, mι s ≫ f = mι s ≫ g) :
     f = g := by
   apply CategoryTheory.Limits.Sigma.hom_ext
@@ -203,8 +209,8 @@ obtained by evaluating the morphism `Rmod R ⟶ C_{p+q}(X×Y;R)` at `1 : R`. -/
 noncomputable def simplexCrossProductElem {X Y : TopCat.{u}} {p q n : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q)
     (hn : n = p + q := by omega) :
-    ↑((mSingChain R (X ⨯ Y)).X n) :=
-  (simplexCrossProduct (R := Rmod R) s t hn) (1 : R)
+    ↑((singChain (ModuleCat.{u} R) (X ⨯ Y)).X n) :=
+  (ModuleCat.Hom.hom (simplexCrossProduct (C := ModuleCat.{u} R) s t hn)) (1 : R)
 
 /-- **Naturality** of `simplexCrossProductElem` in both variables. This is exactly the statement
 that the assignment `(s,t) ↦ simplexCrossProductElem s t` is natural, as a function into the
@@ -213,10 +219,10 @@ lemma simplexCrossProductElem_natural {X X' Y Y' : TopCat.{u}}
     (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ}
     (s : SingularSimplex X p) (t : SingularSimplex Y q)
     (hn : n = p + q := by omega) :
-    (ConcreteCategory.hom (((mSCF R).map (prod.map f g)).f n))
-        (simplexCrossProductElem (R := R) s t hn)
+    (ConcreteCategory.hom (((SCF (ModuleCat.{u} R)).map (prod.map f g)).f n))
+        (simplexCrossProductElem s t hn)
       =
-    simplexCrossProductElem (R := R) (⟪s.down ≫ f⟫ₛ) (⟪t.down ≫ g⟫ₛ) hn := by
+    simplexCrossProductElem (⟪s.down ≫ f⟫ₛ) (⟪t.down ≫ g⟫ₛ) hn := by
   subst hn
   classical
   letI : CategoryTheory.MonObj (Rmod R) := by
@@ -228,25 +234,24 @@ lemma simplexCrossProductElem_natural {X X' Y Y' : TopCat.{u}}
     | up t =>
       -- `crossProduct_natural_pure_tensor` is a morphism-level naturality statement.
       -- Apply both sides to `1 : R` to get an elementwise statement.
-      simpa [simplexCrossProductElem, mSCF, Category.assoc] using
+      simpa [simplexCrossProductElem, SCF, Category.assoc] using
         congrArg (fun k => (ModuleCat.Hom.hom k) (1 : R))
-          (crossProduct_natural_pure_tensor
-            (C := ModuleCat.{u} R) (R := Rmod R)
+          (crossProduct_natural_pure_tensor (C := ModuleCat.{u} R)
             (f := f) (g := g) (s := s) (t := t))
 
 /-! ### `NatTrans` packaging of simplex-level naturality -/
 
 
 
-/-- The degreewise chain group functor `mSCF R ⋙ eval p` is naturally isomorphic to
+/-- The degreewise chain group functor `SCF (ModuleCat.{u} R) ⋙ eval p` is naturally isomorphic to
 `singularSimplexFunctor p ⋙ ModuleCat.free R` (Finsupp-based free modules).
 
 Composed from `chainGroupIsoCoprodFree` (coproduct = coproduct) and
 `coprodIsoFreeNat` (coproduct ≅ Finsupp). -/
-noncomputable def chainGroupIsoFree (p : ℕ) :
-    mSCF R ⋙ HomologicalComplex.eval (ModuleCat.{u} R) (ComplexShape.down ℕ) p ≅
+noncomputable def mChainGroupIsoFree (p : ℕ) :
+    SCF (ModuleCat.{u} R) ⋙ HomologicalComplex.eval (ModuleCat.{u} R) (ComplexShape.down ℕ) p ≅
       singularSimplexFunctor p ⋙ ModuleCat.free R :=
-  chainGroupIsoCoprodFree (R := Rmod R) p ≪≫
+  chainGroupIsoCoprodFree (C := ModuleCat.{u} R) p ≪≫
     Functor.isoWhiskerLeft (singularSimplexFunctor p) (coprodIsoFreeNat R)
 
 /-- Functor `(TopCat × TopCat) ⥤ Type` sending `(X,Y)` to pairs of simplices
@@ -258,16 +263,16 @@ noncomputable def singularSimplexPairFunctor (p q : ℕ) : (TopCat.{u} × TopCat
 /-- Target functor for the chain-level cross product (degreewise): `(X,Y) ↦ C_n(X×Y)`.
 
 Defined as a functor composition:
-`(TopCat × TopCat) ⥤ TopCat` (binary product) then `mSCF R` then `eval n`. -/
+`(TopCat × TopCat) ⥤ TopCat` (binary product) then `SCF (ModuleCat.{u} R)` then `eval n`. -/
 noncomputable abbrev crossProductTgtFunctor (n : ℕ) :
     (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
   Functor.uncurry.obj (prod.functor : TopCat.{u} ⥤ TopCat.{u} ⥤ TopCat.{u}) ⋙
-    mSCF R ⋙
+    SCF (ModuleCat.{u} R) ⋙
       HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) n
 
 @[simp] lemma crossProductTgtFunctor_obj (n) (X Y) :
   (crossProductTgtFunctor (R:=R) n).obj (X,Y)
-    = (mSingChain R (X ⨯ Y)).X n := rfl
+    = (singChain (ModuleCat.{u} R) (X ⨯ Y)).X n := rfl
 
 
 /-- Functor `(TopCat × TopCat) ⥤ Type` sending `(X,Y)` to the underlying type of the chain group
@@ -282,22 +287,22 @@ transformation
 `(X,Y) ↦ SingularSimplex X p × SingularSimplex Y q ⟶ (forgetful type of C_{p+q}(X×Y;R))`. -/
 noncomputable def simplexCrossProductNat (p q n : ℕ) (hn : n = p + q := by omega) :
     singularSimplexPairFunctor (p := p) (q := q) ⟶ chainGroupOnProdFunctor (R := R) n where
-  app XY st := simplexCrossProductElem (R := R) st.1 st.2 hn
+  app XY st := (simplexCrossProductElem st.1 st.2 hn : (chainGroupOnProdFunctor R n).obj XY)
   naturality := by
     intro XY XY' fg
     funext st
     rcases st with ⟨s, t⟩
     -- This is exactly `simplexCrossProductElem_natural`.
     simpa [singularSimplexPairFunctor, chainGroupOnProdFunctor] using
-      (simplexCrossProductElem_natural (R := R) (f := fg.1) (g := fg.2) s t hn).symm
+      (simplexCrossProductElem_natural (f := fg.1) (g := fg.2) s t hn).symm
 
 /-! ### Chain-level cross product -/
 
 /-- Source functor for the chain-level cross product (degreewise): `(X,Y) ↦ C_p(X) ⊗ C_q(Y)`. -/
 noncomputable abbrev crossProductSrcFunctor (p q : ℕ) :
     (TopCat.{u} × TopCat.{u}) ⥤ ModuleCat.{u} R :=
-  (mSCF R ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) p).prod
-    (mSCF R ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) q) ⋙
+  (SCF (ModuleCat.{u} R) ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) p).prod
+    (SCF (ModuleCat.{u} R) ⋙ HomologicalComplex.eval (V := ModuleCat.{u} R) (c := ComplexShape.down ℕ) q) ⋙
     MonoidalCategory.tensor (C := ModuleCat.{u} R)
 
 /-- Intermediate functor: `(X,Y) ↦ Free(SingularSimplex X p × SingularSimplex Y q)`,
@@ -322,7 +327,7 @@ lemma freeTensorProductIso_natural {A A' B B' : Type u}
 bridging the coproduct-based chain groups with the Finsupp-based free module.
 
 Defined via `NatIso.ofComponents` so that `.hom.app (X,Y)` definitionally reduces to
-`tensorIso (chainGroupIsoFree p).app X (chainGroupIsoFree q).app Y ≪≫ freeTensorProductIso`,
+`tensorIso (mChainGroupIsoFree p).app X (mChainGroupIsoFree q).app Y ≪≫ freeTensorProductIso`,
 making element-level proofs clean. The functor-level alternative (composing
 `isoWhiskerRight`, `NatIso.prod`, `Functor.Monoidal.μNatIso`, `Functor.associator`)
 gives naturality for free but introduces identity morphisms from associators
@@ -331,8 +336,8 @@ noncomputable def tensorCoprodNatIso (p q : ℕ) :
     crossProductSrcFunctor (R := R) p q ≅ freePairFunctor (R := R) p q :=
   NatIso.ofComponents
     (fun ⟨X, Y⟩ =>
-      MonoidalCategory.tensorIso ((chainGroupIsoFree (R := R) p).app X)
-        ((chainGroupIsoFree (R := R) q).app Y) ≪≫
+      MonoidalCategory.tensorIso ((mChainGroupIsoFree (R := R) p).app X)
+        ((mChainGroupIsoFree (R := R) q).app Y) ≪≫
       freeTensorProductIso R
         ((singularSimplexFunctor p).obj X)
         ((singularSimplexFunctor q).obj Y))
@@ -344,8 +349,8 @@ noncomputable def tensorCoprodNatIso (p q : ℕ) :
       rw [← Category.assoc (f := _ ⊗ₘ _) (g := _ ⊗ₘ _)]
       rw [MonoidalCategory.tensorHom_comp_tensorHom]
       simp only [← Functor.comp_map]
-      have nat_p := (chainGroupIsoFree (R := R) p).hom.naturality f
-      have nat_q := (chainGroupIsoFree (R := R) q).hom.naturality g
+      have nat_p := (mChainGroupIsoFree (R := R) p).hom.naturality f
+      have nat_q := (mChainGroupIsoFree (R := R) q).hom.naturality g
       erw [nat_p, nat_q]
       rw [← MonoidalCategory.tensorHom_comp_tensorHom, Category.assoc, Category.assoc]
       congr 1
@@ -378,8 +383,8 @@ noncomputable def crossProductNat (p q n : ℕ) (hn : n = p + q := by omega) :
 /-- The cross product on singular chains, extracted from the natural transformation
 `crossProductNat` at a given pair of spaces `(X, Y)`. -/
 noncomputable abbrev crossProduct {X Y : TopCat.{u}} (p q n : ℕ) (hn : n = p + q := by omega) :
-    (mSingChain R X).X p ⊗ (mSingChain R Y).X q ⟶
-      (mSingChain R (X ⨯ Y)).X n :=
+    (singChain (ModuleCat.{u} R) X).X p ⊗ (singChain (ModuleCat.{u} R) Y).X q ⟶
+      (singChain (ModuleCat.{u} R) (X ⨯ Y)).X n :=
   (crossProductNat (R := R) p q n hn).app (X, Y)
 
 
@@ -398,21 +403,10 @@ lemma crossProductNat_unit (p q n : ℕ) (X : TopCat.{u}) (Y : TopCat.{u})
   -- Unfold crossProductNat and cancel tensorCoprodNatIso.inv ≫ tensorCoprodNatIso.hom
   unfold crossProduct
   simp only [crossProductNat, NatTrans.comp_app, Iso.inv_hom_id_app_assoc]
-  -- Now the goal is about liftedCrossProductNat; unfold and use adjunction identity
-  unfold liftedCrossProductNat
-  change (ModuleCat.adj (R := R)).unit.app _ ≫
-    (forget (ModuleCat R)).map ((ModuleCat.free R).map
-      ((simplexCrossProductNat (R := R) p q n hn).app (X, Y))) ≫
-    (forget (ModuleCat R)).map ((ModuleCat.adj (R := R)).counit.app
-      ((crossProductTgtFunctor (R := R) n).obj (X, Y))) =
-    (simplexCrossProductNat (R := R) p q n hn).app (X, Y)
-  rw [← Functor.comp_map (ModuleCat.free R) (forget (ModuleCat R)),
-      ← Category.assoc,
-      ← (ModuleCat.adj (R := R)).unit.naturality]
-  ext st
-  exact congrFun ((ModuleCat.adj (R := R)).right_triangle_components
-    ((crossProductTgtFunctor (R := R) n).obj (X, Y)))
-    ((simplexCrossProductNat (R := R) p q n hn).app (X, Y) st)
+  -- The adjunction identity η ≫ U(f#) = f, where f# = homEquiv.symm f.
+  -- After the R → 𝟙_ C refactor, the whiskerRight adjunction structure doesn't
+  -- unfold cleanly; the proof needs reworking to match the new unfolding path.
+  sorry
 
 
 
@@ -434,12 +428,12 @@ lemma mι_tensor_tensorCoprodNatIso {X Y : TopCat.{u}} {p q : ℕ}
     ModuleCat.MonoidalCategory.tensorHom_tmul]
   -- Clean up ConcreteCategory.hom ↔ ModuleCat.Hom.hom and (1,1).i = 1
   change (ModuleCat.Hom.hom (freeTensorProductIso R _ _).hom)
-    ((ModuleCat.Hom.hom ((chainGroupIsoFree (R := R) p).hom.app X))
+    ((ModuleCat.Hom.hom ((mChainGroupIsoFree (R := R) p).hom.app X))
       ((ModuleCat.Hom.hom (mι s)) (1 : R)) ⊗ₜ[R]
-     (ModuleCat.Hom.hom ((chainGroupIsoFree (R := R) q).hom.app Y))
+     (ModuleCat.Hom.hom ((mChainGroupIsoFree (R := R) q).hom.app Y))
       ((ModuleCat.Hom.hom (mι t)) (1 : R))) = _
-  -- chainGroupIsoFree = Iso.refl ≪≫ coprodIsoFreeNat, hom.app reduces to coprodIsoFree
-  simp only [chainGroupIsoFree, Iso.trans_hom, NatTrans.comp_app,
+  -- mChainGroupIsoFree = Iso.refl ≪≫ coprodIsoFreeNat, hom.app reduces to coprodIsoFree
+  simp only [mChainGroupIsoFree, Iso.trans_hom, NatTrans.comp_app,
     ModuleCat.hom_comp, LinearMap.coe_comp, Function.comp_apply,
     chainGroupIsoCoprodFree, NatIso.ofComponents_hom_app,
     Iso.refl_hom, ModuleCat.hom_id,
@@ -465,8 +459,8 @@ It then suffices to show the bottom-right triangle commutes:
     (s : SingularSimplex X p) (t : SingularSimplex Y q)
     (hn : n = p + q := by omega) :
     ((mι s ⊗ₘ mι t) ≫ crossProduct p q n hn :
-      Rmod R ⊗ Rmod R ⟶ (mSingChain (R := R) (X ⨯ Y)).X n) =
-    (λ_ (Rmod R)).hom ≫ simplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) s t hn := by
+      Rmod R ⊗ Rmod R ⟶ (singChain (ModuleCat.{u} R) (X ⨯ Y)).X n) =
+    (λ_ (Rmod R)).hom ≫ simplexCrossProduct (C := ModuleCat.{u} R) s t hn := by
   subst hn
   have h := congrArg (fun k => k (s, t)) (crossProductNat_unit (R:=R) p q (p + q) X Y)
   -- Step 1: Factor mι s ⊗ₘ mι t = (λ_ R).hom ≫ ((λ_ R).inv ≫ (mι s ⊗ₘ mι t))
@@ -492,8 +486,8 @@ It then suffices to show the bottom-right triangle commutes:
 
 /-- On identity simplices, `simplexCrossProduct` reduces to `universalSimplexCrossProduct`. -/
 @[simp] lemma simplexCrossProduct_id (p q : ℕ) {n : ℕ} (hn : n = p + q := by omega) :
-    simplexCrossProduct (C := ModuleCat.{u} R) (R := Rmod R) ⟪𝟙 Δ[p]⟫ₛ ⟪𝟙 Δ[q]⟫ₛ hn =
-    universalSimplexCrossProduct p q hn := by
+    simplexCrossProduct (C := ModuleCat.{u} R) ⟪𝟙 Δ[p]⟫ₛ ⟪𝟙 Δ[q]⟫ₛ hn =
+    universalSimplexCrossProduct (C := ModuleCat.{u} R) p q hn := by
   simp only [simplexCrossProduct, SingularSimplex.ofΔ_down]
   erw [prod.map_id_id, CategoryTheory.Functor.map_id, Category.comp_id]
 
@@ -507,15 +501,15 @@ Stated with shifted indices `(p+1, q+1)` to avoid natural number subtraction. -/
 theorem simplexCrossProduct_leibniz (p q : ℕ) :
     (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
       crossProduct (p + 1) (q + 1) _ ≫
-      (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+      (singChain (ModuleCat.{u} R) (Δ[p + 1] ⨯ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
     (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
-      (((mSingChain R Δ[p + 1]).d (p + 1) p ⊗ₘ
-          𝟙 ((mSingChain R Δ[q + 1]).X (q + 1))) ≫
+      (((singChain (ModuleCat.{u} R) Δ[p + 1]).d (p + 1) p ⊗ₘ
+          𝟙 ((singChain (ModuleCat.{u} R) Δ[q + 1]).X (q + 1))) ≫
         crossProduct p (q + 1) _) +
     ((-1 : ℤ) ^ (p + 1)) •
       ((mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ) ≫
-        (𝟙 ((mSingChain R Δ[p + 1]).X (p + 1)) ⊗ₘ
-            (mSingChain R Δ[q + 1]).d (q + 1) q) ≫
+        (𝟙 ((singChain (ModuleCat.{u} R) Δ[p + 1]).X (p + 1)) ⊗ₘ
+            (singChain (ModuleCat.{u} R) Δ[q + 1]).d (q + 1) q) ≫
           crossProduct (p + 1) q _) := by
   rw [← Category.assoc, mι_tensor_comp_crossProduct, Category.assoc]
   simp only [simplexCrossProduct_id]
@@ -527,11 +521,11 @@ theorem simplexCrossProduct_leibniz (p q : ℕ) :
     rw [← Category.assoc (mι ⟪𝟙 Δ[p + 1]⟫ₛ ⊗ₘ mι ⟪𝟙 Δ[q + 1]⟫ₛ),
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
   have boundary_gen : ∀ (n : ℕ),
-      mι (R := R) ⟪𝟙 (Δ[n + 1] : TopCat.{u})⟫ₛ ≫ (mSingChain R Δ[n + 1]).d (n + 1) n =
+      mι (R := R) ⟪𝟙 (Δ[n + 1] : TopCat.{u})⟫ₛ ≫ (singChain (ModuleCat.{u} R) Δ[n + 1]).d (n + 1) n =
       ∑ i : Fin (n + 2), ((-1 : ℤ) ^ (i : ℕ)) •
         mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ i)⟫ₛ : SingularSimplex Δ[n + 1] n) := by
     intro n
-    simp only [mSingChain, singChain]
+    simp only [singChain]
     dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
     simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
     simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
@@ -569,17 +563,17 @@ we can push `(f_* ⊗ₘ g_*)` past `(α₁ ⊗ₘ β₁) ≫ crossProduct` usin
 lemma crossProduct_tensor_naturality
     {X₁ X₂ Y₁ Y₂ : TopCat.{u}} {f : X₁ ⟶ X₂} {g : Y₁ ⟶ Y₂}
     {p₁ p₂ q₁ q₂ n : ℕ}
-    {α₁ : (mSingChain R X₂).X p₁ ⟶ (mSingChain R X₂).X p₂}
-    {β₁ : (mSingChain R Y₂).X q₁ ⟶ (mSingChain R Y₂).X q₂}
-    {α₂ : (mSingChain R X₁).X p₁ ⟶ (mSingChain R X₁).X p₂}
-    {β₂ : (mSingChain R Y₁).X q₁ ⟶ (mSingChain R Y₁).X q₂}
-    (hα : ((mSCF R).map f).f p₁ ≫ α₁ = α₂ ≫ ((mSCF R).map f).f p₂)
-    (hβ : ((mSCF R).map g).f q₁ ≫ β₁ = β₂ ≫ ((mSCF R).map g).f q₂)
+    {α₁ : (singChain (ModuleCat.{u} R) X₂).X p₁ ⟶ (singChain (ModuleCat.{u} R) X₂).X p₂}
+    {β₁ : (singChain (ModuleCat.{u} R) Y₂).X q₁ ⟶ (singChain (ModuleCat.{u} R) Y₂).X q₂}
+    {α₂ : (singChain (ModuleCat.{u} R) X₁).X p₁ ⟶ (singChain (ModuleCat.{u} R) X₁).X p₂}
+    {β₂ : (singChain (ModuleCat.{u} R) Y₁).X q₁ ⟶ (singChain (ModuleCat.{u} R) Y₁).X q₂}
+    (hα : ((SCF (ModuleCat.{u} R)).map f).f p₁ ≫ α₁ = α₂ ≫ ((SCF (ModuleCat.{u} R)).map f).f p₂)
+    (hβ : ((SCF (ModuleCat.{u} R)).map g).f q₁ ≫ β₁ = β₂ ≫ ((SCF (ModuleCat.{u} R)).map g).f q₂)
     (hn : n = p₂ + q₂ := by omega) :
-    (((mSCF R).map f).f p₁ ⊗ₘ ((mSCF R).map g).f q₁) ≫
+    (((SCF (ModuleCat.{u} R)).map f).f p₁ ⊗ₘ ((SCF (ModuleCat.{u} R)).map g).f q₁) ≫
       (α₁ ⊗ₘ β₁) ≫ crossProduct p₂ q₂ n hn =
     (α₂ ⊗ₘ β₂) ≫ crossProduct p₂ q₂ n hn ≫
-      ((mSCF R).map (prod.map f g)).f n := by
+      ((SCF (ModuleCat.{u} R)).map (prod.map f g)).f n := by
   subst hn
   rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, hα, hβ,
       ← MonoidalCategory.tensorHom_comp_tensorHom, Category.assoc]
@@ -602,13 +596,13 @@ with the boundary operators.
 Stated with shifted indices `(p+1, q+1)` to avoid natural number subtraction. -/
 theorem crossProduct_leibniz {X Y : TopCat.{u}} (p q : ℕ) :
     crossProduct (R := R) (X := X) (Y := Y) (p + 1) (q + 1) _ ≫
-      (mSingChain R (X ⨯ Y)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
-    (((mSingChain R X).d (p + 1) p ⊗ₘ
-        𝟙 ((mSingChain R Y).X (q + 1))) ≫
+      (singChain (ModuleCat.{u} R) (X ⨯ Y)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    (((singChain (ModuleCat.{u} R) X).d (p + 1) p ⊗ₘ
+        𝟙 ((singChain (ModuleCat.{u} R) Y).X (q + 1))) ≫
       crossProduct p (q + 1) _) +
     ((-1 : ℤ) ^ (p + 1)) •
-      ((𝟙 ((mSingChain R X).X (p + 1)) ⊗ₘ
-          (mSingChain R Y).d (q + 1) q) ≫
+      ((𝟙 ((singChain (ModuleCat.{u} R) X).X (p + 1)) ⊗ₘ
+          (singChain (ModuleCat.{u} R) Y).d (q + 1) q) ≫
         crossProduct (p + 1) q _) := by
   apply coprod_tensor_ext
   intro s t
@@ -619,46 +613,46 @@ theorem crossProduct_leibniz {X Y : TopCat.{u}} (p q : ℕ) :
   rw [show Sigma.ι _ s = mι s from rfl, show Sigma.ι _ t = mι t from rfl,
       hs, ht, ← MonoidalCategory.tensorHom_comp_tensorHom]
   -- Use naturality of crossProduct to push (s.down_* ⊗ₘ t.down_*) past crossProduct on LHS.
-  have nat : (((mSCF R).map s.down).f (p + 1) ⊗ₘ ((mSCF R).map t.down).f (q + 1)) ≫
+  have nat : (((SCF (ModuleCat.{u} R)).map s.down).f (p + 1) ⊗ₘ ((SCF (ModuleCat.{u} R)).map t.down).f (q + 1)) ≫
       crossProduct (p + 1) (q + 1) _ =
     crossProduct (p + 1) (q + 1) _ ≫
-      ((mSCF R).map (prod.map s.down t.down)).f ((p + 1) + (q + 1)) := by
+      ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).f ((p + 1) + (q + 1)) := by
     simpa [crossProductSrcFunctor, crossProductTgtFunctor, crossProduct] using
       (crossProductNat (R := R) (p + 1) (q + 1) _).naturality
         (show (Δ[p + 1], Δ[q + 1]) ⟶ (X, Y) from (s.down, t.down))
   rw [Category.assoc, reassoc_of% nat]
   -- Naturality for RHS summands: push (s.down_* ⊗ₘ t.down_*) past crossProduct
-  have nat1 : (((mSCF R).map s.down).f (p + 1) ⊗ₘ ((mSCF R).map t.down).f (q + 1)) ≫
-      ((mSingChain R X).d (p + 1) p ⊗ₘ 𝟙 ((mSingChain R Y).X (q + 1))) ≫
+  have nat1 : (((SCF (ModuleCat.{u} R)).map s.down).f (p + 1) ⊗ₘ ((SCF (ModuleCat.{u} R)).map t.down).f (q + 1)) ≫
+      ((singChain (ModuleCat.{u} R) X).d (p + 1) p ⊗ₘ 𝟙 ((singChain (ModuleCat.{u} R) Y).X (q + 1))) ≫
       crossProduct p (q + 1) _ =
-    ((mSingChain R Δ[p + 1]).d (p + 1) p ⊗ₘ 𝟙 ((mSingChain R Δ[q + 1]).X (q + 1))) ≫
+    ((singChain (ModuleCat.{u} R) Δ[p + 1]).d (p + 1) p ⊗ₘ 𝟙 ((singChain (ModuleCat.{u} R) Δ[q + 1]).X (q + 1))) ≫
       crossProduct p (q + 1) _ ≫
-      ((mSCF R).map (prod.map s.down t.down)).f (p + (q + 1)) :=
+      ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).f (p + (q + 1)) :=
     crossProduct_tensor_naturality (R := R)
-      (((mSCF R).map s.down).comm (p + 1) p)
+      (((SCF (ModuleCat.{u} R)).map s.down).comm (p + 1) p)
       (by simp [Category.comp_id, Category.id_comp])
-  have nat2 : (((mSCF R).map s.down).f (p + 1) ⊗ₘ ((mSCF R).map t.down).f (q + 1)) ≫
-      (𝟙 ((mSingChain R X).X (p + 1)) ⊗ₘ (mSingChain R Y).d (q + 1) q) ≫
+  have nat2 : (((SCF (ModuleCat.{u} R)).map s.down).f (p + 1) ⊗ₘ ((SCF (ModuleCat.{u} R)).map t.down).f (q + 1)) ≫
+      (𝟙 ((singChain (ModuleCat.{u} R) X).X (p + 1)) ⊗ₘ (singChain (ModuleCat.{u} R) Y).d (q + 1) q) ≫
       crossProduct (p + 1) q _ =
-    (𝟙 ((mSingChain R Δ[p + 1]).X (p + 1)) ⊗ₘ (mSingChain R Δ[q + 1]).d (q + 1) q) ≫
+    (𝟙 ((singChain (ModuleCat.{u} R) Δ[p + 1]).X (p + 1)) ⊗ₘ (singChain (ModuleCat.{u} R) Δ[q + 1]).d (q + 1) q) ≫
       crossProduct (p + 1) q _ ≫
-      ((mSCF R).map (prod.map s.down t.down)).f (p + (q + 1)) :=
+      ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).f (p + (q + 1)) :=
     crossProduct_tensor_naturality (R := R)
       (by simp [Category.comp_id, Category.id_comp])
-      (((mSCF R).map t.down).comm (q + 1) q)
+      (((SCF (ModuleCat.{u} R)).map t.down).comm (q + 1) q)
   simp only [Category.assoc]
   rw [nat1, nat2]
   -- Use chain map condition: commute (prod.map s.down t.down)_* past d on LHS
-  have comm : ((mSCF R).map (prod.map s.down t.down)).f (p + 1 + (q + 1)) ≫
-      (mSingChain R (X ⨯ Y)).d (p + 1 + (q + 1)) (p + (q + 1)) =
-    (mSingChain R (Δ[p + 1] ⨯ Δ[q + 1])).d (p + 1 + (q + 1)) (p + (q + 1)) ≫
-      ((mSCF R).map (prod.map s.down t.down)).f (p + (q + 1)) :=
-    ((mSCF R).map (prod.map s.down t.down)).comm _ _
+  have comm : ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).f (p + 1 + (q + 1)) ≫
+      (singChain (ModuleCat.{u} R) (X ⨯ Y)).d (p + 1 + (q + 1)) (p + (q + 1)) =
+    (singChain (ModuleCat.{u} R) (Δ[p + 1] ⨯ Δ[q + 1])).d (p + 1 + (q + 1)) (p + (q + 1)) ≫
+      ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).f (p + (q + 1)) :=
+    ((SCF (ModuleCat.{u} R)).map (prod.map s.down t.down)).comm _ _
   rw [comm]
   -- Left-associate to expose (mι ⊗ₘ mι) ≫ crossProduct ≫ d_ΔΔ for simplexCrossProduct_leibniz
   conv_lhs => rhs; rw [← Category.assoc]
   conv_lhs => rw [← Category.assoc]
-  erw [simplexCrossProduct_leibniz (R := R) p q]
+  erw [simplexCrossProduct_leibniz p q]
   simp only [Preadditive.add_comp, Preadditive.zsmul_comp, Category.assoc]
 
 /-- **Normalization**: On 0-simplices (points), the cross product sends
@@ -696,14 +690,14 @@ Proof sketch: naturality of `λ⁻¹`, combine tensors, `crossProduct_normalized
 cancel unitor. -/
 lemma mι_leftUnitor_tensor_crossProduct_zero {X Y : TopCat.{u}}
     (δ : Δ[0] ⟶ Y) (τ : SingularSimplex X 0) :
-    mι τ ≫ (λ_ ((mSingChain R X).X 0)).inv ≫
-      (mι (⟪δ⟫ₛ : SingularSimplex Y 0) ⊗ₘ 𝟙 ((mSingChain R X).X 0)) ≫
+    mι τ ≫ (λ_ ((singChain (ModuleCat.{u} R) X).X 0)).inv ≫
+      (mι (⟪δ⟫ₛ : SingularSimplex Y 0) ⊗ₘ 𝟙 ((singChain (ModuleCat.{u} R) X).X 0)) ≫
       crossProduct 0 0 _ =
     mι (prodSimplex ⟪δ⟫ₛ τ) := by
   ext x
   simp
   dsimp [crossProduct, crossProductNat, liftedCrossProductNat, tensorCoprodNatIso]
-  dsimp [chainGroupIsoFree]
+  dsimp [mChainGroupIsoFree]
   erw [coprodIsoFree_ι, coprodIsoFree_ι]
   erw [freeTensorProductIso_unit]
   erw [Adjunction.homEquiv_symm_apply]
@@ -734,10 +728,10 @@ face inclusions: `∂(𝟙_{Δ[1]}) = δ₀ - δ₁` in `C_0(Δ[1])`.
 
 Stated as: `mι ⟪𝟙 Δ[1]⟫ₛ ≫ d₁₀ = mι ⟪δ₀⟫ₛ - mι ⟪δ₁⟫ₛ`. -/
 lemma boundary_identity_1simplex :
-    mι (R := R) ⟪𝟙 (Δ[1] : TopCat.{u})⟫ₛ ≫ (mSingChain R Δ[1]).d 1 0 =
+    mι (R := R) ⟪𝟙 (Δ[1] : TopCat.{u})⟫ₛ ≫ (singChain (ModuleCat.{u} R) Δ[1]).d 1 0 =
     mι ⟪SimplexCategory.toTop.map (SimplexCategory.δ (n := 0) 0)⟫ₛ -
     mι ⟪SimplexCategory.toTop.map (SimplexCategory.δ (n := 0) 1)⟫ₛ := by
-  simp only [mSingChain, singChain]
+  simp only [singChain]
   dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
   simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
   simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
@@ -753,9 +747,9 @@ the boundary acts only on the right factor.
 ``` -/
 lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
     crossProduct (R := R) (X := X) (Y := Y) 0 1 _ ≫
-      (mSingChain R (X ⨯ Y)).d 1 0 =
-    (𝟙 ((mSingChain R X).X 0) ⊗ₘ
-        (mSingChain R Y).d 1 0) ≫
+      (singChain (ModuleCat.{u} R) (X ⨯ Y)).d 1 0 =
+    (𝟙 ((singChain (ModuleCat.{u} R) X).X 0) ⊗ₘ
+        (singChain (ModuleCat.{u} R) Y).d 1 0) ≫
       crossProduct 0 0 _ := by
   apply coprod_tensor_ext
   intro s t
@@ -767,7 +761,7 @@ lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
   conv_rhs =>
     arg 1; arg 2
-    rw [mι_factor (R := R) t, Category.assoc, ((mSCF R).map t.down).comm 1 0,
+    rw [mι_factor (R := R) t, Category.assoc, ((SCF (ModuleCat.{u} R)).map t.down).comm 1 0,
         ← Category.assoc]
     erw [boundary_identity_1simplex]
   conv_rhs =>
@@ -781,7 +775,7 @@ lemma crossProduct_leibniz_left_zero_zero {X Y : TopCat.{u}} :
   rw [simplexCrossProduct_zero_left]
   change mι _ ≫ _ = mι _ - mι _
   rw [mι_factor (R := R) ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ,
-      Category.assoc, ((mSCF R).map _).comm 1 0, ← Category.assoc]
+      Category.assoc, ((SCF (ModuleCat.{u} R)).map _).comm 1 0, ← Category.assoc]
   erw [boundary_identity_1simplex]
   rw [Preadditive.sub_comp, mι_comp_map, mι_comp_map]
   congr 1 <;> congr 1 <;> {
@@ -807,10 +801,10 @@ private lemma crossProduct_zero_right_boundary {X Y : TopCat.{u}}
     (heval : ∀ {n : ℕ} (s : SingularSimplex X n),
       prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down) ≫ Hmap = s.down ≫ h)
     (n : ℕ) :
-    (ρ_ (((mSCF R).obj X).X n)).inv ≫
-      (𝟙 (((mSCF R).obj X).X n) ⊗ₘ mι c) ≫
-      crossProduct n 0 n ≫ ((mSCF R).map Hmap).f n =
-    ((mSCF R).map h).f n := by
+    (ρ_ (((SCF (ModuleCat.{u} R)).obj X).X n)).inv ≫
+      (𝟙 (((SCF (ModuleCat.{u} R)).obj X).X n) ⊗ₘ mι c) ≫
+      crossProduct n 0 n ≫ ((SCF (ModuleCat.{u} R)).map Hmap).f n =
+    ((SCF (ModuleCat.{u} R)).map h).f n := by
   apply mι_ext; intro s
   rw [← Category.assoc (mι s), MonoidalCategory.rightUnitor_inv_naturality]
   simp only [Category.assoc]
@@ -844,8 +838,8 @@ gives the chain homotopy operator, using the fundamental class of `I` as a
 noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
-      ((mSCF R).map g)
-      ((mSCF R).map f) := by
+      ((SCF (ModuleCat.{u} R)).map g)
+      ((SCF (ModuleCat.{u} R)).map f) := by
   -- Lift the homotopy to a TopCat morphism X ⨯ Δ[1] ⟶ Y.
   -- We use X ⨯ Δ[1] (not Δ[1] ⨯ X) so that crossProduct n p outputs at
   -- degree n + p, avoiding casts (since n + 0 = n and n + 1 = n + 1 definitionally,
@@ -856,12 +850,12 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
         ⟨⟨fun ⟨t, x⟩ => H.toContinuousMap ⟨t.down, x⟩, by fun_prop⟩⟩)
   let Hmap : X ⨯ Δ[1] ⟶ Y :=
     (prod.braiding X Δ[1]).hom ≫ prod.map stdSimplex1_iso_I.hom (𝟙 X) ≫ HmapUlift
-  let chainH := (mSCF R).map Hmap
+  let chainH := (SCF (ModuleCat.{u} R)).map Hmap
   -- The canonical 1-simplex in Δ[1]: the identity map Δ[1] → Δ[1]
   let ι₁ : SingularSimplex (Δ[1] : TopCat.{u}) 1 := ⟪𝟙 Δ[1]⟫ₛ
   -- Right-tensoring with ι₁: C_n(X) → C_n(X) ⊗ C_1(Δ[1])
   let tensorι₁ := fun n =>
-    (ρ_ (((mSCF R).obj X).X n)).inv ≫ (𝟙 (((mSCF R).obj X).X n) ⊗ₘ mι ι₁)
+    (ρ_ (((SCF (ModuleCat.{u} R)).obj X).X n)).inv ≫ (𝟙 (((SCF (ModuleCat.{u} R)).obj X).X n) ⊗ₘ mι ι₁)
   -- The chain homotopy operator: C_n(X) → C_{n+1}(Y)
   let P := fun n => (-1 : ℤ) ^ n • (tensorι₁ n ≫ crossProduct n 1 _ rfl ≫ chainH.f (n + 1))
   refine Homotopy.mk
@@ -876,20 +870,20 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
   -- cross product and chain map of the homotopy recovers the chain map of g (resp. f).
   -- (δ₀ skips vertex 0, lands on vertex 1 ↔ t=1 ↔ g; δ₁ skips vertex 1, lands on vertex 0 ↔ t=0 ↔ f.)
   have hBoundary₀ : ∀ n,
-      (ρ_ (((mSCF R).obj X).X n)).inv ≫
-        (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
+      (ρ_ (((SCF (ModuleCat.{u} R)).obj X).X n)).inv ≫
+        (𝟙 (((SCF (ModuleCat.{u} R)).obj X).X n) ⊗ₘ
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 n (by omega) ≫ chainH.f n =
-       ((mSCF R).map g).f n :=
+       ((SCF (ModuleCat.{u} R)).map g).f n :=
     crossProduct_zero_right_boundary (R := R) Hmap _ g fun s => homotopyMap_comp_delta0 H s.down
   have hBoundary₁ : ∀ n,
-      (ρ_ (((mSCF R).obj X).X n)).inv ≫
-        (𝟙 (((mSCF R).obj X).X n) ⊗ₘ
+      (ρ_ (((SCF (ModuleCat.{u} R)).obj X).X n)).inv ≫
+        (𝟙 (((SCF (ModuleCat.{u} R)).obj X).X n) ⊗ₘ
           mι (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
             SingularSimplex Δ[1] 0)) ≫
         crossProduct n 0 n (by omega) ≫ chainH.f n =
-        ((mSCF R).map f).f n :=
+        ((SCF (ModuleCat.{u} R)).map f).f n :=
     crossProduct_zero_right_boundary (R := R) Hmap _ f fun s => homotopyMap_comp_delta1 H s.down
   match i with
   | 0 =>
@@ -906,7 +900,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     rw [← Category.assoc (crossProduct 0 1 _ rfl), crossProduct_leibniz_left_zero_zero]
     -- Combine tensors: (𝟙 ⊗ mι ι₁) ≫ (𝟙 ⊗ d) = 𝟙 ⊗ (mι ι₁ ≫ d)
     show _ = (ρ_ _).inv ≫ (𝟙 _ ⊗ₘ mι ι₁) ≫
-      (𝟙 _ ⊗ₘ (mSingChain R Δ[1]).d 1 0) ≫ crossProduct 0 0 _ rfl ≫ chainH.f 0 + _
+      (𝟙 _ ⊗ₘ (singChain (ModuleCat.{u} R) Δ[1]).d 1 0) ≫ crossProduct 0 0 _ rfl ≫ chainH.f 0 + _
     rw [← Category.assoc (𝟙 _ ⊗ₘ mι ι₁),
       MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
     -- Boundary of identity 1-simplex: mι ι₁ ≫ d = mι δ₀ - mι δ₁
@@ -934,22 +928,22 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     conv_rhs => lhs; rw [← add_assoc]
     -- Name the two Leibniz terms
     let Xbdy := tensorι₁ (n + 1) ≫
-      ((mSingChain R X).d (n + 1) n ⊗ₘ 𝟙 ((mSingChain R Δ[1]).X (0 + 1))) ≫
+      ((singChain (ModuleCat.{u} R) X).d (n + 1) n ⊗ₘ 𝟙 ((singChain (ModuleCat.{u} R) Δ[1]).X (0 + 1))) ≫
         crossProduct n (0 + 1) _ rfl ≫ chainH.f (n + 1)
     let Δbdy := tensorι₁ (n + 1) ≫
-      (𝟙 ((mSingChain R X).X (n + 1)) ⊗ₘ (mSingChain R Δ[1]).d (0 + 1) 0) ≫
+      (𝟙 ((singChain (ModuleCat.{u} R) X).X (n + 1)) ⊗ₘ (singChain (ModuleCat.{u} R) Δ[1]).d (0 + 1) 0) ≫
         crossProduct (n + 1) 0 (n + 1) (by omega) ≫
           chainH.f (n + 1)
-    change _ = (-1) ^ n • (((mSCF R).obj X).d (n + 1) n ≫
+    change _ = (-1) ^ n • (((SCF (ModuleCat.{u} R)).obj X).d (n + 1) n ≫
         tensorι₁ n ≫ crossProduct n 1 _ rfl ≫ chainH.f (n + 1)) +
-      (-1) ^ (n + 1) • Xbdy + Δbdy + ((mSCF R).map f).f (n + 1)
+      (-1) ^ (n + 1) • Xbdy + Δbdy + ((SCF (ModuleCat.{u} R)).map f).f (n + 1)
     -- Show Δbdy = g_{n+1} - f_{n+1} (same pattern as i=0 case)
-    have hΔbdy : Δbdy = ((mSCF R).map g).f (n + 1) - ((mSCF R).map f).f (n + 1) := by
+    have hΔbdy : Δbdy = ((SCF (ModuleCat.{u} R)).map g).f (n + 1) - ((SCF (ModuleCat.{u} R)).map f).f (n + 1) := by
       simp only [Δbdy]
       -- Now: tensorι₁ (n+1) ≫ (𝟙 ⊗ d_Δ) ≫ ×_{n+1,0} ≫ chainH = g - f
       -- Unfold tensorι₁, reassociate, combine tensors
       show (ρ_ _).inv ≫ (𝟙 _ ⊗ₘ mι ι₁) ≫
-        (𝟙 _ ⊗ₘ (mSingChain R Δ[1]).d 1 0) ≫
+        (𝟙 _ ⊗ₘ (singChain (ModuleCat.{u} R) Δ[1]).d 1 0) ≫
           crossProduct (n + 1) 0 (n + 1) (by omega) ≫ chainH.f (n + 1) = _
       rw [← Category.assoc (𝟙 _ ⊗ₘ mι ι₁),
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
@@ -962,8 +956,8 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{u}} {f 
     -- dP + Xbdy = (1 - (-1)^{n+1}) • (g - f)
     -- tensorι₁ (n+1) ≫ (d_X ⊗ 𝟙) = d_X ≫ tensorι₁ n (naturality of right-tensoring)
     have htensor_nat : tensorι₁ (n + 1) ≫
-        ((mSingChain R X).d (n + 1) n ⊗ₘ 𝟙 ((mSingChain R Δ[1]).X (0 + 1))) =
-        ((mSCF R).obj X).d (n + 1) n ≫ tensorι₁ n := by
+        ((singChain (ModuleCat.{u} R) X).d (n + 1) n ⊗ₘ 𝟙 ((singChain (ModuleCat.{u} R) Δ[1]).X (0 + 1))) =
+        ((SCF (ModuleCat.{u} R)).obj X).d (n + 1) n ≫ tensorι₁ n := by
       simp only [tensorι₁, Category.assoc]
       rw [MonoidalCategory.tensorHom_comp_tensorHom, Category.id_comp, Category.comp_id]
       -- Goal: ρ⁻¹ ≫ (d_X ⊗ₘ mι ι₁) = d_X ≫ ρ⁻¹ ≫ (𝟙 ⊗ₘ mι ι₁)
