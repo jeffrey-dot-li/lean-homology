@@ -848,6 +848,18 @@ lemma simplexCrossProduct_zero_left {X Y : TopCat.{v}} {n : ℕ}
       exact eqToHom_map _ _
     rw [← Category.assoc, eqToHom_trans, eqToHom_refl, Category.id_comp]
 
+/-- Naturality of `simplexCoprojection` w.r.t. the singular chain functor:
+pushing a continuous map `f : X ⟶ Y` through the coprojection reindexes the
+simplex by postcomposition, `σ ↦ σ ≫ f`. -/
+@[simp] lemma simplexCoprojection_comp_SCF_map {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (f : X ⟶ Y) :
+    simplexCoprojection (C := C) s ≫ ((SCF C).map f).f n =
+    simplexCoprojection ⟪s.down ≫ f⟫ₛ := by
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor,
+    SSet.singularChainComplexFunctor]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp only [Category.id_comp]; congr 1
+
 lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj (𝟙_ C)]
     (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ}
     (s : Δ[p] ⟶ X) (t : Δ[q] ⟶ Y)
@@ -874,6 +886,38 @@ lemma crossProduct_natural_pure_tensor {X X' Y Y' : TopCat.{v}} [MonObj (𝟙_ C
     simpa [HomologicalComplex.comp_f] using this
   -- Finish by rewriting the LHS using `hmap` and `hprod`.
   simp [hmap, hprod]
+
+/-- Naturality of the chain-level cross product: given continuous maps `f : X ⟶ X'`
+and `g : Y ⟶ Y'`, the cross product commutes with the induced chain maps:
+`chainCrossProduct ≫ (prod.map f g)_* = (f_* ⊗ g_*) ≫ chainCrossProduct`.
+
+This lifts `crossProduct_natural_pure_tensor` from the simplex level to the chain level
+using `chainCrossProduct.ext` (injectivity of `chainTensorHomEquiv`). -/
+theorem crossProduct_natural {X X' Y Y' : TopCat.{v}}
+    (f : X ⟶ X') (g : Y ⟶ Y') {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    chainCrossProduct (C := C) hn ≫ ((SCF C).map (prod.map f g)).f n =
+    (((SCF C).map f).f p ⊗ₘ ((SCF C).map g).f q) ≫ chainCrossProduct (C := C) hn := by
+  apply chainCrossProduct.ext
+  ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply]
+  -- RHS: rewrite (ι s ⊗ₘ ι t) ≫ (f_* ⊗ₘ g_*) = (ι s ≫ f_*) ⊗ₘ (ι t ≫ g_*)
+  rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc]
+  rw [simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+  -- LHS: (λ_.inv ≫ (ι s ⊗ₘ ι t) ≫ chainCrossProduct ≫ (prod.map f g)_*)
+  -- Reassociate so ← chainTensorHomEquiv_apply can match on LHS
+  rw [show (λ_ (𝟙_ C)).inv ≫
+    (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn ≫
+      ((SCF C).map (prod.map f g)).f n =
+    ((λ_ (𝟙_ C)).inv ≫
+      (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn) ≫
+      ((SCF C).map (prod.map f g)).f n from by simp [Category.assoc]]
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C) hn) (s, t)]
+  -- RHS: (λ_.inv ≫ (ι ⟪s.down ≫ f⟫ₛ ⊗ₘ ι ⟪t.down ≫ g⟫ₛ) ≫ chainCrossProduct)
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C) hn) (⟪s.down ≫ f⟫ₛ, ⟪t.down ≫ g⟫ₛ)]
+  exact crossProduct_natural_pure_tensor f g s.down t.down hn
 
 /-- The boundary map of `singChain` equals the alternating face map differential.
 This avoids unfolding `singChain`/`SCF` through deep functor composition. -/
@@ -941,18 +985,6 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {X : TopCat.{v}} {n m : ℕ} (h :
     SSet.singularChainComplexFunctor, SimplicialObject.δ, SimplicialObject.whiskering]
   erw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp
-
-/-- Naturality of `simplexCoprojection` w.r.t. the singular chain functor:
-pushing a continuous map `f : X ⟶ Y` through the coprojection reindexes the
-simplex by postcomposition, `σ ↦ σ ≫ f`. -/
-@[simp] lemma simplexCoprojection_comp_SCF_map {X Y : TopCat.{v}} {n : ℕ}
-    (s : SingularSimplex X n) (f : X ⟶ Y) :
-    simplexCoprojection (C := C) s ≫ ((SCF C).map f).f n =
-    simplexCoprojection ⟪s.down ≫ f⟫ₛ := by
-  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor,
-    SSet.singularChainComplexFunctor]
-  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
-  simp only [Category.id_comp]; congr 1
 
 /-- The boundary of the universal simplex cross product decomposes as a signed sum
 of face-map cross products (the "universal Leibniz rule"):
