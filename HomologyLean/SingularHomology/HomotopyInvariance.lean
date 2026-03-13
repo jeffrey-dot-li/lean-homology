@@ -1544,6 +1544,7 @@ lemma chainCrossProduct_zero_right_boundary {X Y : TopCat.{v}}
   rw [simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
   congr 1; apply ULift.ext; simp only [SingularSimplex.ofΔ_down]; exact heval s
 
+--# TODO: Get rid of this and just derive from the other one
 /-- Special case of the Leibniz rule for degree `(0, 1)`:
 the cross product `chainCrossProduct (0, 1)` composed with the boundary `d` equals
 `(𝟙 ⊗ d) ≫ chainCrossProduct (0, 0)`. -/
@@ -1611,6 +1612,198 @@ lemma chainCrossProduct_leibniz_left_zero_zero {X Y : TopCat.{v}} :
     · rw [prod.lift_snd, prod.lift_snd, ← Category.assoc,
           ← SimplexCategory.toTop.map_comp, SimplexCategory.default_mk0_eq_id, Category.id_comp]
   }
+
+/-- **Leibniz rule, right-zero case** `(p+1, 0)`:
+The cross product `chainCrossProduct (p+1, 0)` composed with the boundary `d` equals
+`(d_X ⊗ 𝟙) ≫ chainCrossProduct (p, 0)`.
+
+There is a unique `(p+1, 0)`-shuffle with sign `1`, so the cross product reduces
+to `simplexCrossProduct_zero_right`. The `d₂` term vanishes because `Y` has
+no differential from degree `0`. -/
+lemma chainCrossProduct_leibniz_right_zero {X Y : TopCat.{v}} (p : ℕ) :
+    (chainCrossProduct (C := C) (X := X) (Y := Y) (p := p + 1) (q := 0) :
+        _ ⟶ (singChain C (X ⨯ Y)).X (p + 1)) ≫
+      (singChain C (X ⨯ Y)).d (p + 1) p =
+    ((singChain C X).d (p + 1) p ⊗ₘ
+        𝟙 ((singChain C Y).X 0)) ≫
+      (chainCrossProduct (C := C) (p := p) (q := 0) :
+        _ ⟶ (singChain C (X ⨯ Y)).X p) := by
+  apply chainCrossProduct.ext; ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  congr 1
+  have gen_key : ∀ {X' Y' : TopCat.{v}} {a b n : ℕ} (hn : n = a + b)
+      (s' : SingularSimplex X' a) (t' : SingularSimplex Y' b),
+      (simplexCoprojection (C := C) s' ⊗ₘ simplexCoprojection t') ≫
+        chainCrossProduct (C := C) hn =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (C := C) hn (s', t') := by
+    intro X' Y' a b n hn s' t'
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+    rw [← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) hn) (s', t')
+  -- LHS: unfold crossProduct(p+1,0) via gen_key and simplexCrossProduct_zero_right
+  rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
+  rw [gen_key]
+  simp only [simplexCrossProduct']
+  rw [simplexCrossProduct_zero_right (C := C)]
+  -- LHS: expand d(X⨯Y) into face map sum
+  rw [Category.assoc, singChain_d_eq_alternatingFaceMapObjD (C := C) (X ⨯ Y) p rfl]
+  simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
+    Preadditive.comp_sum, Preadditive.comp_zsmul, Category.assoc]
+  -- RHS: fuse (ι s ⊗ ι t) ≫ (d_X ⊗ 𝟙) into ((ι s ≫ d_X) ⊗ ι t)
+  conv_rhs =>
+    rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  -- RHS: expand d_X
+  conv_rhs =>
+    enter [1, 1]
+    rw [singChain_d_eq_alternatingFaceMapObjD (C := C) X p rfl]
+    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
+      Preadditive.comp_sum, Preadditive.comp_zsmul]
+  -- Distribute ⊗ₘ over the sum, then ≫ over the sum
+  rw [sum_tensor, Preadditive.sum_comp]
+  -- Match term by term
+  apply Finset.sum_congr rfl; intro j _
+  -- Pull (-1)^j out of the tensor on the RHS
+  conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def]
+  rw [MonoidalLinear.smul_whiskerRight, Preadditive.zsmul_comp,
+      ← MonoidalCategory.tensorHom_def]
+  rw [Preadditive.zsmul_comp]
+  congr 1
+  -- LHS: fold ι(prod.lift s.down (default ≫ t.down)) ≫ δⱼ as ι(δⱼ(prod.lift ...))
+  rw [show simplexCoprojection (C := C)
+      ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ t.down)⟫ₛ ≫
+      (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+        (TopCat.toSSet.obj (X ⨯ Y))).δ j =
+    simplexCoprojection (C := C)
+      ((TopCat.toSSet.obj (X ⨯ Y)).δ j
+        ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ t.down)⟫ₛ) from by
+    have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl
+      ⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ t.down)⟫ₛ j
+    simp only [eqToHom_refl, Category.id_comp] at this
+    exact this]
+  -- RHS: fold ι s ≫ δⱼ as ι(δⱼ(s))
+  conv_rhs =>
+    enter [1, 1]
+    rw [show simplexCoprojection (C := C) s ≫
+        (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+          (TopCat.toSSet.obj X)).δ j =
+      simplexCoprojection (C := C) ((TopCat.toSSet.obj X).δ j s) from by
+      have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s j
+      simp only [eqToHom_refl, Category.id_comp] at this
+      exact this]
+  -- RHS: use gen_key and simplexCrossProduct_zero_right
+  rw [gen_key]
+  simp only [simplexCrossProduct']
+  rw [simplexCrossProduct_zero_right (C := C)]
+  -- Both sides: (λ_).hom ≫ ι(prod.lift ? (default ≫ t.down))
+  -- Show δⱼ(X⨯Y)(prod.lift(s, default ≫ t)) = prod.lift(δⱼ(X) s, default ≫ t)
+  congr 2
+  apply ULift.ext
+  simp only [SingularSimplex.ofΔ_down, SimplicialObject.δ, TopCat.toSSet]
+  change SimplexCategory.toTop.map (SimplexCategory.δ j) ≫
+    prod.lift s.down (SimplexCategory.toTop.map default ≫ t.down) =
+    prod.lift (SimplexCategory.toTop.map (SimplexCategory.δ j) ≫ s.down)
+      (SimplexCategory.toTop.map default ≫ t.down)
+  rw [prod.comp_lift]; congr 1
+  -- δⱼ.toTop ≫ default.toTop ≫ t.down = default.toTop ≫ t.down
+  -- since δⱼ ≫ default = default (unique map to [0])
+  rw [← Category.assoc, ← SimplexCategory.toTop.map_comp]; congr 1
+
+/-- **Leibniz rule, left-zero case** `(0, q+1)`:
+The cross product `chainCrossProduct (0, q+1)` composed with the boundary `d` equals
+`(𝟙 ⊗ d_Y) ≫ chainCrossProduct (0, q)`.
+
+There is a unique `(0, q+1)`-shuffle with sign `1`, so the cross product reduces
+to `simplexCrossProduct_zero_left`. The `d₁` term vanishes because `X` has
+no differential from degree `0`. -/
+lemma chainCrossProduct_leibniz_left_zero {X Y : TopCat.{v}} (q : ℕ) :
+    (chainCrossProduct (C := C) (X := X) (Y := Y) (p := 0) (q := q + 1) :
+        _ ⟶ (singChain C (X ⨯ Y)).X (q + 1)) ≫
+      (singChain C (X ⨯ Y)).d (q + 1) q =
+    (𝟙 ((singChain C X).X 0) ⊗ₘ
+        (singChain C Y).d (q + 1) q) ≫
+      (chainCrossProduct (C := C) (p := 0) (q := q) :
+        _ ⟶ (singChain C (X ⨯ Y)).X q) := by
+  apply chainCrossProduct.ext; ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  congr 1
+  -- gen_key: (ι s' ⊗ ι t') ≫ crossProduct = (λ_).hom ≫ simplexCrossProduct'(s', t')
+  have gen_key : ∀ {X' Y' : TopCat.{v}} {a b n : ℕ} (hn : n = a + b)
+      (s' : SingularSimplex X' a) (t' : SingularSimplex Y' b),
+      (simplexCoprojection (C := C) s' ⊗ₘ simplexCoprojection t') ≫
+        chainCrossProduct (C := C) hn =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (C := C) hn (s', t') := by
+    intro X' Y' a b n hn s' t'
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+    rw [← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) hn) (s', t')
+  -- LHS: unfold crossProduct(0,q+1) via gen_key and simplexCrossProduct_zero_left
+  rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
+  rw [gen_key]
+  simp only [simplexCrossProduct']
+  rw [simplexCrossProduct_zero_left (C := C)]
+  -- LHS: expand d(X⨯Y) into face map sum
+  rw [Category.assoc, singChain_d_eq_alternatingFaceMapObjD (C := C) (X ⨯ Y) q rfl]
+  simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
+    Preadditive.comp_sum, Preadditive.comp_zsmul, Category.assoc]
+  -- RHS: fuse (ι s ⊗ ι t) ≫ (𝟙 ⊗ d_Y) into (ι s ⊗ (ι t ≫ d_Y))
+  conv_rhs =>
+    rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  -- RHS: expand d_Y
+  conv_rhs =>
+    enter [1, 2]
+    rw [singChain_d_eq_alternatingFaceMapObjD (C := C) Y q rfl]
+    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
+      Preadditive.comp_sum, Preadditive.comp_zsmul]
+  -- Distribute ⊗ₘ over the sum, then ≫ over the sum
+  rw [tensor_sum, Preadditive.sum_comp]
+  -- Match term by term
+  apply Finset.sum_congr rfl; intro j _
+  -- Pull (-1)^j out of the tensor on the RHS
+  conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def']
+  rw [MonoidalLinear.whiskerLeft_smul, Preadditive.zsmul_comp,
+      ← MonoidalCategory.tensorHom_def']
+  rw [Preadditive.zsmul_comp]
+  congr 1
+  -- LHS: fold ι(f) ≫ δⱼ as ι(δⱼ(f)) using the simplexCoprojection_comp_eqToHom_comp_δ
+  rw [show simplexCoprojection (C := C)
+      ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ ≫
+      (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+        (TopCat.toSSet.obj (X ⨯ Y))).δ j =
+    simplexCoprojection (C := C)
+      ((TopCat.toSSet.obj (X ⨯ Y)).δ j
+        ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ) from by
+    have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl
+      ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ j
+    simp only [eqToHom_refl, Category.id_comp] at this
+    exact this]
+  -- RHS: fold ι t ≫ δⱼ as ι(δⱼ(t))
+  conv_rhs =>
+    enter [1, 2]
+    rw [show simplexCoprojection (C := C) t ≫
+        (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+          (TopCat.toSSet.obj Y)).δ j =
+      simplexCoprojection (C := C) ((TopCat.toSSet.obj Y).δ j t) from by
+      have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl t j
+      simp only [eqToHom_refl, Category.id_comp] at this
+      exact this]
+  -- RHS: use gen_key and simplexCrossProduct_zero_left
+  rw [gen_key]
+  simp only [simplexCrossProduct']
+  rw [simplexCrossProduct_zero_left (C := C)]
+  -- Now both sides: (λ_).hom ≫ ι(prod.lift(default ≫ s, ?))
+  -- Show δⱼ(X⨯Y)(prod.lift(default ≫ s, t)) = prod.lift(default ≫ s, (δⱼ(Y) t).down)
+  congr 2
+  -- Simplex equality: δⱼ(prod.lift(default ≫ s, t)) = prod.lift(default ≫ s, δⱼ(t))
+  apply ULift.ext
+  simp only [SingularSimplex.ofΔ_down, SimplicialObject.δ, TopCat.toSSet]
+  -- Unfold the .map action (which is precomposition with δⱼ.toTop)
+  change SimplexCategory.toTop.map (SimplexCategory.δ j) ≫
+    prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down =
+    prod.lift (SimplexCategory.toTop.map default ≫ s.down)
+      (SimplexCategory.toTop.map (SimplexCategory.δ j) ≫ t.down)
+  rw [prod.comp_lift]
+  congr 1
+  rw [← Category.assoc, ← SimplexCategory.toTop.map_comp]; congr 1
 
 /-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
 induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
@@ -1764,5 +1957,166 @@ instance curriedTensor_additive :
 
 instance hasCoproducts_zero_of_v : HasCoproducts.{0} C :=
   hasCoproducts_shrink.{0, v}
+
+/-! ### Eilenberg–Zilber cross product chain map
+
+The cross product `chainCrossProduct` at each bidegree `(p, q)` assembles into a
+chain map from the tensor product of singular chain complexes to the singular
+chain complex of the product space:
+```
+  eilenbergZilber : (singChain C X).tensorObj (singChain C Y) ⟶ singChain C (X ⨯ Y)
+```
+The degree-`n` component maps `⨁_{p+q=n} C_p(X) ⊗ C_q(Y) ⟶ C_n(X × Y)` by
+applying `chainCrossProduct` on each summand. The chain map condition follows
+from the Leibniz rules (`chainCrossProduct_leibniz`, `_right_zero`, `_left_zero`).
+-/
+
+section EilenbergZilber
+
+-- Selective open: `open HomologicalComplex` would bring the `Monoidal` namespace prefix
+-- into scope, shadowing `Functor.Monoidal` and breaking `[(forget C).leftAdjoint.Monoidal]`.
+open HomologicalComplex (ιTensorObj mapBifunctorDesc ι_mapBifunctorDesc)
+
+/-- The degree-`n` component of the Eilenberg–Zilber map: it is the unique morphism
+out of the coproduct `⨁_{p+q=n} C_p(X) ⊗ C_q(Y)` that restricts to `chainCrossProduct`
+on each summand. -/
+noncomputable def eilenbergZilber_f (X Y : TopCat.{v}) (n : ℕ) :
+    ((singChain C X).tensorObj (singChain C Y)).X n ⟶
+    (singChain C (X ⨯ Y)).X n :=
+  mapBifunctorDesc (fun p q (h : p + q = n) =>
+    chainCrossProduct (C := C) h.symm)
+
+/-- Inclusion of the `(p, q)` summand followed by `eilenbergZilber_f` equals
+`chainCrossProduct`. -/
+lemma ι_eilenbergZilber_f (X Y : TopCat.{v}) (p q n : ℕ) (h : p + q = n) :
+    ιTensorObj (singChain C X) (singChain C Y) p q n h ≫
+      eilenbergZilber_f (C := C) X Y n =
+    chainCrossProduct (C := C) h.symm :=
+  ι_mapBifunctorDesc _ _ _ h
+
+/-- The chain map condition for `eilenbergZilber`, on the `(p+1, q+1)` summand.
+Dispatches to `chainCrossProduct_leibniz`. -/
+lemma eilenbergZilber_comm_case_pq {X Y : TopCat.{v}} (p q n m : ℕ)
+    (hpq : (p + 1) + (q + 1) = n) (hnm : n = m + 1) :
+    ιTensorObj (singChain C X) (singChain C Y) (p + 1) (q + 1) n hpq ≫
+      eilenbergZilber_f (C := C) X Y n ≫ (singChain C (X ⨯ Y)).d n m =
+    ιTensorObj (singChain C X) (singChain C Y) (p + 1) (q + 1) n hpq ≫
+      ((singChain C X).tensorObj (singChain C Y)).d n m ≫
+      eilenbergZilber_f (C := C) X Y m := by
+  have hm : m = p + (q + 1) := by omega
+  subst hpq; subst hm
+  rw [reassoc_of% (ι_eilenbergZilber_f (C := C) X Y (p + 1) (q + 1)
+    ((p + 1) + (q + 1)))]
+  rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.add_comp,
+    Preadditive.comp_add,
+    HomologicalComplex.mapBifunctor.ι_D₁_assoc, HomologicalComplex.mapBifunctor.ι_D₂_assoc]
+  rw [HomologicalComplex.mapBifunctor.d₁_eq _ _ _ _ (show (ComplexShape.down ℕ).Rel (p + 1) p
+    from by simp [ComplexShape.down_Rel]) (q + 1) (p + (q + 1)) (by simp)]
+  rw [HomologicalComplex.mapBifunctor.d₂_eq _ _ _ _ _ (show (ComplexShape.down ℕ).Rel (q + 1) q
+    from by simp [ComplexShape.down_Rel]) (p + (q + 1))
+    (show (p + 1) + q = p + (q + 1) by omega)]
+  simp only [Category.assoc, ι_eilenbergZilber_f,
+    show (ComplexShape.down ℕ).ε₁ (ComplexShape.down ℕ) (ComplexShape.down ℕ) (p + 1, q + 1) = 1
+    from rfl, one_smul, Preadditive.zsmul_comp, Preadditive.comp_zsmul]
+  convert chainCrossProduct_leibniz (C := C) (X := X) (Y := Y) p q using 1
+  congr 1
+  · simp [MonoidalCategory.curriedTensor]
+  · rw [Units.smul_def, Preadditive.zsmul_comp, Category.assoc, ι_eilenbergZilber_f]
+    congr 1
+    simp [ComplexShape.ε₂, ComplexShape.ε]
+
+/-- The chain map condition for `eilenbergZilber`, on the `(p+1, 0)` summand.
+Dispatches to `chainCrossProduct_leibniz_right_zero`. -/
+lemma eilenbergZilber_comm_case_p0 {X Y : TopCat.{v}} (p n m : ℕ)
+    (hpq : (p + 1) + 0 = n) (hnm : n = m + 1) :
+    ιTensorObj (singChain C X) (singChain C Y) (p + 1) 0 n hpq ≫
+      eilenbergZilber_f (C := C) X Y n ≫ (singChain C (X ⨯ Y)).d n m =
+    ιTensorObj (singChain C X) (singChain C Y) (p + 1) 0 n hpq ≫
+      ((singChain C X).tensorObj (singChain C Y)).d n m ≫
+      eilenbergZilber_f (C := C) X Y m := by
+  have hm : m = p := by omega
+  subst hpq; subst hm
+  rw [reassoc_of% (ι_eilenbergZilber_f (C := C) X Y (m + 1) 0 (m + 1))]
+  rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.add_comp,
+    Preadditive.comp_add,
+    HomologicalComplex.mapBifunctor.ι_D₁_assoc, HomologicalComplex.mapBifunctor.ι_D₂_assoc]
+  have hd₂ : HomologicalComplex.mapBifunctor.d₂ (singChain C X) (singChain C Y)
+      (MonoidalCategory.curriedTensor C) (ComplexShape.down ℕ) (m + 1) 0 m = 0 :=
+    HomologicalComplex.mapBifunctor.d₂_eq_zero _ _ _ _ _ _ _
+      (fun h => by simp [ComplexShape.down_Rel] at h)
+  simp only [hd₂, zero_comp, add_zero]
+  rw [HomologicalComplex.mapBifunctor.d₁_eq _ _ _ _ (show (ComplexShape.down ℕ).Rel (m + 1) m
+    from by simp [ComplexShape.down_Rel]) 0 m (by simp)]
+  change chainCrossProduct _ ≫ _ = (_ • _) ≫ _
+  rw [show (ComplexShape.down ℕ).ε₁ (ComplexShape.down ℕ) (ComplexShape.down ℕ) (m + 1, 0) = 1
+    from rfl, one_smul, Category.assoc, ι_eilenbergZilber_f]
+  convert chainCrossProduct_leibniz_right_zero (C := C) (X := X) (Y := Y) m using 1
+  simp [MonoidalCategory.curriedTensor]
+
+/-- The chain map condition for `eilenbergZilber`, on the `(0, q+1)` summand.
+Dispatches to `chainCrossProduct_leibniz_left_zero`. -/
+lemma eilenbergZilber_comm_case_0q {X Y : TopCat.{v}} (q n m : ℕ)
+    (hpq : 0 + (q + 1) = n) (hnm : n = m + 1) :
+    ιTensorObj (singChain C X) (singChain C Y) 0 (q + 1) n hpq ≫
+      eilenbergZilber_f (C := C) X Y n ≫ (singChain C (X ⨯ Y)).d n m =
+    ιTensorObj (singChain C X) (singChain C Y) 0 (q + 1) n hpq ≫
+      ((singChain C X).tensorObj (singChain C Y)).d n m ≫
+      eilenbergZilber_f (C := C) X Y m := by
+  have hm : m = q := by omega
+  have hn : n = q + 1 := by omega
+  subst hm; subst hn
+  rw [reassoc_of% (ι_eilenbergZilber_f (C := C) X Y 0 (m + 1) (m + 1))]
+  rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.add_comp,
+    Preadditive.comp_add,
+    HomologicalComplex.mapBifunctor.ι_D₁_assoc, HomologicalComplex.mapBifunctor.ι_D₂_assoc]
+  have hd₁ : HomologicalComplex.mapBifunctor.d₁ (singChain C X) (singChain C Y)
+      (MonoidalCategory.curriedTensor C) (ComplexShape.down ℕ) 0 (m + 1) m = 0 :=
+    HomologicalComplex.mapBifunctor.d₁_eq_zero _ _ _ _ _ _ _
+      (fun h => by simp [ComplexShape.down_Rel] at h)
+  simp only [hd₁, zero_comp, zero_add]
+  rw [HomologicalComplex.mapBifunctor.d₂_eq _ _ _ _ _ (show (ComplexShape.down ℕ).Rel (m + 1) m
+    from by simp [ComplexShape.down_Rel]) m (by simp)]
+  change chainCrossProduct _ ≫ _ = (_ • _) ≫ _
+  rw [show (ComplexShape.down ℕ).ε₂ (ComplexShape.down ℕ) (ComplexShape.down ℕ) (0, m + 1) = 1
+    from by simp [ComplexShape.ε₂, ComplexShape.ε], one_smul, Category.assoc, ι_eilenbergZilber_f]
+  convert chainCrossProduct_leibniz_left_zero (C := C) (X := X) (Y := Y) m using 1
+  simp [MonoidalCategory.curriedTensor]
+
+/-- The Eilenberg–Zilber chain map condition: `eilenbergZilber_f` commutes with
+the differentials. Proved by case-splitting on the `(p, q)` summand — since
+`n = m + 1 ≥ 1` and `p + q = n`, at least one of `p, q` is positive. -/
+lemma eilenbergZilber_comm (X Y : TopCat.{v}) (n m : ℕ) (hnm : n = m + 1) :
+    eilenbergZilber_f (C := C) X Y n ≫ (singChain C (X ⨯ Y)).d n m =
+    ((singChain C X).tensorObj (singChain C Y)).d n m ≫
+      eilenbergZilber_f (C := C) X Y m := by
+  apply HomologicalComplex.mapBifunctor.hom_ext
+  intro p q hpq
+  -- hpq : π(p,q) = n, which is definitionally p + q = n
+  change p + q = n at hpq
+  rcases p with _ | p <;> rcases q with _ | q
+  · omega
+  · exact eilenbergZilber_comm_case_0q q n m hpq hnm
+  · exact eilenbergZilber_comm_case_p0 p n m hpq hnm
+  · exact eilenbergZilber_comm_case_pq p q n m hpq hnm
+
+/-- **Eilenberg–Zilber cross product chain map.**
+
+The cross product of singular chains, packaged as a chain map from the tensor
+product of singular chain complexes to the singular chain complex of the product:
+```
+  eilenbergZilber : (singChain C X).tensorObj (singChain C Y) ⟶ singChain C (X ⨯ Y)
+```
+
+Degree-`n` component: `⨁_{p+q=n} C_p(X) ⊗ C_q(Y) → C_n(X × Y)` via the
+shuffle cross product `chainCrossProduct` on each summand. -/
+noncomputable def eilenbergZilber (X Y : TopCat.{v}) :
+    (singChain C X).tensorObj (singChain C Y) ⟶ singChain C (X ⨯ Y) where
+  f n := eilenbergZilber_f (C := C) X Y n
+  comm' n m hnm := by
+    have h : n = m + 1 := by rw [ComplexShape.down_Rel] at hnm; omega
+    exact eilenbergZilber_comm (C := C) X Y n m h
+
+#print axioms eilenbergZilber
+end EilenbergZilber
 
 end HomologyLean.SingularHomology

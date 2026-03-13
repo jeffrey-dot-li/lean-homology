@@ -60,6 +60,23 @@ conv_lhs => rw [show (singChain (C := C) (R := R) X).d (p + 1 + (q + 1)) (p + q 
 Similarly, `K.d i j ≫ eqToHom (congrArg K.X h) = K.d i j'` where `h : j = j'`.
 Useful when you need to shift the *target* index instead of the source.
 
+## Folding `ι s ≫ δⱼ` into `ι(δⱼ s)` via `simplexCoprojection_comp_eqToHom_comp_δ`
+
+When expanding differentials into face map sums, you often get `simplexCoprojection s ≫ δ j` and need to fold it into `simplexCoprojection (δ j s)`. The bridge lemma is `simplexCoprojection_comp_eqToHom_comp_δ`, but it includes an `eqToHom` that needs to be simplified away when the index proof is `rfl`.
+
+**Pattern**:
+```lean
+rw [show simplexCoprojection (C := C) s ≫
+    (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+      (TopCat.toSSet.obj X)).δ j =
+  simplexCoprojection (C := C) ((TopCat.toSSet.obj X).δ j s) from by
+  have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s j
+  simp only [eqToHom_refl, Category.id_comp] at this
+  exact this]
+```
+
+This comes up in cross product Leibniz rule proofs where you need to match `ι(face(s))` on both sides after expanding differentials.
+
 ## Avoid `dsimp` before index shifting
 
 `dsimp [SCF, singularChainComplexFunctor, ...]` unfolds `singChain` and `Δ[p]` into their

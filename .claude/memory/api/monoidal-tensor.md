@@ -141,6 +141,30 @@ change (ModuleCat.Hom.hom (f.hom))
 | `NatTrans.prod_app` | `NatTrans.prod_app_fst` / `NatTrans.prod_app_snd` |
 | `tensorIso` | `MonoidalCategory.tensorIso` (full namespace needed) |
 
+## Distributing scalars through tensor products
+
+When a sum `∑ (-1)^j • f_j` appears inside a tensor product `f ⊗ₘ g`, you need to pull the scalar out. The strategy depends on which side the scalar is on:
+
+**Left side** (`(r • f) ⊗ₘ g`): decompose via `tensorHom_def` then use `smul_whiskerRight`:
+```lean
+conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def]
+rw [MonoidalLinear.smul_whiskerRight, Preadditive.zsmul_comp,
+    ← MonoidalCategory.tensorHom_def]
+```
+
+**Right side** (`f ⊗ₘ (r • g)`): decompose via `tensorHom_def'` then use `whiskerLeft_smul`:
+```lean
+conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def']
+rw [MonoidalLinear.whiskerLeft_smul, Preadditive.zsmul_comp,
+    ← MonoidalCategory.tensorHom_def']
+```
+
+**Related distribution lemmas**:
+- `tensor_sum` — `f ⊗ₘ (∑ g_j) = ∑ (f ⊗ₘ g_j)` (sum on right)
+- `sum_tensor` — `(∑ f_j) ⊗ₘ g = ∑ (f_j ⊗ₘ g)` (sum on left)
+- `Preadditive.sum_comp` / `Preadditive.comp_sum` — distribute `≫` over sums
+- `Preadditive.zsmul_comp` / `Preadditive.comp_zsmul` — distribute `≫` over scalars
+
 ## Key monoidal functor lemmas
 
 - `MonoidalCategory.tensorHom_comp_tensorHom f₁ f₂ g₁ g₂` — `(f₁ ⊗ₘ f₂) ≫ (g₁ ⊗ₘ g₂) = (f₁ ≫ g₁) ⊗ₘ (f₂ ≫ g₂)`. In `MonoidalCategory` namespace (need `open MonoidalCategory` or qualify).
