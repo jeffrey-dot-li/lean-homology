@@ -21,6 +21,7 @@ import Mathlib.CategoryTheory.Monoidal.Preadditive
 import Mathlib.CategoryTheory.Monoidal.Closed.Basic
 import Mathlib.CategoryTheory.Monoidal.Limits.Preserves
 import Mathlib.CategoryTheory.Monoidal.Mon_
+import Mathlib.CategoryTheory.Monoidal.Types.Coyoneda
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Topology.Category.TopCat.Limits.Products
 import HomologyLean.SingularHomology.Shuffle
@@ -39,6 +40,11 @@ variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [Catego
    [MonoidalCategory C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
    [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
    [(forget C).IsRightAdjoint] [(forget C).leftAdjoint.Monoidal]
+   [(forget C).LaxMonoidal] [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+   -- `forgetIso : forget C ≅ Hom(𝟙_ C, -)` is a monoidal natural iso, i.e. it intertwines
+   -- `μ (forget C)` with `μ Hom(𝟙_ C, -)`. For ModuleCat R, this says the pure tensor map
+   -- `M × N → M ⊗_R N` is compatible with `Hom(R, -)`'s monoidal structure `(f,g) ↦ (λ_ R).inv ≫ (f ⊗ g)`.
+   [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
 
 
 
@@ -548,14 +554,65 @@ private lemma freeGen_chainGroupIsoFree {X : TopCat.{v}} {p : ℕ}
     (s : SingularSimplex X p) :
     freeGen (C := C) s ≫ (chainGroupIsoFree (C := C) p).inv.app X =
     simplexCoprojection s := by
-  sorry
+  simp only [chainGroupIsoFree, Iso.trans_inv, NatTrans.comp_app, Functor.isoWhiskerLeft_inv]
+  simp only [chainGroupIsoCoprodFree, NatIso.ofComponents_inv_app, Iso.refl_inv]
+  erw [Category.comp_id]
+  simp only [Functor.whiskerLeft_app]
+  simp only [sigmaConstIsoFree, Adjunction.leftAdjointUniq_inv_app]
+  dsimp only [freeGen]
+  -- Use forgetIso naturality: forgetIso.hom.app _ x ≫ f = forgetIso.hom.app _ ((forget C).map f x)
+  set φ := ((Adjunction.ofIsRightAdjoint (forget C)).leftAdjointUniq
+      ((sigmaConstAdj (𝟙_ C)).ofNatIsoRight MonoidalUnitorRepresentable.forgetIso.symm)).hom.app
+      ((singularSimplexFunctor p).obj X)
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality φ)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (SingularSimplex X p) s)
+  simp only [types_comp_apply] at hnat
+  dsimp [coyoneda] at hnat
+  erw [← hnat]; clear hnat
+  -- (forget C).map φ (adj_free.unit.app A s) = (adj_free.unit ≫ (forget C).whiskerRight φ).app A s
+  -- which by unit_leftAdjointUniq_hom_app equals adj2.unit.app A s
+  change MonoidalUnitorRepresentable.forgetIso.hom.app _ (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map φ) s) = _
+  rw [Adjunction.unit_leftAdjointUniq_hom_app]
+  -- Unfold adj2.unit = (sigmaConstAdj.ofNatIsoRight forgetIso.symm).unit
+  simp only [Adjunction.ofNatIsoRight, Adjunction.mkOfHomEquiv_unit_app]
+  simp only [Equiv.trans_apply, Adjunction.equivHomsetRightOfNatIso]
+  dsimp only [Equiv.coe_fn_mk]
+  rw [Adjunction.homEquiv_unit]
+  simp only [Functor.map_id, types_id_apply, types_comp_apply]
+  -- Cancel coyoneda.map (𝟙 _) and forgetIso.hom ∘ forgetIso.symm.hom
+  dsimp [coyoneda]
+  simp only [Category.comp_id]
+  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app _ ((MonoidalUnitorRepresentable.forgetIso (C := C)).inv.app _ ((sigmaConstAdj (𝟙_ C)).unit.app _ s)) = _
+  simp only [← types_comp_apply (MonoidalUnitorRepresentable.forgetIso.inv.app _) (MonoidalUnitorRepresentable.forgetIso.hom.app _)]
+  simp only [← NatTrans.comp_app, Iso.inv_hom_id, NatTrans.id_app, types_id_apply]
+  rfl
 
 /-- `OplaxMonoidal.δ` sends the free generator at `(a, b)` to the left unitor inverse
 composed with the tensor of free generators at `a` and `b`. -/
 private lemma freeGen_δ (A B : Type v) (a : A) (b : B) :
     freeGen (C := C) (a, b) ≫ Functor.OplaxMonoidal.δ Free A B =
     (λ_ (𝟙_ C)).inv ≫ (freeGen (C := C) a ⊗ₘ freeGen (C := C) b) := by
-  sorry
+  dsimp only [freeGen]
+  -- Use forgetIso naturality to absorb ≫ δ
+  set δ := Functor.OplaxMonoidal.δ (Free (C := C)) A B
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality δ)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (A × B) (a, b))
+  simp only [types_comp_apply] at hnat
+  dsimp [coyoneda] at hnat
+  erw [← hnat]; clear hnat
+  -- Rewrite unit ≫ (forget C).map δ using IsMonoidal
+  change MonoidalUnitorRepresentable.forgetIso.hom.app _ (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map δ) (a, b)) = _
+  rw [Adjunction.unit_app_tensor_comp_map_δ]
+  simp only [types_comp_apply]
+  dsimp
+  -- Goal: forgetIso.hom.app _ (μ (forget C) _ _ (unit a, unit b)) = (λ_ 𝟙_C).inv ≫ (freeGen a ⊗ₘ freeGen b)
+  -- Use NatTrans.IsMonoidal.tensor: μ (forget C) ≫ forgetIso.hom.app _ = (forgetIso.hom.app _ ⊗ₘ forgetIso.hom.app _) ≫ μ Hom(𝟙_C, -)
+  rw [← types_comp_apply (Functor.LaxMonoidal.μ (forget C) _ _)
+    (MonoidalUnitorRepresentable.forgetIso.hom.app _),
+    NatTrans.IsMonoidal.tensor (τ := MonoidalUnitorRepresentable.forgetIso.hom)]
+  simp only [types_comp_apply]
+  dsimp
+  rfl
 
 /-- Evaluating `chainTensorHomEquiv` on coprojection pairs: the forward map
 sends `f` at `(s, t)` to `(λ_ (𝟙_ C)).inv ≫ (ι s ⊗ₘ ι t) ≫ f`. -/
