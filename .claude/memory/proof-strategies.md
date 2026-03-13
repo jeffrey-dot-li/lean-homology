@@ -23,6 +23,36 @@ supervise progress vs looping, and impossible for the agent to reason about what
 - If `simp`/`dsimp` would reduce a goal from 15 lines to 3, do it *before* splitting into subgoals.
 - Unfolding definitions too early (e.g., `SCF`, `singChain`, `TopCat.toSSet`) causes goal blowup. Instead, use rewrite lemmas (like `mι_comp_map`) that keep the goal in high-level categorical language.
 
+### Use `conv`/`slice` before `have` for targeted rewrites (CRITICAL)
+
+When `rw`/`simp` fail because the goal is large and the pattern appears nested inside
+a complex expression, **always reach for `conv` or `slice_lhs`/`slice_rhs` first**. Do NOT
+default to writing a giant `have` block that restates the subexpression — this produces
+bloated, fragile code and wastes time on elaboration mismatches.
+
+**Bad pattern (avoid):**
+```lean
+-- rw [lemma] failed because goal is big
+have h : complex_subexpr = rewritten_form := by ...  -- 5+ lines restating the goal
+rw [h]
+```
+
+**Good pattern (prefer):**
+```lean
+-- rw [lemma] failed because goal is big
+conv_rhs => enter [1, 1, 2]; rw [lemma]        -- surgical, 1 line
+-- or for categorical compositions:
+slice_lhs 3 4 => erw [Functor.map_id, ...]     -- targets morphisms 3-4
+```
+
+**When to use each:**
+- `slice_lhs i j` / `slice_rhs i j`: for rewriting a contiguous range of morphisms in
+  a categorical composition `a ≫ b ≫ c ≫ d`. Handles `Category.assoc` automatically.
+- `conv_lhs` / `conv_rhs` + `enter`: for anything else — rewrites inside `⊗ₘ`, under `∑`,
+  inside functor applications, etc. More general than `slice`.
+- `have` with manual restatement: **last resort only**, when the subexpression genuinely
+  can't be targeted by `conv`/`slice` (e.g., it spans both sides of the equation).
+
 ### Extract rewrite lemmas to avoid unfolding
 - If the proof needs to unfold a definition, push through it, and re-fold — that's a missing lemma.
 - Example: `mι_comp_map` captures `mι s ≫ chain_map f = mι (f_*(s))` without ever exposing `colimit.ι_desc` or `TopCat.toSSet` internals.
@@ -153,6 +183,21 @@ bypasses every possible matching issue (universes, notation, binders).
 2. `enter [2, binder]` enters a `Finset.sum` (arg 2 is the lambda).
 3. `enter [2]` skips past the left operand of `HSMul.hSMul` (i.e., past `c •`).
 4. Always try `rw` → `erw` → `tactic =>` in order. Don't skip to level 3.
+
+**Checking conv goals with `lean_goal` (CRITICAL):**
+Inside a `conv` block, the focused subexpression (shown as `| expr` in the IDE) is only
+visible via `lean_goal` at the **end-of-line column** of the `enter` or tactic line. Using
+a small column (e.g., column 4–6) returns the outer tactic goal, not the conv focus.
+
+```
+conv_rhs =>
+  enter [1, 1, 2]    -- check goal at this line, column = end of line (e.g., 22)
+  rw [some_lemma]     -- check diagnostics to confirm it compiled
+```
+
+- After each `enter`, call `lean_goal` at `(line, end_of_line_column)` to see the `| focused_expr`.
+- After a `rw`/`erw` inside conv, use `lean_diagnostic_messages` to confirm no errors.
+- If unsure about the conv focus, ask the user — they can see it in the IDE infoview.
 
 ---
 
