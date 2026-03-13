@@ -8,8 +8,10 @@
 import Mathlib.CategoryTheory.Yoneda
 import Mathlib.CategoryTheory.Monoidal.Category
 import Mathlib.CategoryTheory.Adjunction.Basic
+import Mathlib.CategoryTheory.Adjunction.Unique
 import Mathlib.CategoryTheory.ConcreteCategory.Basic
 import Mathlib.CategoryTheory.Monoidal.Closed.Types
+import Mathlib.CategoryTheory.Limits.Shapes.Products
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
 
 open CategoryTheory
@@ -43,3 +45,23 @@ instance {R : Type u} [CommRing R] : MonoidalUnitorRepresentable (C := ModuleCat
   forgetIso := sorry
 
 end ModuleCat
+
+section SigmaConstIsoFree
+
+variable {C : Type u} [Category.{v} C] [Limits.HasCoproducts C] [MonoidalCategory C]
+  [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
+  [(forget C).IsRightAdjoint]
+
+/-- `Limits.sigmaConst.obj (𝟙_ C)` is naturally isomorphic to
+the abstract free functor `(forget C).leftAdjoint`. Both send a set `A` to
+the "free object on `A`": `sigmaConst` uses `∐ (fun _ : A => 𝟙_ C)`, while
+`leftAdjoint` is the abstract left adjoint to the forgetful functor. -/
+noncomputable def sigmaConstIsoFree :
+    Limits.sigmaConst.obj (𝟙_ C) ≅ (forget C).leftAdjoint := by
+  have adj1 : Limits.sigmaConst.obj (𝟙_ C) ⊣ (Hom[𝟙_ C |-] : C ⥤ Type v) :=
+    Limits.sigmaConstAdj (𝟙_ C)
+  have adj2 : Limits.sigmaConst.obj (𝟙_ C) ⊣ forget C :=
+    adj1.ofNatIsoRight (MonoidalUnitorRepresentable.forgetIso (C := C)).symm
+  exact Adjunction.leftAdjointUniq adj2 (Adjunction.ofIsRightAdjoint (forget C))
+
+end SigmaConstIsoFree

@@ -102,14 +102,14 @@ noncomputable def coprodIsoFree (R : Type u) [CommRing R] (A : Type u) :
 /-- The natural isomorphism between the coproduct-based free module functor and
 Mathlib's Finsupp-based `ModuleCat.free R`. Each component is `coprodIsoFree`. -/
 noncomputable def coprodIsoFreeNat (R : Type u) [CommRing R] :
-    coprodFreeFunctor (C := ModuleCat.{u} R) ≅ ModuleCat.free R :=
+    Limits.sigmaConst.obj (𝟙_ (ModuleCat.{u} R)) ≅ ModuleCat.free R :=
   NatIso.ofComponents
     (fun A => coprodIsoFree R A)
     (fun {A B} f => by
       apply CategoryTheory.Limits.Sigma.hom_ext
       intro a
-      dsimp [coprodFreeFunctor, coprodIsoFree]
-      simp only [CategoryTheory.Limits.colimit.ι_desc_assoc, CategoryTheory.Limits.Cofan.mk_pt, CategoryTheory.Limits.Cofan.mk_ι_app]
+      dsimp [coprodIsoFree]
+      simp only [CategoryTheory.Limits.Sigma.ι_comp_map'_assoc, Category.id_comp]
       ext
       simp [ModuleCat.coprodIsoDirectSum, ModuleCat.coproductCocone]
       erw [finsuppLEquivDirectSum_symm_lof, finsuppLEquivDirectSum_symm_lof]

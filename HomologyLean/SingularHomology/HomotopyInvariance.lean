@@ -128,54 +128,36 @@ noncomputable def singularSimplexFunctor (p : ℕ) : TopCat.{v} ⥤ Type v where
   map_id X := by funext s; cases s; rfl
   map_comp {X Y Z} f g := by funext s; cases s; simp [Category.assoc]
 
-/-- The "coproduct-based free" functor `Type v ⥤ C`, sending `A ↦ ∐ (fun _ : A => 𝟙_ C)`.
-Functorial action sends `f : A → B` to the map induced by `Sigma.desc`/`Sigma.ι`. -/
-noncomputable def coprodFreeFunctor : Type v ⥤ C where
-  obj A := ∐ fun _ : A => 𝟙_ C
-  map {A B} f := Sigma.desc (fun a => Sigma.ι (fun _ : B => 𝟙_ C) (f a))
-  map_id A := by ext a : 1; simp
-  map_comp {A B D} f g := by ext a : 1; simp
-
-/-- The coproduct-based free functor `coprodFreeFunctor` is naturally isomorphic to
-the abstract free functor `Free = (forget C).leftAdjoint`. Both send a set `A` to
-the "free object on `A`", but are constructed differently: `coprodFreeFunctor` uses
-an explicit coproduct `∐ (fun _ : A => 𝟙_ C)`, while `Free` is the abstract left adjoint
-to the forgetful functor. -/
-noncomputable def coprodFreeIsoFree :
-    coprodFreeFunctor ≅ Free (C := C) :=
-  sorry
-
 /-- The degreewise chain group functor `SCF C ⋙ eval p` is naturally isomorphic to
-`singularSimplexFunctor p ⋙ coprodFreeFunctor`.
+`singularSimplexFunctor p ⋙ Limits.sigmaConst.obj (𝟙_ C)`.
 
 Both send `X` to `∐ (fun _ : SingularSimplex X p => 𝟙_ C)` and push forward simplices
 along continuous maps, but are constructed through different code paths
-(`singularChainComplexFunctor` vs direct `Sigma.desc`/`Sigma.ι`). -/
+(`singularChainComplexFunctor` vs `Sigma.map'`). -/
 noncomputable def chainGroupIsoCoprodFree (p : ℕ) :
     SCF C ⋙ HomologicalComplex.eval C (ComplexShape.down ℕ) p ≅
-      singularSimplexFunctor p ⋙ coprodFreeFunctor :=
+      singularSimplexFunctor p ⋙ Limits.sigmaConst.obj (𝟙_ C) :=
   NatIso.ofComponents
     (fun X => Iso.refl _)
     (fun {X Y} f => by
       dsimp
       simp only [Category.comp_id, Category.id_comp]
-      dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor, coprodFreeFunctor]
+      dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
       apply CategoryTheory.Limits.Sigma.hom_ext
       intro a
       simp only [CategoryTheory.Limits.Sigma.ι_comp_map', Category.id_comp]
-      erw [CategoryTheory.Limits.Sigma.ι_desc]
-      rfl
+      congr 1
     )
 
 /-- The degree-`p` chain group `(singChain C X).X p` is naturally isomorphic to
 `Free.obj (SingularSimplex X p)`, the free object on the set of `p`-simplices.
 
 Composed from `chainGroupIsoCoprodFree` (chain group ≅ coproduct-based free)
-and `coprodFreeIsoFree` (coproduct-based free ≅ abstract free). -/
+and `sigmaConstIsoFree` (sigmaConst-based free ≅ abstract free). -/
 noncomputable def chainGroupIsoFree (p : ℕ) :
     SCF C ⋙ HomologicalComplex.eval C (ComplexShape.down ℕ) p ≅
       singularSimplexFunctor p ⋙ Free (C := C) :=
-  chainGroupIsoCoprodFree p ≪≫ (singularSimplexFunctor p).isoWhiskerLeft coprodFreeIsoFree
+  chainGroupIsoCoprodFree p ≪≫ (singularSimplexFunctor p).isoWhiskerLeft sigmaConstIsoFree
 
 /-- The coprojection (basis inclusion) for a singular simplex: given a singular
 n-simplex `s` in `X`, produce the corresponding "basis element" morphism
@@ -483,83 +465,194 @@ def simplexCrossProduct' {X Y : TopCat.{v}} {p q n : ℕ}
     Hom[𝟙_ C |-].obj ((singChain C (X ⨯ Y)).X n) :=
   fun ⟨s, t⟩ => simplexCrossProduct s t hn
 
-/-- The cross product lifted to the free module level via the monoidal structure of the
-free functor: `Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ C_n(X × Y; 𝟙_ C)` (where `n = p + q`). -/
-def simplexCrossProductLifted {X Y : TopCat.{v}} {p q n : ℕ}
+/-- Precomposition by an iso gives an equivalence on hom-sets (contravariant). -/
+noncomputable def precompEquiv {D : Type*} [Category D] {X Y : D} (α : X ≅ Y) (Z : D) :
+    (Y ⟶ Z) ≃ (X ⟶ Z) where
+  toFun f := α.hom ≫ f
+  invFun g := α.inv ≫ g
+  left_inv f := by simp
+  right_inv g := by simp
+
+/-- The hom-set equivalence for tensors of free objects: morphisms
+`Free.obj A ⊗ Free.obj B ⟶ M` in `C` correspond bijectively to set-level maps
+`A × B → Hom(𝟙_ C, M)`.
+
+Composed from three equivalences:
+1. `(Free A ⊗ Free B ⟶ M) ≃ (Free (A × B) ⟶ M)` via `μIso` (monoidal structure of Free)
+2. `(Free (A × B) ⟶ M) ≃ (A × B → forget C .obj M)` via the free-forget adjunction `homEquiv`
+3. `(A × B → forget C .obj M) ≃ (A × B → Hom(𝟙_ C, M))` via `forgetIso` -/
+noncomputable def freeTensorHomEquiv (A B : Type v) (M : C) :
+    (Free.obj A ⊗ Free.obj B ⟶ M) ≃
+    (A × B → Hom[𝟙_ C |-].obj M) :=
+  -- (Free A ⊗ Free B ⟶ M) ≃ (Free (A × B) ⟶ M) via μIso
+  precompEquiv (Functor.Monoidal.μIso Free A B).symm M |>.trans
+  -- (Free (A × B) ⟶ M) ≃ (A × B → (forget C).obj M) via adjunction homEquiv
+  ((Adjunction.ofIsRightAdjoint (forget C)).homEquiv (A × B) M) |>.trans
+  -- (A × B → (forget C).obj M) ≃ (A × B → Hom(𝟙_ C, M)) via forgetIso
+  (Equiv.arrowCongr (Equiv.refl _)
+    ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).toEquiv)
+
+/-- The hom-set equivalence for the tensor of chain groups: morphisms
+`C_p(X) ⊗ C_q(Y) ⟶ M` in `C` correspond bijectively to set-level maps
+`SingularSimplex X p × SingularSimplex Y q → Hom(𝟙_ C, M)`.
+
+Obtained by transporting `freeTensorHomEquiv` along `chainGroupIsoFree`,
+which identifies `C_p(X) ≅ Free(SingularSimplex X p)`. -/
+noncomputable def chainTensorHomEquiv {X Y : TopCat.{v}} {p q : ℕ} (M : C) :
+    ((singChain C X).X p ⊗ (singChain C Y).X q ⟶ M) ≃
+    (SingularSimplex X p × SingularSimplex Y q →
+      Hom[𝟙_ C |-].obj M) :=
+  -- (C_p(X) ⊗ C_q(Y) ⟶ M) ≃ (Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ M)
+  precompEquiv (MonoidalCategory.tensorIso ((chainGroupIsoFree (C := C) p).app X)
+    ((chainGroupIsoFree (C := C) q).app Y)).symm M |>.trans
+  -- (Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ M) ≃ (Sing_p X × Sing_q Y → Hom(𝟙_ C, M))
+  (freeTensorHomEquiv (SingularSimplex X p) (SingularSimplex Y q) M)
+
+/-- The cross product on chain groups:
+`C_p(X; 𝟙_ C) ⊗ C_q(Y; 𝟙_ C) ⟶ C_n(X × Y; 𝟙_ C)` (where `n = p + q`).
+
+Defined by lifting the simplex-level cross product `simplexCrossProduct'` via
+`chainTensorHomEquiv`. -/
+def chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
     (hn : n = p + q := by omega) :
-    Free.obj (SingularSimplex X p) ⊗ Free.obj (SingularSimplex Y q) ⟶
+    (singChain C X).X p ⊗ (singChain C Y).X q ⟶
     (singChain C (X ⨯ Y)).X n :=
-  -- Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ Free(Sing_p X × Sing_q Y)
-  -- via the monoidal structure of the free functor
-  (Functor.Monoidal.μIso Free
-      (SingularSimplex X p) (SingularSimplex Y q)).hom ≫
-  -- Free(Sing_p X × Sing_q Y) ⟶ Free(Hom(𝟙_ C, C_n(X×Y; 𝟙_ C)))
-  -- by applying Free to the set-level cross product
-  Free.map (simplexCrossProduct' hn) ≫
-  -- Free(Hom(𝟙_ C, C_n(X×Y; 𝟙_ C))) ⟶ Free(forget C .obj (C_n(X×Y; 𝟙_ C)))
-  -- by applying Free to the inverse of the forgetIso natural transformation
-  Free.map ((MonoidalUnitorRepresentable.forgetIso (C := C)).inv.app _) ≫
-  -- Free(forget C .obj (C_n(X×Y; 𝟙_ C))) ⟶ C_n(X×Y; 𝟙_ C)
-  -- via the counit of the Free ⊣ forget adjunction
-  (Adjunction.ofIsRightAdjoint (forget C)).counit.app _
+  (chainTensorHomEquiv _).symm (simplexCrossProduct' hn)
 
-/-- For `q = 0`, the cross product of an `n`-simplex `s` in `X` with a `0`-simplex `c`
-in `Y` reduces to a single product simplex `t ↦ (s(t), c(*))`.
+/-- Applying `chainTensorHomEquiv` to `chainCrossProduct` recovers
+`simplexCrossProduct'`: the chain-level cross product is the unique lift of
+the simplex-level cross product. -/
+lemma chainCrossProduct.spec {X Y : TopCat.{v}} {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    chainTensorHomEquiv (X := X) (Y := Y) _
+      (chainCrossProduct (C := C) hn) = simplexCrossProduct' hn :=
+  (chainTensorHomEquiv _).right_inv (simplexCrossProduct' hn)
 
-There is a unique `(n, 0)`-shuffle with sign `1`, so the shuffle sum collapses. -/
-instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
-  default := ⟨⟨fun i => (i, 0), fun i j h => ⟨h, by simp⟩⟩, fun i j h => by simpa using h⟩
-  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
-    apply Subtype.ext
-    apply OrderHom.ext
-    funext i
-    ext
-    · have hmono : StrictMono (fun i => (f i).1) := by
-        intro a b hab
-        have h_le := hf hab.le
-        have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
-        have h_le_1 : (f a).1 ≤ (f b).1 := h_le.1
-        cases eq_or_lt_of_le h_le_1 with
-        | inl heq =>
-          exfalso
-          apply h_neq
-          ext
-          · exact congrArg Fin.val heq
-          · simp
-        | inr hlt => exact hlt
-      have heq : ∀ i, (f i).1 = i := by
-        intro i
-        exact le_antisymm (StrictMono.le_id hmono i) (StrictMono.id_le hmono i)
-      exact congrArg Fin.val (heq i)
-    · simp
+/-- Two morphisms out of `C_p(X) ⊗ C_q(Y)` are equal iff they agree on all pairs
+of simplex coprojections. This is the tensor analogue of `Sigma.hom_ext`. -/
+lemma chainCrossProduct.ext {X Y : TopCat.{v}} {p q : ℕ} {M : C}
+    {f g : (singChain C X).X p ⊗ (singChain C Y).X q ⟶ M}
+    (h : chainTensorHomEquiv M f = chainTensorHomEquiv M g) : f = g :=
+  (chainTensorHomEquiv M).injective h
 
-instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
-  default := ⟨⟨fun i => (0, i.cast (by omega)),
-    fun i j h => ⟨by simp, by simpa using h⟩⟩,
-    fun i j h => by ext; simpa using congrArg (Fin.val ∘ Prod.snd) h⟩
-  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
-    apply Subtype.ext; apply OrderHom.ext; funext i
-    have hmono : StrictMono (fun i => (f i).2) := by
-      intro a b hab
-      have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
-      cases eq_or_lt_of_le (hf hab.le).2 with
-      | inl heq =>
-        exact absurd (Prod.ext (by simp [Fin.eq_zero])
-          (Fin.ext (congrArg Fin.val heq))) h_neq
-      | inr hlt => exact hlt
-    let g : Fin (n + 1) → Fin (n + 1) := fun j => (f (j.cast (by omega))).2
-    have hg : StrictMono g := fun a b h =>
-      hmono (show a.cast _ < b.cast _ by exact_mod_cast h)
-    have hg_eq : ∀ j, g j = j :=
-      fun j => le_antisymm (StrictMono.le_id hg j) (StrictMono.id_le hg j)
-    have hcast : ∀ i : Fin (0 + n + 1),
-        (i.cast (show 0 + n + 1 = n + 1 by omega)).cast
-          (show n + 1 = 0 + n + 1 by omega) = i :=
-      fun i => Fin.ext (by simp)
-    have h2 : (f i).2 = i.cast (by omega) := by
-      have := hg_eq (i.cast (by omega))
-      simp only [g, hcast] at this; exact this
-    exact Prod.ext (Fin.eq_zero _) h2
+/-- The "free generator" morphism: for `a : A`, the morphism `𝟙_ C ⟶ Free.obj A`
+obtained by applying `forgetIso` to the adjunction unit at `a`.
+Represents the inclusion of the generator `a` into the free object. -/
+private noncomputable abbrev freeGen {A : Type v} (a : A) : 𝟙_ C ⟶ Free.obj A :=
+  (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app (Free.obj A)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app A a)
+
+/-- The free generator at `s`, mapped through `(chainGroupIsoFree p).inv.app X`,
+equals the coproduct injection `simplexCoprojection s`. -/
+private lemma freeGen_chainGroupIsoFree {X : TopCat.{v}} {p : ℕ}
+    (s : SingularSimplex X p) :
+    freeGen (C := C) s ≫ (chainGroupIsoFree (C := C) p).inv.app X =
+    simplexCoprojection s := by
+  sorry
+
+/-- `OplaxMonoidal.δ` sends the free generator at `(a, b)` to the left unitor inverse
+composed with the tensor of free generators at `a` and `b`. -/
+private lemma freeGen_δ (A B : Type v) (a : A) (b : B) :
+    freeGen (C := C) (a, b) ≫ Functor.OplaxMonoidal.δ Free A B =
+    (λ_ (𝟙_ C)).inv ≫ (freeGen (C := C) a ⊗ₘ freeGen (C := C) b) := by
+  sorry
+
+/-- Evaluating `chainTensorHomEquiv` on coprojection pairs: the forward map
+sends `f` at `(s, t)` to `(λ_ (𝟙_ C)).inv ≫ (ι s ⊗ₘ ι t) ≫ f`. -/
+lemma chainTensorHomEquiv_apply {X Y : TopCat.{v}} {p q : ℕ} {M : C}
+    (f : (singChain C X).X p ⊗ (singChain C Y).X q ⟶ M)
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    chainTensorHomEquiv M f (s, t) =
+    (λ_ (𝟙_ C)).inv ≫
+      MonoidalCategory.tensorHom (simplexCoprojection s) (simplexCoprojection t) ≫ f := by
+  -- Unfold the composed equivalence to expose forgetIso, adj.homEquiv, μIso, chainGroupIsoFree
+  simp only [chainTensorHomEquiv, freeTensorHomEquiv, precompEquiv, Equiv.trans_apply]
+  change ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).hom
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ M)
+      ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
+        ((chainGroupIsoFree (C := C) p).app X ⊗ᵢ
+          (chainGroupIsoFree (C := C) q).app Y).symm.hom ≫ f)
+      (s, t)) =
+    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
+  -- Reassociate and peel off f using naturality of homEquiv and forgetIso
+  have hassoc : (Functor.Monoidal.μIso Free _ _).symm.hom ≫
+      ((chainGroupIsoFree (C := C) p).app X ⊗ᵢ
+        (chainGroupIsoFree (C := C) q).app Y).symm.hom ≫ f =
+    ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
+      ((chainGroupIsoFree (C := C) p).app X ⊗ᵢ
+        (chainGroupIsoFree (C := C) q).app Y).symm.hom) ≫ f :=
+    (Category.assoc _ _ _).symm
+  simp_rw [hassoc, Adjunction.homEquiv_naturality_right]
+  simp only [types_comp_apply]
+  -- Use forgetIso naturality to factor out ≫ f, then ≫ tensor_inv
+  set y := (forget C).map ((chainGroupIsoFree p).app X ⊗ᵢ
+      (chainGroupIsoFree q).app Y).symm.hom
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
+      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality f) y
+  simp only [types_comp_apply] at hnat
+  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app M ((forget C).map f y) =
+    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
+  rw [hnat]; dsimp [coyoneda]; rw [← Category.assoc ((λ_ (𝟙_ C)).inv)]; congr 1
+  -- Reduced to f-free goal:
+  --   forgetIso.hom.app (C_p ⊗ C_q) y = (λ_ (𝟙_ C)).inv ≫ (ι s ⊗ₘ ι t)
+  -- Use forgetIso naturality to absorb (forget C).map tensor_inv
+  simp only [y]; clear y hnat hassoc f M
+  have hnat2 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
+    ((chainGroupIsoFree (C := C) p).app X ⊗ᵢ
+      (chainGroupIsoFree (C := C) q).app Y).symm.hom)
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
+      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
+  simp only [types_comp_apply] at hnat2
+  erw [hnat2]; dsimp [coyoneda]
+  -- Goal: freeGen(s,t)-like ≫ δ ≫ (CGF.inv ⊗ₘ CGF.inv) = (λ_ 𝟙_C).inv ≫ (ι s ⊗ₘ ι t)
+  -- Unfold adj.homEquiv to unit ≫ forget.map, then apply forgetIso naturality for δ
+  rw [Adjunction.homEquiv_unit]
+  simp only [types_comp_apply]
+  have hnat3 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
+    (Functor.OplaxMonoidal.δ Free _ _))
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ (s, t))
+  simp only [types_comp_apply] at hnat3
+  erw [hnat3]; dsimp [coyoneda]
+  -- Now: (freeGen(s,t) ≫ δ) ≫ (CGF.inv ⊗ₘ CGF.inv) = (λ_ 𝟙_C).inv ≫ (ι s ⊗ₘ ι t)
+  rw [Category.assoc]
+  simp only [types_tensorObj_def] at *
+  rw [← Category.assoc, freeGen_δ, Category.assoc,
+    MonoidalCategory.tensorHom_comp_tensorHom,
+    freeGen_chainGroupIsoFree, freeGen_chainGroupIsoFree]
+
+/-- On 0-simplices, `simplexCrossProduct x y` is just `simplexCoprojection (prodSimplex x y)`:
+there is a unique (0,0)-shuffle with sign 1, so the shuffle sum collapses. -/
+lemma simplexCrossProduct_zero_zero {X Y : TopCat.{v}}
+    (x : SingularSimplex X 0) (y : SingularSimplex Y 0) :
+    simplexCrossProduct (C := C) x y = simplexCoprojection (prodSimplex x y) := by
+  simp only [simplexCrossProduct, universalSimplexCrossProduct, shuffleSimplex]
+  rw [Fintype.sum_subsingleton _ default]
+  have : (default : Shuffle 0 0).sign = 1 := by simp [Shuffle.sign, Shuffle.invCount]
+  rw [this, one_smul]
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp only [Category.id_comp]
+  congr 1
+  show ⟪(shuffleStdSimplexMap default ≫ prod.map ⟪𝟙 Δ[0]⟫ₛ.down ⟪𝟙 Δ[0]⟫ₛ.down) ≫
+    prod.map x.down y.down⟫ₛ = prodSimplex x y
+  have h1 : ⟪𝟙 Δ[0]⟫ₛ.down = 𝟙 Δ[0] := SingularSimplex.ofΔ_down _
+  rw [h1, prod.map_id_id, Category.comp_id]
+  simp only [ shuffleStdSimplexMap,
+    SimplexCategory.hom_zero_zero, SimplexCategory.toTop.map_id,
+     prod.lift_map, prodSimplex, simplexProdMap]
+  simp
+
+
+theorem crossProduct_normalized' {X Y : TopCat.{v}}
+    (x : SingularSimplex X 0) (y : SingularSimplex Y 0) :
+    MonoidalCategory.tensorHom (simplexCoprojection (C := C) x)
+      (simplexCoprojection y) ≫ chainCrossProduct (C := C) =
+    (λ_ (𝟙_ C)).hom ≫ simplexCoprojection (prodSimplex x y) := by
+  rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C)) (x, y)]
+  exact simplexCrossProduct_zero_zero x y
 
 @[simp] lemma SimplexCategory.default_mk0_eq_id :
     (default : SimplexCategory.mk 0 ⟶ SimplexCategory.mk 0) = 𝟙 _ := by

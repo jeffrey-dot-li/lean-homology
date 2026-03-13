@@ -2914,4 +2914,58 @@ lemma swapDiagonalSteps_ne {p q : ℕ}
 
 end Shuffle
 
+instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
+  default := ⟨⟨fun i => (i, 0), fun i j h => ⟨h, by simp⟩⟩, fun i j h => by simpa using h⟩
+  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
+    apply Subtype.ext
+    apply OrderHom.ext
+    funext i
+    ext
+    · have hmono : StrictMono (fun i => (f i).1) := by
+        intro a b hab
+        have h_le := hf hab.le
+        have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
+        have h_le_1 : (f a).1 ≤ (f b).1 := h_le.1
+        cases eq_or_lt_of_le h_le_1 with
+        | inl heq =>
+          exfalso
+          apply h_neq
+          ext
+          · exact congrArg Fin.val heq
+          · simp
+        | inr hlt => exact hlt
+      have heq : ∀ i, (f i).1 = i := by
+        intro i
+        exact le_antisymm (StrictMono.le_id hmono i) (StrictMono.id_le hmono i)
+      exact congrArg Fin.val (heq i)
+    · simp
+
+instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
+  default := ⟨⟨fun i => (0, i.cast (by omega)),
+    fun i j h => ⟨by simp, by simpa using h⟩⟩,
+    fun i j h => by ext; simpa using congrArg (Fin.val ∘ Prod.snd) h⟩
+  uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
+    apply Subtype.ext; apply OrderHom.ext; funext i
+    have hmono : StrictMono (fun i => (f i).2) := by
+      intro a b hab
+      have h_neq : f a ≠ f b := fun h => hab.ne (hinj h)
+      cases eq_or_lt_of_le (hf hab.le).2 with
+      | inl heq =>
+        exact absurd (Prod.ext (by simp [Fin.eq_zero])
+          (Fin.ext (congrArg Fin.val heq))) h_neq
+      | inr hlt => exact hlt
+    let g : Fin (n + 1) → Fin (n + 1) := fun j => (f (j.cast (by omega))).2
+    have hg : StrictMono g := fun a b h =>
+      hmono (show a.cast _ < b.cast _ by exact_mod_cast h)
+    have hg_eq : ∀ j, g j = j :=
+      fun j => le_antisymm (StrictMono.le_id hg j) (StrictMono.id_le hg j)
+    have hcast : ∀ i : Fin (0 + n + 1),
+        (i.cast (show 0 + n + 1 = n + 1 by omega)).cast
+          (show n + 1 = 0 + n + 1 by omega) = i :=
+      fun i => Fin.ext (by simp)
+    have h2 : (f i).2 = i.cast (by omega) := by
+      have := hg_eq (i.cast (by omega))
+      simp only [g, hcast] at this; exact this
+    exact Prod.ext (Fin.eq_zero _) h2
+
 end HomologyLean.SingularHomology
