@@ -30,6 +30,7 @@ import Mathlib.Topology.Category.TopCat.Limits.Products
 import HomologyLean.SingularHomology.Shuffle
 import HomologyLean.SingularHomology.SumInvolution
 import HomologyLean.SingularHomology.Representable
+import Mathlib.Algebra.Homology.Monoidal
 
 noncomputable section
 
@@ -1744,5 +1745,24 @@ noncomputable def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}}
     rw [← Functor.map_comp, singularHomology_map_eq_of_homotopy (C := C) hgf n]; simp
 
 #print axioms singularHomology_iso_of_homotopyEquiv
+
+/-! ### Tensor product of chain complexes: instances
+
+`HasTensor (singChain C X) (singChain C Y)` requires two instances not automatically
+derived from the existing hypotheses:
+1. `(curriedTensor C).Additive` — the bifunctor `C ⥤ (C ⥤ C)` respects addition.
+   Follows from `MonoidalPreadditive.add_whiskerRight`.
+2. `HasCoproducts.{0} C` — the degree-`n` object of the tensor product is a coproduct
+   indexed by `{(p,q) : ℕ × ℕ | p + q = n}` (a `Type 0`), so we resize from `HasCoproducts.{v} C`.
+-/
+
+instance curriedTensor_additive :
+    (MonoidalCategory.curriedTensor C).Additive where
+  map_add {X Y} f g := by
+    apply NatTrans.ext; funext Z
+    exact MonoidalPreadditive.add_whiskerRight f g
+
+instance hasCoproducts_zero_of_v : HasCoproducts.{0} C :=
+  hasCoproducts_shrink.{0, v}
 
 end HomologyLean.SingularHomology
