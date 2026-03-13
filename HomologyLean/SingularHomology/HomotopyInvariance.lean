@@ -2117,6 +2117,100 @@ noncomputable def eilenbergZilber (X Y : TopCat.{v}) :
     exact eilenbergZilber_comm (C := C) X Y n m h
 
 #print axioms eilenbergZilber
+
+/-! ### Eilenberg–Zilber as a natural transformation
+
+The Eilenberg–Zilber map is natural in `(X, Y)`: for continuous maps `f : X₁ → X₂`
+and `g : Y₁ → Y₂`, the square
+```
+  C_*(X₁) ⊗ C_*(Y₁) --EZ--> C_*(X₁ × Y₁)
+        |                          |
+  f_* ⊗ g_*                  (f × g)_*
+        |                          |
+  C_*(X₂) ⊗ C_*(Y₂) --EZ--> C_*(X₂ × Y₂)
+```
+commutes. We package this as a `NatTrans` between two functors
+`TopCat.{v} × TopCat.{v} ⥤ ChainComplex C ℕ`.
+-/
+
+/-- The **source bifunctor** for the Eilenberg–Zilber natural transformation:
+`(X, Y) ↦ (singChain C X).tensorObj (singChain C Y)`.
+
+On morphisms: `(f, g) ↦ tensorHom ((SCF C).map f) ((SCF C).map g)`. -/
+noncomputable def singChainTensor :
+    TopCat.{v} × TopCat.{v} ⥤ ChainComplex C ℕ where
+  obj p := (singChain C p.1).tensorObj (singChain C p.2)
+  map f := HomologicalComplex.tensorHom ((SCF C).map f.1) ((SCF C).map f.2)
+  map_id _ := by simp [HomologicalComplex.tensorHom, HomologicalComplex.mapBifunctorMap]
+  map_comp f g := by
+    show HomologicalComplex.tensorHom ((SCF C).map (f.1 ≫ g.1)) ((SCF C).map (f.2 ≫ g.2)) = _
+    simp only [Functor.map_comp]
+    show HomologicalComplex.tensorHom (((SCF C).map f.1) ≫ ((SCF C).map g.1))
+        (((SCF C).map f.2) ≫ ((SCF C).map g.2)) =
+      HomologicalComplex.tensorHom ((SCF C).map f.1) ((SCF C).map f.2) ≫
+        HomologicalComplex.tensorHom ((SCF C).map g.1) ((SCF C).map g.2)
+    apply HomologicalComplex.Hom.ext; funext n
+    apply HomologicalComplex.mapBifunctor.hom_ext; intro p q h
+    simp only [HomologicalComplex.ι_mapBifunctorMap, HomologicalComplex.comp_f,
+      HomologicalComplex.ι_mapBifunctorMap_assoc, Category.assoc,
+      Functor.map_comp, NatTrans.comp_app, Functor.comp_map]
+    -- Swap middle two morphisms via naturality of (curriedTensor.map g₁)
+    slice_lhs 2 3 => rw [← NatTrans.naturality]
+    simp [Category.assoc]
+
+/-- The **target bifunctor** for the Eilenberg–Zilber natural transformation:
+`(X, Y) ↦ singChain C (X ⨯ Y)`.
+
+On morphisms: `(f, g) ↦ (SCF C).map (prod.map f g)`. -/
+noncomputable def singChainProd :
+    TopCat.{v} × TopCat.{v} ⥤ ChainComplex C ℕ where
+  obj p := singChain C (p.1 ⨯ p.2)
+  map f := (SCF C).map (prod.map f.1 f.2)
+  map_id _ := by simp [prod.map_id_id]
+  map_comp f g := by
+    show (SCF C).map (prod.map (f.1 ≫ g.1) (f.2 ≫ g.2)) = _
+    rw [← Functor.map_comp, prod.map_map]
+
+/-- **Naturality of the Eilenberg–Zilber map at a pair of morphisms `(f, g)`.**
+
+For continuous maps `f : X₁ → X₂` and `g : Y₁ → Y₂`:
+```
+  eilenbergZilber X₁ Y₁ ≫ (SCF C).map (prod.map f g) =
+    tensorHom ((SCF C).map f) ((SCF C).map g) ≫ eilenbergZilber X₂ Y₂
+```
+This follows from `crossProduct_natural` applied at each bidegree. -/
+lemma eilenbergZilber_natural {X₁ X₂ Y₁ Y₂ : TopCat.{v}} (f : X₁ ⟶ X₂) (g : Y₁ ⟶ Y₂) :
+    eilenbergZilber (C := C) X₁ Y₁ ≫ (SCF C).map (prod.map f g) =
+    HomologicalComplex.tensorHom ((SCF C).map f) ((SCF C).map g) ≫
+      eilenbergZilber (C := C) X₂ Y₂ := by
+  apply HomologicalComplex.Hom.ext; funext n
+  apply HomologicalComplex.mapBifunctor.hom_ext; intro p q h
+  simp only [HomologicalComplex.comp_f, Category.assoc, eilenbergZilber]
+  -- Both sides: ι_{p,q} ≫ ... where ι is ιMapBifunctor = ιTensorObj
+  change HomologicalComplex.ιTensorObj (singChain C X₁) (singChain C Y₁) p q n (by omega) ≫
+      eilenbergZilber_f X₁ Y₁ n ≫ ((SCF C).map (prod.map f g)).f n =
+    HomologicalComplex.ιTensorObj (singChain C X₁) (singChain C Y₁) p q n (by omega) ≫
+      (HomologicalComplex.tensorHom ((SCF C).map f) ((SCF C).map g)).f n ≫
+        eilenbergZilber_f X₂ Y₂ n
+  rw [reassoc_of% (ι_eilenbergZilber_f (C := C) X₁ Y₁ p q n h)]
+  rw [HomologicalComplex.ι_mapBifunctorMap_assoc, ι_eilenbergZilber_f]
+  -- Goal: chainCrossProduct ≫ (prod.map f g)_* = (curriedTensor.map f_*).app _ ≫ (curriedTensor.obj _).map g_* ≫ chainCrossProduct
+  -- Use crossProduct_natural, then fold the tensor product
+  rw [crossProduct_natural (C := C) f g (hn := h.symm)]
+  -- Now: (f_* ⊗ₘ g_*) ≫ chainCrossProduct = (curriedTensor.map f_*).app _ ≫ (curriedTensor.obj _).map g_* ≫ chainCrossProduct
+  simp [Category.assoc, MonoidalCategory.tensorHom_def]
+
+/-- **The Eilenberg–Zilber cross product as a natural transformation.**
+
+A natural transformation from `singChainTensor` to `singChainProd`:
+at each `(X, Y)`, the component is the Eilenberg–Zilber chain map
+`(singChain C X).tensorObj (singChain C Y) ⟶ singChain C (X ⨯ Y)`,
+and naturality in `(X, Y)` follows from `eilenbergZilber_natural`. -/
+noncomputable def eilenbergZilberNatTrans :
+    singChainTensor (C := C) ⟶ singChainProd (C := C) where
+  app p := eilenbergZilber (C := C) p.1 p.2
+  naturality _ _ f := (eilenbergZilber_natural f.1 f.2).symm
+
 end EilenbergZilber
 
 end HomologyLean.SingularHomology
