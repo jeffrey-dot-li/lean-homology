@@ -19,6 +19,8 @@ import Mathlib.Topology.UnitInterval
 import Mathlib.CategoryTheory.Monoidal.Category
 import Mathlib.CategoryTheory.Monoidal.Preadditive
 import Mathlib.CategoryTheory.Monoidal.Linear
+import HomologyLean.CategoryTheory.SubTensorHom
+import HomologyLean.SingularHomology.HomotopyMap
 import Mathlib.CategoryTheory.Monoidal.Closed.Basic
 import Mathlib.CategoryTheory.Monoidal.Limits.Preserves
 import Mathlib.CategoryTheory.Monoidal.Mon_
@@ -1483,8 +1485,264 @@ theorem chainCrossProduct_leibniz {X Y : TopCat.{v}} (p q : ℕ) :
   congr 1
   exact simplexCrossProduct_boundary (C := C) p q s t
 
-/-! The chain-level cross product and homotopy invariance theorems
-are in `HomologyLean.SingularHomology.CrossProduct`, specialized to `ModuleCat R`. -/
+/-! ## Chain homotopy from topological homotopy -/
 
+/-- The boundary of the identity 1-simplex in `Δ[1]`:
+`simplexCoprojection ⟪𝟙 Δ[1]⟫ₛ ≫ d₁₀ = simplexCoprojection δ₀ - simplexCoprojection δ₁`,
+where `δ₀` and `δ₁` are the two vertex inclusions `Δ[0] → Δ[1]`. -/
+lemma boundary_identity_1simplex_generic :
+    simplexCoprojection (C := C) ⟪𝟙 Δ[1]⟫ₛ ≫ (singChain C Δ[1]).d 1 0 =
+    simplexCoprojection (C := C) ⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ -
+    simplexCoprojection ⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ := by
+  simp only [singChain]
+  dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
+  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
+  rw [Fin.sum_univ_two]
+  simp only [Fin.val_zero, pow_zero, one_smul, Fin.val_one, pow_one, neg_smul, sub_eq_add_neg]
+  simp only [simplexCoprojection]
+  erw [Sigma.ι_comp_map', Sigma.ι_comp_map']
+  simp only [Category.id_comp, sub_eq_add_neg]
+  congr 1 <;> congr 1 <;> {ext; rfl}
+
+/-- Evaluating the cross product on a 0-simplex on the right and pushing forward
+along a map recovers the chain map, generically.
+
+Given `Hmap : X ⨯ Δ[1] ⟶ Y`, a 0-simplex `c` in `Δ[1]`, and `h : X ⟶ Y`
+such that `prod.lift s c ≫ Hmap = s ≫ h` for all simplices `s`, we get
+`(ρ⁻¹ ≫ (𝟙 ⊗ ι c) ≫ chainCrossProduct) ≫ Hmap_* = h_*` at each degree. -/
+lemma chainCrossProduct_zero_right_boundary {X Y : TopCat.{v}}
+    (Hmap : X ⨯ Δ[1] ⟶ Y) (c : SingularSimplex Δ[1] 0) (h : X ⟶ Y)
+    (heval : ∀ {n : ℕ} (s : SingularSimplex X n),
+      prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down) ≫ Hmap = s.down ≫ h)
+    (n : ℕ) :
+    (ρ_ ((singChain C X).X n)).inv ≫
+      (𝟙 ((singChain C X).X n) ⊗ₘ simplexCoprojection c) ≫
+      chainCrossProduct (C := C) (show n + 0 = n from by omega) ≫ ((SCF C).map Hmap).f n =
+    ((SCF C).map h).f n := by
+  apply Sigma.hom_ext; intro s
+  slice_lhs 1 2 => erw [MonoidalCategory.rightUnitor_inv_naturality]
+  simp only [Category.assoc]
+  rw [← MonoidalCategory.tensorHom_id]
+  rw [← Category.assoc (Sigma.ι _ s ⊗ₘ _)]
+  erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  rw [Category.id_comp]
+  have key : (simplexCoprojection s ⊗ₘ simplexCoprojection c) ≫ chainCrossProduct (C := C)
+      (show n + 0 = n from by omega) =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (show n + 0 = n from by omega) (s, c) := by
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+    rw [← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) _) (s, c)
+  rw [← Category.assoc (Sigma.ι _ s ⊗ₘ _), key]
+  simp only [simplexCrossProduct']
+  rw [simplexCrossProduct_zero_right]
+  rw [Category.assoc, ← Category.assoc (ρ_ (𝟙_ C)).inv (λ_ (𝟙_ C)).hom]
+  rw [show (ρ_ (𝟙_ C)).inv ≫ (λ_ (𝟙_ C)).hom = 𝟙 _ from by
+    erw [MonoidalCategory.unitors_equal]; exact (ρ_ _).inv_hom_id]
+  rw [Category.id_comp]
+  rw [simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+  congr 1; apply ULift.ext; simp only [SingularSimplex.ofΔ_down]; exact heval s
+
+/-- Special case of the Leibniz rule for degree `(0, 1)`:
+the cross product `chainCrossProduct (0, 1)` composed with the boundary `d` equals
+`(𝟙 ⊗ d) ≫ chainCrossProduct (0, 0)`. -/
+lemma chainCrossProduct_leibniz_left_zero_zero {X Y : TopCat.{v}} :
+    chainCrossProduct (C := C) (X := X) (Y := Y) (show 0 + 1 = 0 + 1 from rfl) ≫
+      (singChain C (X ⨯ Y)).d (0 + 1) 0 =
+    (𝟙 ((singChain C X).X 0) ⊗ₘ (singChain C Y).d 1 0) ≫
+      chainCrossProduct (C := C) (show 0 + 0 = 0 from by omega) := by
+  apply chainCrossProduct.ext; ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  congr 1
+  -- LHS: (ι s ⊗ₘ ι t) ≫ chainCrossProduct ≫ d
+  -- Use key: (ι s ⊗ₘ ι t) ≫ chainCrossProduct = (λ_).hom ≫ simplexCrossProduct s t
+  rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
+  rw [show (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct (C := C)
+      (show 0 + 1 = 0 + 1 from rfl) =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (show 0 + 1 = 0 + 1 from rfl) (s, t) from by
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C)), ← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) _) (s, t)]
+  -- RHS: (ι s ⊗ₘ (ι t ≫ d)) ≫ chainCrossProduct
+  conv_rhs =>
+    rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  conv_rhs =>
+    arg 1; arg 2
+    rw [simplexCoprojection_factor t, Category.assoc,
+        ((SCF C).map t.down).comm 1 0, ← Category.assoc]
+    erw [boundary_identity_1simplex_generic (C := C)]
+  conv_rhs =>
+    arg 1; arg 2
+    rw [Preadditive.sub_comp, simplexCoprojection_comp_SCF_map,
+        simplexCoprojection_comp_SCF_map]
+  open HomologyLean.CategoryTheory in
+  rw [tensorHom_sub, Preadditive.sub_comp]
+  rw [show (simplexCoprojection s ⊗ₘ simplexCoprojection
+      ⟪⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ.down ≫ t.down⟫ₛ) ≫
+      chainCrossProduct (C := C) (show 0 + 0 = 0 from by omega) =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (show 0 + 0 = 0 from by omega)
+        (s, ⟪⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ.down ≫ t.down⟫ₛ) from by
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C)), ← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) _) _]
+  rw [show (simplexCoprojection s ⊗ₘ simplexCoprojection
+      ⟪⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ.down ≫ t.down⟫ₛ) ≫
+      chainCrossProduct (C := C) (show 0 + 0 = 0 from by omega) =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct' (show 0 + 0 = 0 from by omega)
+        (s, ⟪⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ.down ≫ t.down⟫ₛ) from by
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C)), ← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) _) _]
+  simp only [simplexCrossProduct']
+  rw [Category.assoc, ← Preadditive.comp_sub]
+  congr 1
+  rw [simplexCrossProduct_zero_right, simplexCrossProduct_zero_right]
+  rw [simplexCrossProduct_zero_left]
+  rw [simplexCoprojection_factor ⟪prod.lift (SimplexCategory.toTop.map default ≫ s.down) t.down⟫ₛ,
+      Category.assoc, ((SCF C).map _).comm 1 0, ← Category.assoc]
+  erw [boundary_identity_1simplex_generic (C := C)]
+  rw [Preadditive.sub_comp, simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+  congr 1 <;> congr 1 <;> {
+    apply ULift.ext
+    simp only [singularSimplexFunctor, SingularSimplex.ofΔ_down]
+    rw [prod.comp_lift]
+    apply CategoryTheory.Limits.prod.hom_ext
+    · rw [prod.lift_fst, prod.lift_fst, ← Category.assoc,
+          ← SimplexCategory.toTop.map_comp, SimplexCategory.δ_comp_default_mk1,
+          SimplexCategory.toTop.map_id, Category.id_comp]
+    · rw [prod.lift_snd, prod.lift_snd, ← Category.assoc,
+          ← SimplexCategory.toTop.map_comp, SimplexCategory.default_mk0_eq_id, Category.id_comp]
+  }
+
+/-- A topological homotopy `H : f ∼ g` between continuous maps `f g : X → Y`
+induces a chain homotopy between the chain maps `C_*(f)` and `C_*(g)`.
+
+The proof uses the cross product with the unit interval: the homotopy
+`H : I × X → Y` composed with the cross product `C_1(Δ[1]) ⊗ C_n(X) → C_{n+1}(X × Δ[1])`
+gives the chain homotopy operator, using the fundamental class of `Δ[1]` as a
+1-chain connecting the two endpoints. -/
+noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
+    (H : ContinuousMap.Homotopy f.hom' g.hom') :
+    Homotopy
+      ((SCF C).map g)
+      ((SCF C).map f) := by
+  let Hmap : X ⨯ Δ[1] ⟶ Y := homotopyMap H
+  let chainH := (SCF C).map Hmap
+  let ι₁ : SingularSimplex (Δ[1] : TopCat.{v}) 1 := ⟪𝟙 Δ[1]⟫ₛ
+  let tensorι₁ := fun n =>
+    (ρ_ (((SCF C).obj X).X n)).inv ≫
+      (𝟙 (((SCF C).obj X).X n) ⊗ₘ simplexCoprojection (C := C) ι₁)
+  let P := fun n => (-1 : ℤ) ^ n •
+    (tensorι₁ n ≫ chainCrossProduct (C := C) (show n + 1 = n + 1 from rfl) ≫ chainH.f (n + 1))
+  refine Homotopy.mk
+    (fun i j => if h : j = i + 1 then h ▸ P i else 0)
+    (by intro i j h; dsimp; rw [dif_neg]; rw [ComplexShape.down_Rel] at h; omega)
+    ?_
+  intro i
+  rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel (i + 1) i by simp [ComplexShape.down_Rel])]
+  simp only [dif_pos trivial]
+  have hBoundary₀ : ∀ n,
+      (ρ_ (((SCF C).obj X).X n)).inv ≫
+        (𝟙 (((SCF C).obj X).X n) ⊗ₘ
+          simplexCoprojection (C := C) (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
+            SingularSimplex Δ[1] 0)) ≫
+        chainCrossProduct (C := C) (show n + 0 = n from by omega) ≫ chainH.f n =
+       ((SCF C).map g).f n :=
+    chainCrossProduct_zero_right_boundary (C := C) Hmap _ g fun s => homotopyMap_comp_delta0 H s.down
+  have hBoundary₁ : ∀ n,
+      (ρ_ (((SCF C).obj X).X n)).inv ≫
+        (𝟙 (((SCF C).obj X).X n) ⊗ₘ
+          simplexCoprojection (C := C) (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
+            SingularSimplex Δ[1] 0)) ≫
+        chainCrossProduct (C := C) (show n + 0 = n from by omega) ≫ chainH.f n =
+        ((SCF C).map f).f n :=
+    chainCrossProduct_zero_right_boundary (C := C) Hmap _ f fun s => homotopyMap_comp_delta1 H s.down
+  open HomologyLean.CategoryTheory in
+  match i with
+  | 0 =>
+    rw [dNext_eq_zero _ 0 (by simp [ComplexShape.down_Rel])]
+    simp
+    conv_rhs => lhs; rw [show P 0 = tensorι₁ 0 ≫
+        chainCrossProduct (C := C) (show 0 + 1 = 0 + 1 from rfl) ≫ chainH.f 1 from by
+      simp [P]]
+    simp only [Category.assoc]
+    rw [chainH.comm 1 0]
+    rw [← Category.assoc (chainCrossProduct (C := C) (show 0 + 1 = 0 + 1 from rfl)),
+        chainCrossProduct_leibniz_left_zero_zero (C := C)]
+    simp only [tensorι₁, Category.assoc]
+    rw [← Category.assoc (𝟙 _ ⊗ₘ simplexCoprojection (C := C) ι₁),
+      MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+    erw [boundary_identity_1simplex_generic (C := C)]
+    rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+    rw [hBoundary₀ 0, hBoundary₁ 0]
+    abel
+  | n + 1 =>
+    rw [dNext_eq _ (show (ComplexShape.down ℕ).Rel (n + 1) n by simp [ComplexShape.down_Rel])]
+    simp
+    simp only [P, Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc]
+    rw [chainH.comm (n + 2) (n + 1)]
+    rw [← Category.assoc (chainCrossProduct (C := C) (show (n + 1) + 1 = (n + 1) + 1 from rfl)),
+        chainCrossProduct_leibniz (C := C) n 0]
+    simp only [Preadditive.add_comp, Preadditive.comp_add, Preadditive.comp_zsmul,
+      Preadditive.zsmul_comp, Category.assoc]
+    simp only [smul_add, smul_smul, ← pow_add, ← two_mul,
+      pow_mul, neg_one_pow_two, one_pow, one_smul]
+    conv_rhs => lhs; rw [← add_assoc]
+    let Xbdy := tensorι₁ (n + 1) ≫
+      ((singChain C X).d (n + 1) n ⊗ₘ 𝟙 ((singChain C Δ[1]).X (0 + 1))) ≫
+        chainCrossProduct (C := C) (show n + (0 + 1) = n + (0 + 1) from rfl) ≫ chainH.f (n + 1)
+    let Δbdy := tensorι₁ (n + 1) ≫
+      (𝟙 ((singChain C X).X (n + 1)) ⊗ₘ (singChain C Δ[1]).d (0 + 1) 0) ≫
+        chainCrossProduct (C := C) (show (n + 1) + 0 = n + 1 from by omega) ≫
+          chainH.f (n + 1)
+    change _ = (-1) ^ n • (((SCF C).obj X).d (n + 1) n ≫
+        tensorι₁ n ≫ chainCrossProduct (C := C) (show n + 1 = n + 1 from rfl) ≫
+          chainH.f (n + 1)) +
+      (-1) ^ (n + 1) • Xbdy + Δbdy + ((SCF C).map f).f (n + 1)
+    have hΔbdy : Δbdy = ((SCF C).map g).f (n + 1) - ((SCF C).map f).f (n + 1) := by
+      simp only [Δbdy, tensorι₁, Category.assoc]
+      rw [← Category.assoc (𝟙 _ ⊗ₘ simplexCoprojection (C := C) ι₁),
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+      erw [boundary_identity_1simplex_generic (C := C)]
+      rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+      rw [hBoundary₀ (n + 1), hBoundary₁ (n + 1)]
+    rw [hΔbdy]
+    abel
+    simp only [Xbdy]
+    have htensor_nat : tensorι₁ (n + 1) ≫
+        ((singChain C X).d (n + 1) n ⊗ₘ 𝟙 ((singChain C Δ[1]).X (0 + 1))) =
+        ((SCF C).obj X).d (n + 1) n ≫ tensorι₁ n := by
+      simp only [tensorι₁, Category.assoc]
+      rw [MonoidalCategory.tensorHom_comp_tensorHom, Category.id_comp, Category.comp_id]
+      conv_rhs =>
+        rw [← Category.assoc, MonoidalCategory.rightUnitor_inv_naturality, Category.assoc]
+      congr 1
+      rw [← MonoidalCategory.tensorHom_id,
+        MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id, Category.id_comp]
+    simp only [← Category.assoc (tensorι₁ (n + 1)), htensor_nat, Category.assoc]
+    norm_num
+    rw [pow_succ, mul_neg_one, neg_smul]
+    abel
+
+/-- Homotopic maps induce equal maps on singular homology. -/
+theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
+    (H : ContinuousMap.Homotopy f.hom' g.hom') (n : ℕ) :
+    ((singularHomologyFunctor C n).obj (𝟙_ C)).map f =
+      ((singularHomologyFunctor C n).obj (𝟙_ C)).map g :=
+  ((singularChain_chainHomotopy_of_homotopy (C := C) H).homologyMap_eq n).symm
+
+/-- Homotopy equivalent spaces have isomorphic singular homology. -/
+noncomputable def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}}
+    (f : X ⟶ Y) (g : Y ⟶ X)
+    (hfg : ContinuousMap.Homotopy (f ≫ g : X ⟶ X).hom' (𝟙 X : X ⟶ X).hom')
+    (hgf : ContinuousMap.Homotopy (g ≫ f : Y ⟶ Y).hom' (𝟙 Y : Y ⟶ Y).hom')
+    (n : ℕ) :
+    ((singularHomologyFunctor C n).obj (𝟙_ C)).obj X ≅
+      ((singularHomologyFunctor C n).obj (𝟙_ C)).obj Y where
+  hom := ((singularHomologyFunctor C n).obj (𝟙_ C)).map f
+  inv := ((singularHomologyFunctor C n).obj (𝟙_ C)).map g
+  hom_inv_id := by
+    rw [← Functor.map_comp, singularHomology_map_eq_of_homotopy (C := C) hfg n]; simp
+  inv_hom_id := by
+    rw [← Functor.map_comp, singularHomology_map_eq_of_homotopy (C := C) hgf n]; simp
+
+#print axioms singularHomology_iso_of_homotopyEquiv
 
 end HomologyLean.SingularHomology

@@ -39,10 +39,10 @@ instance : MonoidalUnitorRepresentable (C := Type u) where
 
 section ModuleCat
 
--- `𝟙_ (ModuleCat R) = R` as a module over itself; `Hom(R, M)` is naturally isomorphic
--- to the underlying type of `M` via `f ↦ f 1` / `x ↦ (r ↦ r • x)`.
-instance {R : Type u} [CommRing R] : MonoidalUnitorRepresentable (C := ModuleCat.{u} R) where
-  forgetIso := sorry
+-- -- `𝟙_ (ModuleCat R) = R` as a module over itself; `Hom(R, M)` is naturally isomorphic
+-- -- to the underlying type of `M` via `f ↦ f 1` / `x ↦ (r ↦ r • x)`.
+-- instance {R : Type u} [CommRing R] : MonoidalUnitorRepresentable (C := ModuleCat.{u} R) where
+--   forgetIso := sorry
 
 end ModuleCat
 
