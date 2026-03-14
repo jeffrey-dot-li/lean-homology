@@ -23,6 +23,10 @@ Topic: $ARGUMENTS
 - `.claude/skills/*/SKILL.md` — slash command definitions
 - `.claude/settings.local.json` — Claude Code settings
 - Memory files in `~/.claude/projects/` — cross-session notes
+- MCP config — must be updated in **three** places to stay in sync:
+  1. `.mcp.json` (project root — used by Claude Code)
+  2. `.cursor/mcp.json` (used by Cursor's MCP panel)
+  3. `.claude/` if any instructions reference MCP server names
 
 ## Rules
 
