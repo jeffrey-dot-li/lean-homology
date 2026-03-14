@@ -476,14 +476,6 @@ def simplexCrossProduct' {X Y : TopCat.{v}} {p q n : ℕ}
     Hom[𝟙_ C |-].obj ((singChain C (X ⨯ Y)).X n) :=
   fun ⟨s, t⟩ => simplexCrossProduct s t hn
 
-/-- Precomposition by an iso gives an equivalence on hom-sets (contravariant). -/
-noncomputable def precompEquiv {D : Type*} [Category D] {X Y : D} (α : X ≅ Y) (Z : D) :
-    (Y ⟶ Z) ≃ (X ⟶ Z) where
-  toFun f := α.hom ≫ f
-  invFun g := α.inv ≫ g
-  left_inv f := by simp
-  right_inv g := by simp
-
 /-- The hom-set equivalence for tensors of free objects: morphisms
 `Free.obj A ⊗ Free.obj B ⟶ M` in `C` correspond bijectively to set-level maps
 `A × B → Hom(𝟙_ C, M)`.
@@ -496,7 +488,7 @@ noncomputable def freeTensorHomEquiv (A B : Type v) (M : C) :
     (Free.obj A ⊗ Free.obj B ⟶ M) ≃
     (A × B → Hom[𝟙_ C |-].obj M) :=
   -- (Free A ⊗ Free B ⟶ M) ≃ (Free (A × B) ⟶ M) via μIso
-  precompEquiv (Functor.Monoidal.μIso Free A B).symm M |>.trans
+  (Functor.Monoidal.μIso Free A B).symm.homFromEquiv.symm |>.trans
   -- (Free (A × B) ⟶ M) ≃ (A × B → (forget C).obj M) via adjunction homEquiv
   ((Adjunction.ofIsRightAdjoint (forget C)).homEquiv (A × B) M) |>.trans
   -- (A × B → (forget C).obj M) ≃ (A × B → Hom(𝟙_ C, M)) via forgetIso
@@ -514,8 +506,8 @@ noncomputable def chainTensorHomEquiv {X Y : TopCat.{v}} {p q : ℕ} (M : C) :
     (SingularSimplex X p × SingularSimplex Y q →
       Hom[𝟙_ C |-].obj M) :=
   -- (C_p(X) ⊗ C_q(Y) ⟶ M) ≃ (Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ M)
-  precompEquiv (MonoidalCategory.tensorIso ((chainGroupIsoFree (C := C) p).app X)
-    ((chainGroupIsoFree (C := C) q).app Y)).symm M |>.trans
+  (MonoidalCategory.tensorIso ((chainGroupIsoFree (C := C) p).app X)
+    ((chainGroupIsoFree (C := C) q).app Y)).symm.homFromEquiv.symm |>.trans
   -- (Free(Sing_p X) ⊗ Free(Sing_q Y) ⟶ M) ≃ (Sing_p X × Sing_q Y → Hom(𝟙_ C, M))
   (freeTensorHomEquiv (SingularSimplex X p) (SingularSimplex Y q) M)
 
@@ -628,7 +620,7 @@ lemma chainTensorHomEquiv_apply {X Y : TopCat.{v}} {p q : ℕ} {M : C}
     (λ_ (𝟙_ C)).inv ≫
       MonoidalCategory.tensorHom (simplexCoprojection s) (simplexCoprojection t) ≫ f := by
   -- Unfold the composed equivalence to expose forgetIso, adj.homEquiv, μIso, chainGroupIsoFree
-  simp only [chainTensorHomEquiv, freeTensorHomEquiv, precompEquiv, Equiv.trans_apply]
+  simp only [chainTensorHomEquiv, freeTensorHomEquiv, Iso.homFromEquiv, Equiv.trans_apply]
   change ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).hom
     (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ M)
       ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
@@ -2116,7 +2108,6 @@ noncomputable def eilenbergZilber (X Y : TopCat.{v}) :
     have h : n = m + 1 := by rw [ComplexShape.down_Rel] at hnm; omega
     exact eilenbergZilber_comm (C := C) X Y n m h
 
-#print axioms eilenbergZilber
 
 /-! ### Eilenberg–Zilber as a natural transformation
 
@@ -2210,6 +2201,7 @@ noncomputable def eilenbergZilberNatTrans :
     singChainTensor (C := C) ⟶ singChainProd (C := C) where
   app p := eilenbergZilber (C := C) p.1 p.2
   naturality _ _ f := (eilenbergZilber_natural f.1 f.2).symm
+#print axioms eilenbergZilberNatTrans
 
 end EilenbergZilber
 
