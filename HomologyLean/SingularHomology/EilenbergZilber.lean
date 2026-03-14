@@ -889,7 +889,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             (Shuffle.insertLeftStep ν j) ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩ := rfl
           rw [this]
           convert hleft using 2; congr 1
-          simp [Fin.val_cast] at hr_eq ⊢; omega
+          simp [Fin.val_cast] at hr_eq⊢; omega
         · exact ⟨(k, ν), Finset.mem_univ _,
             Sigma.ext hμ_eq.symm (heq_of_eq (Fin.ext (by simp [Fin.val_cast] at hr_eq ⊢; omega)))⟩
       · -- Summand equality (right case)
