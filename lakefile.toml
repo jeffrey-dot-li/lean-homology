@@ -11,8 +11,8 @@ maxSynthPendingDepth = 3
 
 [[require]]
 name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.28.0-rc1"
+git = "https://github.com/jeffrey-dot-li/mathlib4"
+rev = "simplicial-homotopy"
 
 [[lean_lib]]
 name = "HomologyLean"

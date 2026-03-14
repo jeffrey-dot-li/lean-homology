@@ -16,6 +16,14 @@
     # ruff.enable = true;
     # ruff-format.enable = true;
     alejandra.enable = true;
+    lake-build = {
+      enable = true;
+      name = "lake build";
+      entry = "${pkgs.bash}/bin/bash -c 'lake build'";
+      language = "system";
+      pass_filenames = false;
+      stages = ["pre-commit"];
+    };
   };
 
   languages = {
