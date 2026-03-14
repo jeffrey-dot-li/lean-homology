@@ -1,5 +1,6 @@
 {
   "lean4.envPathExtensions": [
     "./.devenv/profile/bin"
-  ]
+  ],
+  "lean4.leanExecutablePath": "./.devenv/profile/bin/lean"
 }
