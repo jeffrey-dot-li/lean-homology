@@ -1653,3 +1653,50 @@ noncomputable def eilenbergZilberNatTrans :
     (singChainProdIso (C := C)).hom
 
 end HomologyLean.SingularHomology.SSetEZ
+
+
+
+/-! ### `TopCat.toSSet` preserves binary products
+
+`TopCat.toSSet` is a right adjoint (to `SSet.toTop` via `sSetTopAdj`), so it preserves
+all limits. We register the `IsRightAdjoint` instance so that Mathlib's automatic
+`PreservesLimitsOfSize` kicks in, giving `PreservesLimit (pair X Y) TopCat.toSSet`. -/
+
+noncomputable instance : CartesianMonoidalCategory TopCat := .ofHasFiniteProducts
+
+noncomputable instance : TopCat.toSSet.IsRightAdjoint :=
+  ⟨SSet.toTop, ⟨sSetTopAdj⟩⟩
+
+/-- The canonical iso `toSSet.obj (X ⨯ Y) ≅ toSSet.obj X ⨯ toSSet.obj Y` in `SSet`,
+from the fact that `toSSet` preserves binary products (as a right adjoint). -/
+noncomputable def TopCat.toSSet_prodIso (X Y : TopCat) :
+    TopCat.toSSet.obj (X ⨯ Y) ≅
+    TopCat.toSSet.obj X ⨯ TopCat.toSSet.obj Y :=
+  CategoryTheory.Limits.PreservesLimitPair.iso TopCat.toSSet X Y
+
+/-- `TopCat.toSSet` commutes with monoidal products, naturally in both variables.
+
+The natural isomorphism `⊗_TopCat ⋙ toSSet ≅ (toSSet × toSSet) ⋙ ⊗_SSet`
+between functors `TopCat × TopCat ⥤ SSet`. -/
+noncomputable def TopCat.toSSet_prodNatIso :
+    MonoidalCategory.tensor (C := TopCat) ⋙ TopCat.toSSet ≅
+    TopCat.toSSet.prod TopCat.toSSet ⋙
+      MonoidalCategory.tensor (C := SSet) :=
+  letI : TopCat.toSSet.Monoidal := Functor.Monoidal.ofChosenFiniteProducts _
+  (Functor.Monoidal.μNatIso TopCat.toSSet).symm
+
+open HomologyLean.SingularHomology.SSetEZ in
+/-- **The Eilenberg–Zilber cross product for topological spaces.**
+
+The composite of `toSSet_prodNatIso` and `eilenbergZilberNatTrans`:
+```
+  (toSSet ⋙ SCF) × (toSSet ⋙ SCF) ⋙ ⊗_Chain  ⟶  ⊗_TopCat ⋙ toSSet ⋙ SCF
+```
+i.e., `C_*(X) ⊗ C_*(Y) → C_*(X × Y)` naturally in `X, Y : TopCat`. -/
+noncomputable def TopCat.eilenbergZilberNatTrans :
+    Functor.prod (TopCat.toSSet ⋙ SCF C) (TopCat.toSSet ⋙ SCF C) ⋙
+      MonoidalCategory.tensor (C := ChainComplex C ℕ) ⟶
+    MonoidalCategory.tensor (C := TopCat) ⋙ TopCat.toSSet ⋙ SCF C :=
+  (TopCat.toSSet.prod TopCat.toSSet).whiskerLeft
+      (HomologyLean.SingularHomology.SSetEZ.eilenbergZilberNatTrans (C := C)) ≫
+    Functor.whiskerRight toSSet_prodNatIso.inv (SCF C)
