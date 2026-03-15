@@ -34,12 +34,15 @@ Prove a specific sorry'd lemma iteratively using LSP tools. Before starting, rea
 Work through a proof one step at a time, user-directed. The agent executes exactly what the user asks, shows the goal state, and waits. Full procedure: `.claude/skills/interactive/SKILL.md`.
 
 ### Mode 5: Refactor (`/refactor`)
-Improve an existing working proof for brevity, clarity, or documentation. Full procedure: `.claude/skills/refactor/SKILL.md`.
+Improve an existing working proof structurally: extract lemmas, simplify proof flow, improve naming, add documentation. Full procedure: `.claude/skills/refactor/SKILL.md`.
 
-### Mode 6: Discuss (`/discuss`)
+### Mode 6: Clean (`/clean`)
+Fix warnings line by line and bring code into compliance with Mathlib style standards. Does **not** restructure proofs — use `/refactor` for that. Full procedure: `.claude/skills/clean/SKILL.md`.
+
+### Mode 7: Discuss (`/discuss`)
 Read and discuss proofs or math concepts. **No file edits.** Full procedure: `.claude/skills/discuss/SKILL.md`.
 
-### Mode 7: Improve Workflow (`/improve-workflow`)
+### Mode 8: Improve Workflow (`/improve-workflow`)
 Improve the Claude Code setup — instructions, skills, memory, conventions. **All config must be git-tracked** (store under the repo, not `~/.claude/`). Full procedure: `.claude/skills/improve-workflow/SKILL.md`.
 
 ## Lean Conventions
@@ -127,7 +130,8 @@ First, make a trivial Lean MCP call (e.g. `lean_diagnostic_messages` on the targ
 - Filter by line range to focus on specific proof sections
 - **Use `severity` to filter**: `"error"`, `"warning"`, `"info"`, or `"hint"`. Omit for all levels.
   - **During proof filling** (`/fill-sorry`, `/interactive`, `/draft`): use `severity="error"` — you only care whether it compiles. Warnings and infos (linter, "Try this") are noise that bloats context.
-  - **During refactoring** (`/refactor`): omit `severity` or use `severity="warning"` — you want lint-clean output too.
+  - **During refactoring** (`/refactor`): use `severity="error"` — structural changes, not warning cleanup.
+  - **During cleaning** (`/clean`): omit `severity` — you want all warnings, hints, and infos.
   - **For "Try this" suggestions**: use `severity="info"` after `simp?`/`exact?`/`apply?`/`decide?` to retrieve suggestions without the warning clutter. Also useful for reading `#check`/`#print`/`#eval`/`#print axioms` output, which are all info-level.
 - Check after every significant edit to catch type errors early
 - **Always use this instead of `getDiagnostics`** — the IDE diagnostics tool returns cspell and other non-Lean noise that pollutes context
