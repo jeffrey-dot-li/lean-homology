@@ -1553,43 +1553,6 @@ commutes. We package this as a `NatTrans` between two functors
 `SSet.{v} × SSet.{v} ⥤ ChainComplex C ℕ`.
 -/
 
-/-- The **source bifunctor** for the Eilenberg–Zilber natural transformation:
-`(S, T) ↦ (singChain C S).tensorObj (singChain C T)`.
-
-On morphisms: `(f, g) ↦ tensorHom ((SCF C).map f) ((SCF C).map g)`. -/
-noncomputable def singChainTensor :
-    SSet.{v} × SSet.{v} ⥤ ChainComplex C ℕ where
-  obj p := (singChain C p.1).tensorObj (singChain C p.2)
-  map f := HomologicalComplex.tensorHom ((SCF C).map f.1) ((SCF C).map f.2)
-  map_id _ := by simp [HomologicalComplex.tensorHom, HomologicalComplex.mapBifunctorMap]
-  map_comp f g := by
-    show HomologicalComplex.tensorHom ((SCF C).map (f.1 ≫ g.1)) ((SCF C).map (f.2 ≫ g.2)) = _
-    simp only [Functor.map_comp]
-    show HomologicalComplex.tensorHom (((SCF C).map f.1) ≫ ((SCF C).map g.1))
-        (((SCF C).map f.2) ≫ ((SCF C).map g.2)) =
-      HomologicalComplex.tensorHom ((SCF C).map f.1) ((SCF C).map f.2) ≫
-        HomologicalComplex.tensorHom ((SCF C).map g.1) ((SCF C).map g.2)
-    apply HomologicalComplex.Hom.ext; funext n
-    apply HomologicalComplex.mapBifunctor.hom_ext; intro p q h
-    simp only [HomologicalComplex.ι_mapBifunctorMap, HomologicalComplex.comp_f,
-      HomologicalComplex.ι_mapBifunctorMap_assoc, Category.assoc,
-      Functor.map_comp, NatTrans.comp_app, Functor.comp_map]
-    slice_lhs 2 3 => rw [← NatTrans.naturality]
-    simp [Category.assoc]
-
-/-- The **target bifunctor** for the Eilenberg–Zilber natural transformation:
-`(S, T) ↦ singChain C (S ⊗ T)`.
-
-On morphisms: `(f, g) ↦ (SCF C).map (f ⊗ g)`. -/
-noncomputable def singChainProd :
-    SSet.{v} × SSet.{v} ⥤ ChainComplex C ℕ where
-  obj p := singChain C (p.1 ⊗ₛ p.2)
-  map f := (SCF C).map (f.1 ⊗ₘₛ f.2)
-  map_id _ := by simp [MonoidalCategory.id_tensorHom_id]
-  map_comp f g := by
-    change (SCF C).map (MonoidalCategory.tensorHom (C := SSet) (f.1 ≫ g.1) (f.2 ≫ g.2)) =
-      (SCF C).map (f.1 ⊗ₘₛ f.2) ≫ (SCF C).map (g.1 ⊗ₘₛ g.2)
-    rw [← Functor.map_comp, MonoidalCategory.tensorHom_comp_tensorHom (C := SSet)]
 
 /-- **Naturality of the Eilenberg–Zilber map at a pair of morphisms `(f, g)`.**
 
@@ -1622,19 +1585,6 @@ variable [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X
 noncomputable instance chainComplexMonoidal : MonoidalCategory (ChainComplex C ℕ) :=
   HomologicalComplex.monoidalCategory C (ComplexShape.down ℕ)
 
-/-- The internal `singChainTensor` is naturally isomorphic to the standard composition
-`Functor.prod (SCF C) (SCF C) ⋙ MonoidalCategory.tensor (C := ChainComplex C ℕ)`. -/
-noncomputable def singChainTensorIso :
-    singChainTensor (C := C) ≅
-    Functor.prod (SCF C) (SCF C) ⋙ MonoidalCategory.tensor (C := ChainComplex C ℕ) :=
-  NatIso.ofComponents (fun _ => Iso.refl _) (by aesop_cat)
-
-/-- The internal `singChainProd` is naturally isomorphic to the standard composition
-`MonoidalCategory.tensor (C := SSet) ⋙ SCF C`. -/
-noncomputable def singChainProdIso :
-    singChainProd (C := C) ≅
-    MonoidalCategory.tensor (C := SSet) ⋙ SCF C :=
-  NatIso.ofComponents (fun _ => Iso.refl _) (by aesop_cat)
 
 /-- **The Eilenberg–Zilber cross product as a natural transformation** for simplicial sets.
 
@@ -1650,11 +1600,8 @@ noncomputable def eilenbergZilberNatTrans :
       MonoidalCategory.tensor (C := ChainComplex C ℕ) ⟶
     MonoidalCategory.tensor (C := SSet) ⋙
       (SSet.singularChainComplexFunctor.{v} C).obj (𝟙_ C) :=
-  (singChainTensorIso (C := C)).inv ≫
-    (show singChainTensor (C := C) ⟶ singChainProd (C := C) from
-      { app := fun p => eilenbergZilber (C := C) p.1 p.2
-        naturality := fun _ _ f => (eilenbergZilber_natural f.1 f.2).symm }) ≫
-    (singChainProdIso (C := C)).hom
+  { app := fun p => eilenbergZilber (C := C) p.1 p.2
+    naturality := fun _ _ f => (eilenbergZilber_natural f.1 f.2).symm }
 
 end HomologyLean.SingularHomology.SSetEZ
 
