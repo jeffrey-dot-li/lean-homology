@@ -1390,6 +1390,12 @@ instance curriedTensor_additive :
 instance hasCoproducts_zero_of_v : HasCoproducts.{0} C :=
   hasCoproducts_shrink.{0, v}
 
+noncomputable instance hasFiniteCoproducts_of_v : HasFiniteCoproducts C :=
+  @hasFiniteCoproducts_of_hasCoproducts C _ (hasCoproducts_shrink.{0, v})
+
+noncomputable instance hasZeroObject_of_v : HasZeroObject C :=
+  hasZeroObject_of_hasInitial_object
+
 /-! ### Eilenberg–Zilber chain map
 
 The cross product assembled into a chain map `(singChain C S).tensorObj (singChain C T) ⟶ singChain C (S ⊗ T)`.
@@ -1609,15 +1615,41 @@ lemma eilenbergZilber_natural {S₁ S₂ T₁ T₂ : SSet.{v}} (f : S₁ ⟶ S�
   rw [crossProduct_natural (C := C) f g (hn := h.symm)]
   simp [Category.assoc, MonoidalCategory.tensorHom_def]
 
+variable [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)]
+
+-- Caching the `MonoidalCategory` instance avoids a heartbeat-expensive synthesis chain
+-- through `GradedObject.HasTensor`, `HasGoodTensor₁₂Tensor`, etc.
+noncomputable instance chainComplexMonoidal : MonoidalCategory (ChainComplex C ℕ) :=
+  HomologicalComplex.monoidalCategory C (ComplexShape.down ℕ)
+
+/-- The internal `singChainTensor` is naturally isomorphic to the standard composition
+`Functor.prod (SCF C) (SCF C) ⋙ MonoidalCategory.tensor (C := ChainComplex C ℕ)`. -/
+noncomputable def singChainTensorIso :
+    singChainTensor (C := C) ≅
+    Functor.prod (SCF C) (SCF C) ⋙ MonoidalCategory.tensor (C := ChainComplex C ℕ) := sorry
+
+/-- The internal `singChainProd` is naturally isomorphic to the standard composition
+`MonoidalCategory.tensor (C := SSet) ⋙ SCF C`. -/
+noncomputable def singChainProdIso :
+    singChainProd (C := C) ≅
+    MonoidalCategory.tensor (C := SSet) ⋙ SCF C := sorry
+
 /-- **The Eilenberg–Zilber cross product as a natural transformation** for simplicial sets.
 
-A natural transformation from `singChainTensor` to `singChainProd`:
-at each `(S, T)`, the component is the Eilenberg–Zilber chain map
-`(singChain C S).tensorObj (singChain C T) ⟶ singChain C (S ⊗ T)`,
-and naturality in `(S, T)` follows from `eilenbergZilber_natural`. -/
+A natural transformation from the tensor product of singular chain complexes to the
+singular chain complex of the monoidal product:
+```
+  Functor.prod (SCF C) (SCF C) ⋙ ⊗_{ChainComplex} ⟶ ⊗_{SSet} ⋙ SCF C
+```
+Obtained by composing the internal EZ nat trans (between `singChainTensor`
+and `singChainProd`) with the natural isomorphisms to the standard functor compositions. -/
 noncomputable def eilenbergZilberNatTrans :
-    singChainTensor (C := C) ⟶ singChainProd (C := C) where
-  app p := eilenbergZilber (C := C) p.1 p.2
-  naturality _ _ f := (eilenbergZilber_natural f.1 f.2).symm
+    Functor.prod (SCF C) (SCF C) ⋙ MonoidalCategory.tensor (C := ChainComplex C ℕ) ⟶
+    MonoidalCategory.tensor (C := SSet) ⋙ SCF C :=
+  (singChainTensorIso (C := C)).inv ≫
+    (show singChainTensor (C := C) ⟶ singChainProd (C := C) from
+      { app := fun p => eilenbergZilber (C := C) p.1 p.2
+        naturality := fun _ _ f => (eilenbergZilber_natural f.1 f.2).symm }) ≫
+    (singChainProdIso (C := C)).hom
 
 end HomologyLean.SingularHomology.SSetEZ
