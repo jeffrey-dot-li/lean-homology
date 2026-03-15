@@ -35,48 +35,7 @@ open Representable
 
 universe u v
 
-variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [CategoryWithHomology C]
-   [MonoidalCategory C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
-   [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
-   [(forget C).IsRightAdjoint] [(forget C).leftAdjoint.Monoidal]
-   [(forget C).LaxMonoidal] [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
-   [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
-   [MonoidalLinear ℤ C]
-
 namespace HomologyLean.SingularHomology.SSetEZ
-
-/-! ### Abbreviations -/
-
-/-- The free functor left adjoint to `forget C`. -/
-private abbrev Free : Type v ⥤ C := (forget C).leftAdjoint
-
-/-! ### Free-forgetful equivalences -/
-
-/-- The hom-set equivalence for tensors of free objects: morphisms
-`Free.obj A ⊗ Free.obj B ⟶ M` in `C` correspond bijectively to set-level maps
-`A × B → Hom(𝟙_ C, M)`.
-
-Composed from three equivalences:
-1. `(Free A ⊗ Free B ⟶ M) ≃ (Free (A × B) ⟶ M)` via `μIso` (monoidal structure of Free)
-2. `(Free (A × B) ⟶ M) ≃ (A × B → forget C .obj M)` via the free-forget adjunction `homEquiv`
-3. `(A × B → forget C .obj M) ≃ (A × B → Hom(𝟙_ C, M))` via `forgetIso` -/
-noncomputable def freeTensorHomEquiv (A B : Type v) (M : C) :
-    (Free.obj A ⊗ Free.obj B ⟶ M) ≃
-    (A × B → Hom[𝟙_ C |-].obj M) :=
-  (Functor.Monoidal.μIso Free A B).symm.homFromEquiv.symm |>.trans
-  ((Adjunction.ofIsRightAdjoint (forget C)).homEquiv (A × B) M) |>.trans
-  (Equiv.arrowCongr (Equiv.refl _)
-    ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).toEquiv)
-
-/-- The singular chain complex functor on SSet with coefficients in 𝟙_ C. -/
-private abbrev SCF (C : Type u) [Category.{v} C] [HasCoproducts.{v} C] [Preadditive C]
-    [MonoidalCategory C] : SSet.{v} ⥤ ChainComplex C ℕ :=
-  (SSet.singularChainComplexFunctor.{v} C).obj (𝟙_ C)
-
-/-- The singular chain complex of a simplicial set S with coefficients in 𝟙_ C. -/
-private abbrev singChain (C : Type u) [Category.{v} C] [HasCoproducts.{v} C] [Preadditive C]
-    [MonoidalCategory C] (S : SSet.{v}) : ChainComplex C ℕ :=
-  (SCF C).obj S
 
 -- `⊗` is ambiguous between `C` and `SSet` when both monoidal structures are in scope.
 local notation:50 S " ⊗ₛ " T => (MonoidalCategory.tensorObj (C := SSet) S T)
@@ -312,12 +271,27 @@ private lemma sndHom_insertRightStep_comp_δ {p q : ℕ} (ν : Shuffle p q) (k :
         SimplexCategory.eqToHom_toOrderHom, Fin.castOrderIso])).trans hface)
   exact fun _ _ h => congr_arg _ (Fin.ext h)
 
+private abbrev idSimplex (n : ℕ) : Δ[n] _⦋n⦌ := SSet.stdSimplex.objEquiv.symm (𝟙 ⦋n⦌)
+private abbrev faceSimplex {n : ℕ} (j : Fin (n + 2)) : Δ[n + 1] _⦋n⦌ :=
+  SSet.stdSimplex.objEquiv.symm (SimplexCategory.δ j)
+
+section BasicChainComplex
+variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [MonoidalCategory C]
+
+/-- The singular chain complex functor on SSet with coefficients in `𝟙_ C`. -/
+private abbrev SCF : SSet.{v} ⥤ ChainComplex C ℕ :=
+  (SSet.singularChainComplexFunctor.{v} C).obj (𝟙_ C)
+
+/-- The singular chain complex of a simplicial set `S` with coefficients in `𝟙_ C`. -/
+private abbrev singChain (S : SSet.{v}) : ChainComplex C ℕ :=
+  (SCF (C := C)).obj S
+
 /-! ### Simplex-level cross product -/
 
 /-- The coprojection (basis inclusion) for a simplex: given an n-simplex `s` in `S`,
 produce the corresponding basis element `𝟙_ C ⟶ C_n(S; 𝟙_ C)` via the coproduct. -/
 private abbrev simplexCoprojection {S : SSet.{v}} {n : ℕ}
-    (s : S _⦋n⦌) : 𝟙_ C ⟶ (singChain C S).X n :=
+    (s : S _⦋n⦌) : 𝟙_ C ⟶ (singChain (C := C) S).X n :=
   Sigma.ι (fun _ : S _⦋n⦌ ↦ 𝟙_ C) s
 
 /-- The universal simplex-level cross product on the standard simplices.
@@ -326,7 +300,7 @@ The signed formal sum `∑_μ sign(μ) · ι(shuffleSimplex id_p id_q μ)` over 
 (p,q)-shuffles, where `id_p` and `id_q` are the identity simplices of `Δ[p]`
 and `Δ[q]`. -/
 def universalSimplexCrossProduct (p q : ℕ) {n : ℕ} (hn : n = p + q := by omega) :
-    𝟙_ C ⟶ (singChain C (Δ[p] ⊗ₛ Δ[q])).X n :=
+    𝟙_ C ⟶ (singChain (C := C) (Δ[p] ⊗ₛ Δ[q])).X n :=
   ∑ μ : Shuffle p q, μ.sign • simplexCoprojection
     (shuffleSimplex (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋p⦌))
       (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋q⦌)) μ hn)
@@ -343,9 +317,9 @@ cross product on `Δ[p] ⊗ Δ[q]` with the functorial map induced by
 def simplexCrossProduct {S T : SSet.{v}} {p q n : ℕ}
     (s : S _⦋p⦌) (t : T _⦋q⦌)
     (hn : n = p + q := by omega) :
-    𝟙_ C ⟶ (singChain C (S ⊗ₛ T)).X n :=
+    𝟙_ C ⟶ (singChain (C := C) (S ⊗ₛ T)).X n :=
   universalSimplexCrossProduct p q hn ≫
-    ((SCF C).map (SSet.yonedaEquiv.symm s ⊗ₘₛ SSet.yonedaEquiv.symm t)).f n
+    ((SCF (C := C)).map (SSet.yonedaEquiv.symm s ⊗ₘₛ SSet.yonedaEquiv.symm t)).f n
 
 -- TODO: make `simplexCrossProduct'` the primary definition and provide
 -- curried `simplexCrossProduct` as a wrapper.
@@ -354,186 +328,8 @@ takes a pair `(s, t)` of simplices and returns an element of
 `𝟙_ C ⟶ C_n(S ⊗ T; 𝟙_ C)` (where `n = p + q`). -/
 def simplexCrossProduct' {S T : SSet.{v}} {p q n : ℕ}
     (hn : n = p + q := by omega) :
-    S _⦋p⦌ × T _⦋q⦌ → Hom[𝟙_ C |-].obj ((singChain C (S ⊗ₛ T)).X n) :=
+    S _⦋p⦌ × T _⦋q⦌ → Hom[𝟙_ C |-].obj ((singChain (C := C) (S ⊗ₛ T)).X n) :=
   fun ⟨s, t⟩ => simplexCrossProduct s t hn
-
-/-! ### Chain group equivalences -/
-
-/-- The degree-`p` chain group `(singChain C S).X p` is isomorphic to
-`Free.obj (S _⦋p⦌)`, the free object on the set of `p`-simplices.
-
-For SSet, the chain group is definitionally `∐_{σ : S _⦋p⦌} 𝟙_ C`, so
-this is just `sigmaConstIsoFree` applied pointwise. -/
-noncomputable def chainGroupIsoFree {S : SSet.{v}} (p : ℕ) :
-    (singChain C S).X p ≅ Free.obj (S _⦋p⦌) :=
-  sigmaConstIsoFree.app (S _⦋p⦌)
-
-/-- The hom-set equivalence for the tensor of chain groups: morphisms
-`C_p(S) ⊗ C_q(T) ⟶ M` in `C` correspond bijectively to set-level maps
-`S _⦋p⦌ × T _⦋q⦌ → Hom(𝟙_ C, M)`.
-
-Obtained by transporting `freeTensorHomEquiv` along `chainGroupIsoFree`,
-which identifies `C_p(S) ≅ Free(S _⦋p⦌)`. -/
-noncomputable def chainTensorHomEquiv {S T : SSet.{v}} {p q : ℕ} (M : C) :
-    ((singChain C S).X p ⊗ (singChain C T).X q ⟶ M) ≃
-    (S _⦋p⦌ × T _⦋q⦌ → Hom[𝟙_ C |-].obj M) :=
-  (MonoidalCategory.tensorIso (chainGroupIsoFree (C := C) p)
-    (chainGroupIsoFree (C := C) q)).symm.homFromEquiv.symm |>.trans
-  (freeTensorHomEquiv (S _⦋p⦌) (T _⦋q⦌) M)
-
-/-! ### Chain-level cross product -/
-
-/-- The cross product on chain groups:
-`C_p(S; 𝟙_ C) ⊗ C_q(T; 𝟙_ C) ⟶ C_n(S ⊗ T; 𝟙_ C)` (where `n = p + q`).
-
-Defined by lifting the simplex-level cross product `simplexCrossProduct'` via
-`chainTensorHomEquiv`. -/
-def chainCrossProduct {S T : SSet.{v}} {p q n : ℕ}
-    (hn : n = p + q := by omega) :
-    (singChain C S).X p ⊗ (singChain C T).X q ⟶
-    (singChain C (S ⊗ₛ T)).X n :=
-  (chainTensorHomEquiv _).symm (simplexCrossProduct' hn)
-
-/-- Applying `chainTensorHomEquiv` to `chainCrossProduct` recovers
-`simplexCrossProduct'`: the chain-level cross product is the unique lift of
-the simplex-level cross product. -/
-@[simp]
-lemma chainCrossProduct.spec {S T : SSet.{v}} {p q n : ℕ}
-    (hn : n = p + q := by omega) :
-    chainTensorHomEquiv (S := S) (T := T) _
-      (chainCrossProduct (C := C) hn) = simplexCrossProduct' hn :=
-  (chainTensorHomEquiv _).right_inv (simplexCrossProduct' hn)
-
-/-- Two morphisms out of `C_p(S) ⊗ C_q(T)` are equal iff they agree on all pairs
-of simplex coprojections. This is the tensor analogue of `Sigma.hom_ext`. -/
-lemma chainCrossProduct.ext {S T : SSet.{v}} {p q : ℕ} {M : C}
-    {f g : (singChain C S).X p ⊗ (singChain C T).X q ⟶ M}
-    (h : chainTensorHomEquiv M f = chainTensorHomEquiv M g) : f = g :=
-  (chainTensorHomEquiv M).injective h
-
-/-! ### Free generator lemmas -/
-
-/-- The "free generator" morphism: for `a : A`, the morphism `𝟙_ C ⟶ Free.obj A`
-obtained by applying `forgetIso` to the adjunction unit at `a`.
-Represents the inclusion of the generator `a` into the free object. -/
-private noncomputable abbrev freeGen {A : Type v} (a : A) : 𝟙_ C ⟶ Free.obj A :=
-  (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app (Free.obj A)
-    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app A a)
-
-/-- The free generator at `s`, mapped through `chainGroupIsoFree.inv`,
-equals the coproduct injection `simplexCoprojection s`. -/
-private lemma freeGen_chainGroupIsoFree {S : SSet.{v}} {p : ℕ}
-    (s : S _⦋p⦌) :
-    freeGen (C := C) s ≫ (chainGroupIsoFree (C := C) p).inv =
-    simplexCoprojection s := by
-  simp only [chainGroupIsoFree]
-  simp only [sigmaConstIsoFree]
-  dsimp only [freeGen]
-  set φ := ((Adjunction.ofIsRightAdjoint (forget C)).leftAdjointUniq
-    ((sigmaConstAdj (𝟙_ C)).ofNatIsoRight MonoidalUnitorRepresentable.forgetIso.symm)).hom.app
-    (S _⦋p⦌)
-  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality φ)
-    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (S _⦋p⦌) s)
-  simp only [types_comp_apply] at hnat
-  dsimp [coyoneda] at hnat
-  erw [← hnat]; clear hnat
-  change MonoidalUnitorRepresentable.forgetIso.hom.app _
-    (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map φ) s) = _
-  rw [Adjunction.unit_leftAdjointUniq_hom_app]
-  simp only [Adjunction.ofNatIsoRight, Adjunction.mkOfHomEquiv_unit_app]
-  simp only [Equiv.trans_apply, Adjunction.equivHomsetRightOfNatIso]
-  dsimp only [Equiv.coe_fn_mk]
-  rw [Adjunction.homEquiv_unit]
-  simp only [types_comp_apply]
-  dsimp [coyoneda]
-  simp only [Category.comp_id]
-  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app _
-    ((MonoidalUnitorRepresentable.forgetIso (C := C)).inv.app _
-      ((sigmaConstAdj (𝟙_ C)).unit.app _ s)) = _
-  simp only [← types_comp_apply (MonoidalUnitorRepresentable.forgetIso.inv.app _)
-    (MonoidalUnitorRepresentable.forgetIso.hom.app _)]
-  simp only [← NatTrans.comp_app, Iso.inv_hom_id, NatTrans.id_app, types_id_apply]
-  rfl
-
-/-- `OplaxMonoidal.δ` sends the free generator at `(a, b)` to the left unitor inverse
-composed with the tensor of free generators at `a` and `b`. -/
-private lemma freeGen_δ (A B : Type v) (a : A) (b : B) :
-    freeGen (C := C) (a, b) ≫ Functor.OplaxMonoidal.δ Free A B =
-    (λ_ (𝟙_ C)).inv ≫ (freeGen (C := C) a ⊗ₘ freeGen (C := C) b) := by
-  dsimp only [freeGen]
-  set δ := Functor.OplaxMonoidal.δ (Free (C := C)) A B
-  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality δ)
-    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (A × B) (a, b))
-  simp only [types_comp_apply] at hnat
-  dsimp [coyoneda] at hnat
-  erw [← hnat]; clear hnat
-  change MonoidalUnitorRepresentable.forgetIso.hom.app _
-    (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map δ) (a, b)) = _
-  rw [Adjunction.unit_app_tensor_comp_map_δ]
-  simp only [types_comp_apply]
-  dsimp
-  rw [← types_comp_apply (Functor.LaxMonoidal.μ (forget C) _ _)
-    (MonoidalUnitorRepresentable.forgetIso.hom.app _),
-    NatTrans.IsMonoidal.tensor (τ := MonoidalUnitorRepresentable.forgetIso.hom)]
-  simp only [types_comp_apply]
-  dsimp
-  rfl
-
-/-- Evaluating `chainTensorHomEquiv` on coprojection pairs: the forward map
-sends `f` at `(s, t)` to `(λ_ (𝟙_ C)).inv ≫ (ι s ⊗ₘ ι t) ≫ f`. -/
-lemma chainTensorHomEquiv_apply {S T : SSet.{v}} {p q : ℕ} {M : C}
-    (f : (singChain C S).X p ⊗ (singChain C T).X q ⟶ M)
-    (s : S _⦋p⦌) (t : T _⦋q⦌) :
-    chainTensorHomEquiv M f (s, t) =
-    (λ_ (𝟙_ C)).inv ≫
-      MonoidalCategory.tensorHom (simplexCoprojection s) (simplexCoprojection t) ≫ f := by
-  simp only [chainTensorHomEquiv, freeTensorHomEquiv, Iso.homFromEquiv, Equiv.trans_apply]
-  change ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).hom
-    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ M)
-      ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
-        ((chainGroupIsoFree (C := C) p) ⊗ᵢ
-          (chainGroupIsoFree (C := C) q)).symm.hom ≫ f)
-      (s, t)) =
-    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
-  have hassoc : (Functor.Monoidal.μIso Free _ _).symm.hom ≫
-      ((chainGroupIsoFree (C := C) p) ⊗ᵢ
-        (chainGroupIsoFree (C := C) q)).symm.hom ≫ f =
-    ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
-      ((chainGroupIsoFree (C := C) p) ⊗ᵢ
-        (chainGroupIsoFree (C := C) q)).symm.hom) ≫ f :=
-    (Category.assoc _ _ _).symm
-  simp_rw [hassoc, Adjunction.homEquiv_naturality_right]
-  simp only [types_comp_apply]
-  set y := (forget C).map ((chainGroupIsoFree (C := C) p) ⊗ᵢ
-      (chainGroupIsoFree (C := C) q)).symm.hom
-    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
-      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
-  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality f) y
-  simp only [types_comp_apply] at hnat
-  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app M ((forget C).map f y) =
-    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
-  rw [hnat]; dsimp [coyoneda]; rw [← Category.assoc ((λ_ (𝟙_ C)).inv)]; congr 1
-  simp only [y]; clear y hnat hassoc f M
-  have hnat2 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
-    ((chainGroupIsoFree (C := C) p) ⊗ᵢ
-      (chainGroupIsoFree (C := C) q)).symm.hom)
-    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
-      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
-  simp only [types_comp_apply] at hnat2
-  erw [hnat2]; dsimp [coyoneda]
-  rw [Adjunction.homEquiv_unit]
-  simp only [types_comp_apply]
-  have hnat3 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
-    (Functor.OplaxMonoidal.δ Free _ _))
-    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ (s, t))
-  simp only [types_comp_apply] at hnat3
-  erw [hnat3]; dsimp [coyoneda]
-  rw [Category.assoc]
-  simp only [types_tensorObj_def] at *
-  rw [← Category.assoc, freeGen_δ, Category.assoc,
-    MonoidalCategory.tensorHom_comp_tensorHom,
-    freeGen_chainGroupIsoFree, freeGen_chainGroupIsoFree]
-
 /-- On 0-simplices, `simplexCrossProduct s t` is just `simplexCoprojection (prodSimplex s t)`:
 there is a unique (0,0)-shuffle with sign 1, so the shuffle sum collapses. -/
 lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
@@ -554,22 +350,9 @@ lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
     rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
     simp [SimplexCategory.hom_zero_zero]
   }
-
-/-- The cross product of two 0-simplex coprojections factors through the
-coprojection of the product simplex, up to the left unitor. -/
-theorem crossProduct_normalized {S T : SSet.{v}}
-    (s : S _⦋0⦌) (t : T _⦋0⦌) :
-    MonoidalCategory.tensorHom (simplexCoprojection (C := C) s)
-      (simplexCoprojection t) ≫ chainCrossProduct (C := C) =
-    (λ_ (𝟙_ C)).hom ≫ simplexCoprojection (prodSimplex s t) := by
-  rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
-  rw [← chainTensorHomEquiv_apply]
-  rw [congrFun (chainCrossProduct.spec (C := C)) (s, t)]
-  exact simplexCrossProduct_zero_zero s t
-
 @[simp] lemma simplexCoprojection_comp_SCF_map {S T : SSet.{v}} {n : ℕ}
     (s : S _⦋n⦌) (f : S ⟶ T) :
-    simplexCoprojection (C := C) s ≫ ((SCF C).map f).f n =
+    simplexCoprojection (C := C) s ≫ ((SCF (C := C)).map f).f n =
     simplexCoprojection (f.app _ s) := by
   dsimp [simplexCoprojection, SCF, SSet.singularChainComplexFunctor]
   erw [CategoryTheory.Limits.Sigma.ι_comp_map']
@@ -583,7 +366,7 @@ The Leibniz rule needs to factor `ι s ⊗ₘ ι t` into
 lemma simplexCoprojection_factor {S : SSet.{v}} {n : ℕ} (s : S _⦋n⦌) :
     simplexCoprojection (C := C) s =
     simplexCoprojection (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋n⦌)) ≫
-      ((SCF C).map (SSet.yonedaEquiv.symm s)).f n := by
+      ((SCF (C := C)).map (SSet.yonedaEquiv.symm s)).f n := by
   rw [simplexCoprojection_comp_SCF_map, yonedaEquiv_symm_app]
   simp
 
@@ -592,11 +375,11 @@ lemma crossProduct_natural_pure_tensor {S S' T T' : SSet.{v}}
     (s : S _⦋p⦌) (t : T _⦋q⦌)
     (hn : n = p + q := by omega) :
     simplexCrossProduct s t hn ≫
-      ((SCF C).map (f ⊗ₘₛ g)).f n =
+      ((SCF (C := C)).map (f ⊗ₘₛ g)).f n =
     simplexCrossProduct (C := C) (f.app _ s) (g.app _ t) hn := by
   subst hn
   simp only [simplexCrossProduct, Category.assoc]
-  -- Combine `.f n` components: `(SCF C).map φ).f n ≫ ((SCF C).map ψ).f n = ((SCF C).map (φ ≫ ψ)).f n`
+  -- Combine `.f n` components: `(SCF (C := C)).map φ).f n ≫ ((SCF (C := C)).map ψ).f n = ((SCF (C := C)).map (φ ≫ ψ)).f n`
   rw [← HomologicalComplex.comp_f, ← Functor.map_comp]
   congr 1
   -- `(yonedaEquiv.symm s ⊗ₘₛ yonedaEquiv.symm t) ≫ (f ⊗ₘₛ g)
@@ -604,44 +387,13 @@ lemma crossProduct_natural_pure_tensor {S S' T T' : SSet.{v}}
   rw [MonoidalCategory.tensorHom_comp_tensorHom]
   rw [yonedaEquiv_symm_comp, yonedaEquiv_symm_comp]
 
-/-- Naturality of the chain-level cross product: given simplicial maps `f : S ⟶ S'`
-and `g : T ⟶ T'`, the cross product commutes with the induced chain maps:
-`chainCrossProduct ≫ (f ⊗ₘₛ g)_* = (f_* ⊗ g_*) ≫ chainCrossProduct`.
-
-This lifts `crossProduct_natural_pure_tensor` from the simplex level to the chain level
-using `chainCrossProduct.ext` (injectivity of `chainTensorHomEquiv`). -/
-theorem crossProduct_natural {S S' T T' : SSet.{v}}
-    (f : S ⟶ S') (g : T ⟶ T') {p q n : ℕ}
-    (hn : n = p + q := by omega) :
-    chainCrossProduct (C := C) hn ≫ ((SCF C).map (f ⊗ₘₛ g)).f n =
-    (((SCF C).map f).f p ⊗ₘ ((SCF C).map g).f q) ≫ chainCrossProduct (C := C) hn := by
-  apply chainCrossProduct.ext
-  ext ⟨s, t⟩
-  simp only [chainTensorHomEquiv_apply]
-  -- RHS: rewrite (ι s ⊗ₘ ι t) ≫ (f_* ⊗ₘ g_*) = (ι s ≫ f_*) ⊗ₘ (ι t ≫ g_*)
-  rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc]
-  rw [simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
-  -- LHS: reassociate so `← chainTensorHomEquiv_apply` can match
-  rw [show (λ_ (𝟙_ C)).inv ≫
-    (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn ≫
-      ((SCF C).map (f ⊗ₘₛ g)).f n =
-    ((λ_ (𝟙_ C)).inv ≫
-      (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn) ≫
-      ((SCF C).map (f ⊗ₘₛ g)).f n from by simp [Category.assoc]]
-  rw [← chainTensorHomEquiv_apply]
-  rw [congrFun (chainCrossProduct.spec (C := C) hn) (s, t)]
-  -- RHS: reduce via `chainCrossProduct.spec`
-  rw [← chainTensorHomEquiv_apply]
-  rw [congrFun (chainCrossProduct.spec (C := C) hn) (f.app _ s, g.app _ t)]
-  exact crossProduct_natural_pure_tensor f g s t hn
-
 /-! ### Leibniz rule infrastructure -/
 
 /-- The boundary map of `singChain` equals the alternating face map differential.
 This avoids unfolding `singChain`/`SCF` through deep functor composition. -/
 lemma singChain_d_eq_alternatingFaceMapObjD (S : SSet.{v}) (n : ℕ) {m : ℕ} (hm : m = n + 1) :
-    (singChain C S).d m n =
-    eqToHom (congrArg (singChain C S).X hm) ≫
+    (singChain (C := C) S).d m n =
+    eqToHom (congrArg (singChain (C := C) S).X hm) ≫
     AlternatingFaceMapComplex.objD
       (((SimplicialObject.whiskering (Type v) C).obj
         ((sigmaConst (C := C)).obj (𝟙_ C))).obj S) n := by
@@ -656,7 +408,7 @@ on simplices through the coproduct structure. -/
 lemma simplexCoprojection_comp_eqToHom_comp_δ {S : SSet.{v}} {n m : ℕ} (h : n = m + 1)
     (s : S _⦋n⦌) (i : Fin (m + 2)) :
     simplexCoprojection (C := C) s ≫
-      eqToHom (congrArg (singChain C S).X h) ≫
+      eqToHom (congrArg (singChain (C := C) S).X h) ≫
       (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
         S).δ i =
     simplexCoprojection (C := C) (S.δ i (h ▸ s)) := by
@@ -666,7 +418,6 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {S : SSet.{v}} {n m : ℕ} (h : n
     SimplicialObject.δ, SimplicialObject.whiskering]
   erw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp
-
 /-! ### Universal Leibniz rule for the simplex-level cross product
 
 **Proof sketch** (after expanding ∂ into face maps):
@@ -686,10 +437,6 @@ The RHS is two sums: one over `(j, ν)` with `ν : Shuffle p (q+1)`, one over
 3. **Cancel diagonal remainder** via `swapDiagonalSteps` sign-reversing involution.
 -/
 
-private abbrev idSimplex (n : ℕ) : Δ[n] _⦋n⦌ := SSet.stdSimplex.objEquiv.symm (𝟙 ⦋n⦌)
-private abbrev faceSimplex {n : ℕ} (j : Fin (n + 2)) : Δ[n + 1] _⦋n⦌ :=
-  SSet.stdSimplex.objEquiv.symm (SimplexCategory.δ j)
-
 /-- The boundary of the universal simplex cross product decomposes as a signed sum
 of face-map cross products (the "universal Leibniz rule"):
 ```
@@ -700,7 +447,7 @@ of face-map cross products (the "universal Leibniz rule"):
 -/
 theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
     universalSimplexCrossProduct (C := C) (p + 1) (q + 1) ≫
-      (singChain C (Δ[p + 1] ⊗ₛ Δ[q + 1])).d
+      (singChain (C := C) (Δ[p + 1] ⊗ₛ Δ[q + 1])).d
         ((p + 1) + (q + 1)) (p + (q + 1)) =
     ∑ j : Fin (p + 2),
       ((-1 : ℤ) ^ (j : ℕ)) •
@@ -988,8 +735,264 @@ lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
     simp [Equiv.ulift]
   }
 
+section FreeForgetful
+variable [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
+  [(forget C).IsRightAdjoint] [(forget C).leftAdjoint.Monoidal]
+
+/-! ### Abbreviations -/
+
+/-- The free functor left adjoint to `forget C`. -/
+private abbrev Free : Type v ⥤ C := (forget C).leftAdjoint
+
+/-! ### Free-forgetful equivalences -/
+
+/-- The hom-set equivalence for tensors of free objects: morphisms
+`Free.obj A ⊗ Free.obj B ⟶ M` in `C` correspond bijectively to set-level maps
+`A × B → Hom(𝟙_ C, M)`.
+
+Composed from three equivalences:
+1. `(Free A ⊗ Free B ⟶ M) ≃ (Free (A × B) ⟶ M)` via `μIso` (monoidal structure of Free)
+2. `(Free (A × B) ⟶ M) ≃ (A × B → forget C .obj M)` via the free-forget adjunction `homEquiv`
+3. `(A × B → forget C .obj M) ≃ (A × B → Hom(𝟙_ C, M))` via `forgetIso` -/
+noncomputable def freeTensorHomEquiv (A B : Type v) (M : C) :
+    (Free.obj A ⊗ Free.obj B ⟶ M) ≃
+    (A × B → Hom[𝟙_ C |-].obj M) :=
+  (Functor.Monoidal.μIso Free A B).symm.homFromEquiv.symm |>.trans
+  ((Adjunction.ofIsRightAdjoint (forget C)).homEquiv (A × B) M) |>.trans
+  (Equiv.arrowCongr (Equiv.refl _)
+    ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).toEquiv)
+/-! ### Chain group equivalences -/
+
+/-- The degree-`p` chain group `(singChain (C := C) S).X p` is isomorphic to
+`Free.obj (S _⦋p⦌)`, the free object on the set of `p`-simplices.
+
+For SSet, the chain group is definitionally `∐_{σ : S _⦋p⦌} 𝟙_ C`, so
+this is just `sigmaConstIsoFree` applied pointwise. -/
+noncomputable def chainGroupIsoFree {S : SSet.{v}} (p : ℕ) :
+    (singChain (C := C) S).X p ≅ Free.obj (S _⦋p⦌) :=
+  sigmaConstIsoFree.app (S _⦋p⦌)
+
+/-- The hom-set equivalence for the tensor of chain groups: morphisms
+`C_p(S) ⊗ C_q(T) ⟶ M` in `C` correspond bijectively to set-level maps
+`S _⦋p⦌ × T _⦋q⦌ → Hom(𝟙_ C, M)`.
+
+Obtained by transporting `freeTensorHomEquiv` along `chainGroupIsoFree`,
+which identifies `C_p(S) ≅ Free(S _⦋p⦌)`. -/
+noncomputable def chainTensorHomEquiv {S T : SSet.{v}} {p q : ℕ} (M : C) :
+    ((singChain (C := C) S).X p ⊗ (singChain (C := C) T).X q ⟶ M) ≃
+    (S _⦋p⦌ × T _⦋q⦌ → Hom[𝟙_ C |-].obj M) :=
+  (MonoidalCategory.tensorIso (chainGroupIsoFree (C := C) p)
+    (chainGroupIsoFree (C := C) q)).symm.homFromEquiv.symm |>.trans
+  (freeTensorHomEquiv (S _⦋p⦌) (T _⦋q⦌) M)
+
+/-! ### Chain-level cross product -/
+
+/-- The cross product on chain groups:
+`C_p(S; 𝟙_ C) ⊗ C_q(T; 𝟙_ C) ⟶ C_n(S ⊗ T; 𝟙_ C)` (where `n = p + q`).
+
+Defined by lifting the simplex-level cross product `simplexCrossProduct'` via
+`chainTensorHomEquiv`. -/
+def chainCrossProduct {S T : SSet.{v}} {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    (singChain (C := C) S).X p ⊗ (singChain (C := C) T).X q ⟶
+    (singChain (C := C) (S ⊗ₛ T)).X n :=
+  (chainTensorHomEquiv _).symm (simplexCrossProduct' hn)
+
+/-- Applying `chainTensorHomEquiv` to `chainCrossProduct` recovers
+`simplexCrossProduct'`: the chain-level cross product is the unique lift of
+the simplex-level cross product. -/
+@[simp]
+lemma chainCrossProduct.spec {S T : SSet.{v}} {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    chainTensorHomEquiv (S := S) (T := T) _
+      (chainCrossProduct (C := C) hn) = simplexCrossProduct' hn :=
+  (chainTensorHomEquiv _).right_inv (simplexCrossProduct' hn)
+
+/-- Two morphisms out of `C_p(S) ⊗ C_q(T)` are equal iff they agree on all pairs
+of simplex coprojections. This is the tensor analogue of `Sigma.hom_ext`. -/
+lemma chainCrossProduct.ext {S T : SSet.{v}} {p q : ℕ} {M : C}
+    {f g : (singChain (C := C) S).X p ⊗ (singChain (C := C) T).X q ⟶ M}
+    (h : chainTensorHomEquiv M f = chainTensorHomEquiv M g) : f = g :=
+  (chainTensorHomEquiv M).injective h
+
+/-! ### Free generator lemmas -/
+
+/-- The "free generator" morphism: for `a : A`, the morphism `𝟙_ C ⟶ Free.obj A`
+obtained by applying `forgetIso` to the adjunction unit at `a`.
+Represents the inclusion of the generator `a` into the free object. -/
+private noncomputable abbrev freeGen {A : Type v} (a : A) : 𝟙_ C ⟶ Free.obj A :=
+  (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app (Free.obj A)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app A a)
+
+omit [(forget C).leftAdjoint.Monoidal] in
+/-- The free generator at `s`, mapped through `chainGroupIsoFree.inv`,
+equals the coproduct injection `simplexCoprojection s`. -/
+private lemma freeGen_chainGroupIsoFree {S : SSet.{v}} {p : ℕ}
+    (s : S _⦋p⦌) :
+    freeGen (C := C) s ≫ (chainGroupIsoFree (C := C) p).inv =
+    simplexCoprojection s := by
+  simp only [chainGroupIsoFree]
+  simp only [sigmaConstIsoFree]
+  dsimp only [freeGen]
+  set φ := ((Adjunction.ofIsRightAdjoint (forget C)).leftAdjointUniq
+    ((sigmaConstAdj (𝟙_ C)).ofNatIsoRight MonoidalUnitorRepresentable.forgetIso.symm)).hom.app
+    (S _⦋p⦌)
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality φ)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (S _⦋p⦌) s)
+  simp only [types_comp_apply] at hnat
+  dsimp [coyoneda] at hnat
+  erw [← hnat]; clear hnat
+  change MonoidalUnitorRepresentable.forgetIso.hom.app _
+    (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map φ) s) = _
+  rw [Adjunction.unit_leftAdjointUniq_hom_app]
+  simp only [Adjunction.ofNatIsoRight, Adjunction.mkOfHomEquiv_unit_app]
+  simp only [Equiv.trans_apply, Adjunction.equivHomsetRightOfNatIso]
+  dsimp only [Equiv.coe_fn_mk]
+  rw [Adjunction.homEquiv_unit]
+  simp only [types_comp_apply]
+  dsimp [coyoneda]
+  simp only [Category.comp_id]
+  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app _
+    ((MonoidalUnitorRepresentable.forgetIso (C := C)).inv.app _
+      ((sigmaConstAdj (𝟙_ C)).unit.app _ s)) = _
+  simp only [← types_comp_apply (MonoidalUnitorRepresentable.forgetIso.inv.app _)
+    (MonoidalUnitorRepresentable.forgetIso.hom.app _)]
+  simp only [← NatTrans.comp_app, Iso.inv_hom_id, NatTrans.id_app, types_id_apply]
+  rfl
+
+section MonoidalCoherence
+variable [MonoidalPreadditive C] [(forget C).LaxMonoidal]
+  [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+  [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
+  [MonoidalLinear ℤ C]
+
+omit [HasCoproducts C] [Preadditive C] [MonoidalPreadditive C] [MonoidalLinear ℤ C] in
+/-- `OplaxMonoidal.δ` sends the free generator at `(a, b)` to the left unitor inverse
+composed with the tensor of free generators at `a` and `b`. -/
+private lemma freeGen_δ (A B : Type v) (a : A) (b : B) :
+    freeGen (C := C) (a, b) ≫ Functor.OplaxMonoidal.δ Free A B =
+    (λ_ (𝟙_ C)).inv ≫ (freeGen (C := C) a ⊗ₘ freeGen (C := C) b) := by
+  dsimp only [freeGen]
+  set δ := Functor.OplaxMonoidal.δ (Free (C := C)) A B
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality δ)
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (A × B) (a, b))
+  simp only [types_comp_apply] at hnat
+  dsimp [coyoneda] at hnat
+  erw [← hnat]; clear hnat
+  change MonoidalUnitorRepresentable.forgetIso.hom.app _
+    (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map δ) (a, b)) = _
+  rw [Adjunction.unit_app_tensor_comp_map_δ]
+  simp only [types_comp_apply]
+  dsimp
+  rw [← types_comp_apply (Functor.LaxMonoidal.μ (forget C) _ _)
+    (MonoidalUnitorRepresentable.forgetIso.hom.app _),
+    NatTrans.IsMonoidal.tensor (τ := MonoidalUnitorRepresentable.forgetIso.hom)]
+  simp only [types_comp_apply]
+  dsimp
+  rfl
+
+omit [MonoidalPreadditive C] [MonoidalLinear ℤ C] in
+/-- Evaluating `chainTensorHomEquiv` on coprojection pairs: the forward map
+sends `f` at `(s, t)` to `(λ_ (𝟙_ C)).inv ≫ (ι s ⊗ₘ ι t) ≫ f`. -/
+lemma chainTensorHomEquiv_apply {S T : SSet.{v}} {p q : ℕ} {M : C}
+    (f : (singChain (C := C) S).X p ⊗ (singChain (C := C) T).X q ⟶ M)
+    (s : S _⦋p⦌) (t : T _⦋q⦌) :
+    chainTensorHomEquiv M f (s, t) =
+    (λ_ (𝟙_ C)).inv ≫
+      MonoidalCategory.tensorHom (simplexCoprojection s) (simplexCoprojection t) ≫ f := by
+  simp only [chainTensorHomEquiv, freeTensorHomEquiv, Iso.homFromEquiv, Equiv.trans_apply]
+  change ((MonoidalUnitorRepresentable.forgetIso (C := C)).app M).hom
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ M)
+      ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
+        ((chainGroupIsoFree (C := C) p) ⊗ᵢ
+          (chainGroupIsoFree (C := C) q)).symm.hom ≫ f)
+      (s, t)) =
+    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
+  have hassoc : (Functor.Monoidal.μIso Free _ _).symm.hom ≫
+      ((chainGroupIsoFree (C := C) p) ⊗ᵢ
+        (chainGroupIsoFree (C := C) q)).symm.hom ≫ f =
+    ((Functor.Monoidal.μIso Free _ _).symm.hom ≫
+      ((chainGroupIsoFree (C := C) p) ⊗ᵢ
+        (chainGroupIsoFree (C := C) q)).symm.hom) ≫ f :=
+    (Category.assoc _ _ _).symm
+  simp_rw [hassoc, Adjunction.homEquiv_naturality_right]
+  simp only [types_comp_apply]
+  set y := (forget C).map ((chainGroupIsoFree (C := C) p) ⊗ᵢ
+      (chainGroupIsoFree (C := C) q)).symm.hom
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
+      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
+  have hnat := congr_fun (MonoidalUnitorRepresentable.forgetIso (C := C) |>.hom.naturality f) y
+  simp only [types_comp_apply] at hnat
+  change (MonoidalUnitorRepresentable.forgetIso (C := C)).hom.app M ((forget C).map f y) =
+    (λ_ (𝟙_ C)).inv ≫ (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ f
+  rw [hnat]; dsimp [coyoneda]; rw [← Category.assoc ((λ_ (𝟙_ C)).inv)]; congr 1
+  simp only [y]; clear y hnat hassoc f M
+  have hnat2 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
+    ((chainGroupIsoFree (C := C) p) ⊗ᵢ
+      (chainGroupIsoFree (C := C) q)).symm.hom)
+    (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
+      (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
+  simp only [types_comp_apply] at hnat2
+  erw [hnat2]; dsimp [coyoneda]
+  rw [Adjunction.homEquiv_unit]
+  simp only [types_comp_apply]
+  have hnat3 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
+    (Functor.OplaxMonoidal.δ Free _ _))
+    ((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ (s, t))
+  simp only [types_comp_apply] at hnat3
+  erw [hnat3]; dsimp [coyoneda]
+  rw [Category.assoc]
+  simp only [types_tensorObj_def] at *
+  rw [← Category.assoc, freeGen_δ, Category.assoc,
+    MonoidalCategory.tensorHom_comp_tensorHom,
+    freeGen_chainGroupIsoFree, freeGen_chainGroupIsoFree]
+
+omit [MonoidalPreadditive C] [MonoidalLinear ℤ C] in
+/-- The cross product of two 0-simplex coprojections factors through the
+coprojection of the product simplex, up to the left unitor. -/
+theorem crossProduct_normalized {S T : SSet.{v}}
+    (s : S _⦋0⦌) (t : T _⦋0⦌) :
+    MonoidalCategory.tensorHom (simplexCoprojection (C := C) s)
+      (simplexCoprojection t) ≫ chainCrossProduct (C := C) =
+    (λ_ (𝟙_ C)).hom ≫ simplexCoprojection (prodSimplex s t) := by
+  rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C)) (s, t)]
+  exact simplexCrossProduct_zero_zero s t
+omit [MonoidalPreadditive C] [MonoidalLinear ℤ C] in
+/-- Naturality of the chain-level cross product: given simplicial maps `f : S ⟶ S'`
+and `g : T ⟶ T'`, the cross product commutes with the induced chain maps:
+`chainCrossProduct ≫ (f ⊗ₘₛ g)_* = (f_* ⊗ g_*) ≫ chainCrossProduct`.
+
+This lifts `crossProduct_natural_pure_tensor` from the simplex level to the chain level
+using `chainCrossProduct.ext` (injectivity of `chainTensorHomEquiv`). -/
+theorem crossProduct_natural {S S' T T' : SSet.{v}}
+    (f : S ⟶ S') (g : T ⟶ T') {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    chainCrossProduct (C := C) hn ≫ ((SCF (C := C)).map (f ⊗ₘₛ g)).f n =
+    (((SCF (C := C)).map f).f p ⊗ₘ ((SCF (C := C)).map g).f q) ≫ chainCrossProduct (C := C) hn := by
+  apply chainCrossProduct.ext
+  ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply]
+  -- RHS: rewrite (ι s ⊗ₘ ι t) ≫ (f_* ⊗ₘ g_*) = (ι s ≫ f_*) ⊗ₘ (ι t ≫ g_*)
+  rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc]
+  rw [simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+  -- LHS: reassociate so `← chainTensorHomEquiv_apply` can match
+  rw [show (λ_ (𝟙_ C)).inv ≫
+    (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn ≫
+      ((SCF (C := C)).map (f ⊗ₘₛ g)).f n =
+    ((λ_ (𝟙_ C)).inv ≫
+      (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫ chainCrossProduct hn) ≫
+      ((SCF (C := C)).map (f ⊗ₘₛ g)).f n from by simp [Category.assoc]]
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C) hn) (s, t)]
+  -- RHS: reduce via `chainCrossProduct.spec`
+  rw [← chainTensorHomEquiv_apply]
+  rw [congrFun (chainCrossProduct.spec (C := C) hn) (f.app _ s, g.app _ t)]
+  exact crossProduct_natural_pure_tensor f g s t hn
 /-! ### Coprojection-level and simplex-level Leibniz rules -/
 
+omit [MonoidalPreadditive C] [MonoidalLinear ℤ C] in
 /-- The chain-level cross product absorbs coprojection tensors: tensoring two
 simplex coprojections and composing with `chainCrossProduct` equals the left
 unitor composed with the simplex-level cross product.
@@ -1009,15 +1012,15 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     ((simplexCoprojection (C := C) (idSimplex (p + 1)) ⊗ₘ
         simplexCoprojection (idSimplex (q + 1))) ≫
       chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl)) ≫
-      (singChain C (Δ[p + 1] ⊗ₛ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+      (singChain (C := C) (Δ[p + 1] ⊗ₛ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
     ((simplexCoprojection (idSimplex (p + 1)) ⊗ₘ simplexCoprojection (idSimplex (q + 1))) ≫
-        ((singChain C Δ[p + 1]).d (p + 1) p ⊗ₘ
-          𝟙 ((singChain C Δ[q + 1]).X (q + 1)))) ≫
+        ((singChain (C := C) Δ[p + 1]).d (p + 1) p ⊗ₘ
+          𝟙 ((singChain (C := C) Δ[q + 1]).X (q + 1)))) ≫
       chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
     ((-1 : ℤ) ^ (p + 1)) •
       ((simplexCoprojection (idSimplex (p + 1)) ⊗ₘ simplexCoprojection (idSimplex (q + 1))) ≫
-          (𝟙 ((singChain C Δ[p + 1]).X (p + 1)) ⊗ₘ
-            (singChain C Δ[q + 1]).d (q + 1) q)) ≫
+          (𝟙 ((singChain (C := C) Δ[p + 1]).X (p + 1)) ⊗ₘ
+            (singChain (C := C) Δ[q + 1]).d (q + 1) q)) ≫
         chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega) := by
   rw [coprojection_tensorHom_chainCrossProduct]
   simp only [simplexCrossProduct, Category.assoc]
@@ -1030,7 +1033,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     simp only [Category.comp_id]
     exact ULift.ext _ _ rfl
   rw [yoneda_id, yoneda_id, MonoidalCategory.id_tensorHom_id]
-  slice_lhs 3 4 => erw [(SCF C).map_id, HomologicalComplex.id_f]
+  slice_lhs 3 4 => erw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
   simp only [Category.id_comp, Category.assoc]
   rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
@@ -1093,15 +1096,15 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
     (s : S _⦋p + 1⦌) (t : T _⦋q + 1⦌) :
     (simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection t) ≫
       chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl) ≫
-      (singChain C (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
     (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫
-      ((singChain C S).d (p + 1) p ⊗ₘ
-          𝟙 ((singChain C T).X (q + 1))) ≫
+      ((singChain (C := C) S).d (p + 1) p ⊗ₘ
+          𝟙 ((singChain (C := C) T).X (q + 1))) ≫
         chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
     ((-1 : ℤ) ^ (p + 1)) •
       ((simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫
-        (𝟙 ((singChain C S).X (p + 1)) ⊗ₘ
-            (singChain C T).d (q + 1) q) ≫
+        (𝟙 ((singChain (C := C) S).X (p + 1)) ⊗ₘ
+            (singChain (C := C) T).d (q + 1) q) ≫
           chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
   set fs := SSet.yonedaEquiv.symm s
   set ft := SSet.yonedaEquiv.symm t
@@ -1110,22 +1113,22 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
   simp only [Category.assoc]
   slice_lhs 2 3 => rw [(crossProduct_natural (C := C) fs ft).symm]
   simp only [Category.assoc]
-  rw [((SCF C).map (fs ⊗ₘₛ ft)).comm ((p + 1) + (q + 1)) (p + (q + 1))]
+  rw [((SCF (C := C)).map (fs ⊗ₘₛ ft)).comm ((p + 1) + (q + 1)) (p + (q + 1))]
   -- RHS Term 1: fuse (fs_* ⊗ ft_*) ≫ (d_S ⊗ 𝟙) into (fs_* ≫ d_S ⊗ ft_*),
   -- apply chain map comm fs_* ≫ d_S = d_Δ ≫ fs_*, then unfuse back
   conv_rhs =>
     enter [1, 2]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc,
-        ((SCF C).map fs).comm (p + 1) p, Category.comp_id,
-        ← Category.id_comp (((SCF C).map ft).f (q + 1)),
+        ((SCF (C := C)).map fs).comm (p + 1) p, Category.comp_id,
+        ← Category.id_comp (((SCF (C := C)).map ft).f (q + 1)),
         ← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
   -- RHS Term 2: fuse (fs_* ⊗ ft_*) ≫ (𝟙 ⊗ d_T) into (fs_* ⊗ ft_* ≫ d_T),
   -- apply chain map comm ft_* ≫ d_T = d_Δ ≫ ft_*, then unfuse back
   conv_rhs =>
     enter [2, 2, 2]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc,
-        ((SCF C).map ft).comm (q + 1) q, Category.comp_id,
-        ← Category.id_comp (((SCF C).map fs).f (p + 1)),
+        ((SCF (C := C)).map ft).comm (q + 1) q, Category.comp_id,
+        ← Category.id_comp (((SCF (C := C)).map fs).f (p + 1)),
         ← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
   -- Now each summand has ... ≫ (d ⊗ 𝟙) ≫ (fs_* ⊗ ft_*) ≫ chainCrossProduct.
   -- Use crossProduct_natural backwards: (fs_* ⊗ ft_*) ≫ chainCrossProduct = chainCrossProduct ≫ (fs ⊗ ft)_*
@@ -1148,13 +1151,13 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
 with the boundary operators. -/
 theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
     chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl) ≫
-      (singChain C (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
-    ((singChain C S).d (p + 1) p ⊗ₘ
-        𝟙 ((singChain C T).X (q + 1))) ≫
+      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    ((singChain (C := C) S).d (p + 1) p ⊗ₘ
+        𝟙 ((singChain (C := C) T).X (q + 1))) ≫
       chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
     ((-1 : ℤ) ^ (p + 1)) •
-      ((𝟙 ((singChain C S).X (p + 1)) ⊗ₘ
-          (singChain C T).d (q + 1) q) ≫
+      ((𝟙 ((singChain (C := C) S).X (p + 1)) ⊗ₘ
+          (singChain (C := C) T).d (q + 1) q) ≫
         chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
   apply chainCrossProduct.ext
   ext ⟨s, t⟩
@@ -1168,9 +1171,9 @@ theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
 /-- Edge case `(p+1, 0)`: the Leibniz rule when the right factor has degree 0. -/
 theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
     chainCrossProduct (C := C) (show (p + 1) + 0 = (p + 1) + 0 from rfl) ≫
-      (singChain C (S ⊗ₛ T)).d ((p + 1) + 0) (p + 0) =
-    ((singChain C S).d (p + 1) p ⊗ₘ
-        𝟙 ((singChain C T).X 0)) ≫
+      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + 0) (p + 0) =
+    ((singChain (C := C) S).d (p + 1) p ⊗ₘ
+        𝟙 ((singChain (C := C) T).X 0)) ≫
       chainCrossProduct (C := C) (show p + 0 = p + 0 from rfl) := by
   apply chainCrossProduct.ext; ext ⟨s, t⟩
   simp only [chainTensorHomEquiv_apply, Category.assoc]
@@ -1182,8 +1185,8 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   -- LHS: expand d(S⊗T) into face map sum
   -- The indices are (p+1+0, p+0) which need to match (p+1, p)
   rw [Category.assoc,
-    show (singChain C (S ⊗ₛ T)).d (p + 1 + 0) (p + 0) =
-      (singChain C (S ⊗ₛ T)).d (p + 1) p from by congr 1 <;> omega,
+    show (singChain (C := C) (S ⊗ₛ T)).d (p + 1 + 0) (p + 0) =
+      (singChain (C := C) (S ⊗ₛ T)).d (p + 1) p from by congr 1 <;> omega,
     singChain_d_eq_alternatingFaceMapObjD (C := C) (S ⊗ₛ T) p rfl]
   simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
     Preadditive.comp_sum, Preadditive.comp_zsmul, Category.assoc]
@@ -1247,12 +1250,12 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
 /-- Edge case `(0, q+1)`: the Leibniz rule when the left factor has degree 0. -/
 theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
     (chainCrossProduct (C := C) (p := 0) (q := q + 1) :
-        _ ⟶ (singChain C (S ⊗ₛ T)).X (q + 1)) ≫
-      (singChain C (S ⊗ₛ T)).d (q + 1) q =
-    (𝟙 ((singChain C S).X 0) ⊗ₘ
-        (singChain C T).d (q + 1) q) ≫
+        _ ⟶ (singChain (C := C) (S ⊗ₛ T)).X (q + 1)) ≫
+      (singChain (C := C) (S ⊗ₛ T)).d (q + 1) q =
+    (𝟙 ((singChain (C := C) S).X 0) ⊗ₘ
+        (singChain (C := C) T).d (q + 1) q) ≫
       (chainCrossProduct (C := C) (p := 0) (q := q) :
-        _ ⟶ (singChain C (S ⊗ₛ T)).X q) := by
+        _ ⟶ (singChain (C := C) (S ⊗ₛ T)).X q) := by
   apply chainCrossProduct.ext; ext ⟨s, t⟩
   simp only [chainTensorHomEquiv_apply, Category.assoc]
   congr 1
@@ -1354,6 +1357,10 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
       snd_default q _
     congr 1
 
+section EilenbergZilberAssembly
+variable [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C]
+  [MonoidalClosed C]
+
 /-! ### Tensor product of chain complexes: instances -/
 
 instance curriedTensor_additive :
@@ -1373,7 +1380,7 @@ noncomputable instance hasZeroObject_of_v : HasZeroObject C :=
 
 /-! ### Eilenberg–Zilber chain map
 
-The cross product assembled into a chain map `(singChain C S).tensorObj (singChain C T) ⟶ singChain C (S ⊗ T)`.
+The cross product assembled into a chain map `(singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ T)`.
 -/
 
 -- Selective open: `open HomologicalComplex` would bring the `Monoidal` namespace prefix
@@ -1383,15 +1390,15 @@ open HomologicalComplex (ιTensorObj mapBifunctorDesc ι_mapBifunctorDesc)
 /-- Degree-`n` component of the Eilenberg–Zilber chain map:
 `⨁_{p+q=n} C_p(S) ⊗ C_q(T) → C_n(S ⊗ T)` via `chainCrossProduct` on each summand. -/
 noncomputable def eilenbergZilber_f (S T : SSet.{v}) (n : ℕ) :
-    ((singChain C S).tensorObj (singChain C T)).X n ⟶
-    (singChain C (S ⊗ₛ T)).X n :=
+    ((singChain (C := C) S).tensorObj (singChain (C := C) T)).X n ⟶
+    (singChain (C := C) (S ⊗ₛ T)).X n :=
   mapBifunctorDesc (fun p q (h : p + q = n) =>
     chainCrossProduct (C := C) h.symm)
 
 /-- Inclusion of the `(p, q)` summand followed by `eilenbergZilber_f` equals
 `chainCrossProduct`. -/
 @[simp] lemma ι_eilenbergZilber_f (S T : SSet.{v}) (p q n : ℕ) (h : p + q = n) :
-    ιTensorObj (singChain C S) (singChain C T) p q n h ≫
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) p q n h ≫
       eilenbergZilber_f (C := C) S T n =
     chainCrossProduct (C := C) h.symm :=
   ι_mapBifunctorDesc _ _ _ h
@@ -1400,10 +1407,10 @@ noncomputable def eilenbergZilber_f (S T : SSet.{v}) (n : ℕ) :
 Dispatches to `chainCrossProduct_leibniz`. -/
 lemma eilenbergZilber_comm_case_pq {S T : SSet.{v}} (p q n m : ℕ)
     (hpq : (p + 1) + (q + 1) = n) (hnm : n = m + 1) :
-    ιTensorObj (singChain C S) (singChain C T) (p + 1) (q + 1) n hpq ≫
-      eilenbergZilber_f (C := C) S T n ≫ (singChain C (S ⊗ₛ T)).d n m =
-    ιTensorObj (singChain C S) (singChain C T) (p + 1) (q + 1) n hpq ≫
-      ((singChain C S).tensorObj (singChain C T)).d n m ≫
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) (p + 1) (q + 1) n hpq ≫
+      eilenbergZilber_f (C := C) S T n ≫ (singChain (C := C) (S ⊗ₛ T)).d n m =
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) (p + 1) (q + 1) n hpq ≫
+      ((singChain (C := C) S).tensorObj (singChain (C := C) T)).d n m ≫
       eilenbergZilber_f (C := C) S T m := by
   have hm : m = p + (q + 1) := by omega
   subst hpq; subst hm
@@ -1431,10 +1438,10 @@ lemma eilenbergZilber_comm_case_pq {S T : SSet.{v}} (p q n m : ℕ)
 Dispatches to `chainCrossProduct_leibniz_right_zero`. -/
 lemma eilenbergZilber_comm_case_p0 {S T : SSet.{v}} (p n m : ℕ)
     (hpq : (p + 1) + 0 = n) (hnm : n = m + 1) :
-    ιTensorObj (singChain C S) (singChain C T) (p + 1) 0 n hpq ≫
-      eilenbergZilber_f (C := C) S T n ≫ (singChain C (S ⊗ₛ T)).d n m =
-    ιTensorObj (singChain C S) (singChain C T) (p + 1) 0 n hpq ≫
-      ((singChain C S).tensorObj (singChain C T)).d n m ≫
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) (p + 1) 0 n hpq ≫
+      eilenbergZilber_f (C := C) S T n ≫ (singChain (C := C) (S ⊗ₛ T)).d n m =
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) (p + 1) 0 n hpq ≫
+      ((singChain (C := C) S).tensorObj (singChain (C := C) T)).d n m ≫
       eilenbergZilber_f (C := C) S T m := by
   have hm : m = p := by omega
   subst hpq; subst hm
@@ -1442,7 +1449,7 @@ lemma eilenbergZilber_comm_case_p0 {S T : SSet.{v}} (p n m : ℕ)
   rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.add_comp,
     Preadditive.comp_add,
     HomologicalComplex.mapBifunctor.ι_D₁_assoc, HomologicalComplex.mapBifunctor.ι_D₂_assoc]
-  have hd₂ : HomologicalComplex.mapBifunctor.d₂ (singChain C S) (singChain C T)
+  have hd₂ : HomologicalComplex.mapBifunctor.d₂ (singChain (C := C) S) (singChain (C := C) T)
       (MonoidalCategory.curriedTensor C) (ComplexShape.down ℕ) (m + 1) 0 m = 0 :=
     HomologicalComplex.mapBifunctor.d₂_eq_zero _ _ _ _ _ _ _
       (fun h => by simp [ComplexShape.down_Rel] at h)
@@ -1459,10 +1466,10 @@ lemma eilenbergZilber_comm_case_p0 {S T : SSet.{v}} (p n m : ℕ)
 Dispatches to `chainCrossProduct_leibniz_left_zero`. -/
 lemma eilenbergZilber_comm_case_0q {S T : SSet.{v}} (q n m : ℕ)
     (hpq : 0 + (q + 1) = n) (hnm : n = m + 1) :
-    ιTensorObj (singChain C S) (singChain C T) 0 (q + 1) n hpq ≫
-      eilenbergZilber_f (C := C) S T n ≫ (singChain C (S ⊗ₛ T)).d n m =
-    ιTensorObj (singChain C S) (singChain C T) 0 (q + 1) n hpq ≫
-      ((singChain C S).tensorObj (singChain C T)).d n m ≫
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) 0 (q + 1) n hpq ≫
+      eilenbergZilber_f (C := C) S T n ≫ (singChain (C := C) (S ⊗ₛ T)).d n m =
+    ιTensorObj (singChain (C := C) S) (singChain (C := C) T) 0 (q + 1) n hpq ≫
+      ((singChain (C := C) S).tensorObj (singChain (C := C) T)).d n m ≫
       eilenbergZilber_f (C := C) S T m := by
   have hm : m = q := by omega
   have hn : n = q + 1 := by omega
@@ -1471,7 +1478,7 @@ lemma eilenbergZilber_comm_case_0q {S T : SSet.{v}} (q n m : ℕ)
   rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.add_comp,
     Preadditive.comp_add,
     HomologicalComplex.mapBifunctor.ι_D₁_assoc, HomologicalComplex.mapBifunctor.ι_D₂_assoc]
-  have hd₁ : HomologicalComplex.mapBifunctor.d₁ (singChain C S) (singChain C T)
+  have hd₁ : HomologicalComplex.mapBifunctor.d₁ (singChain (C := C) S) (singChain (C := C) T)
       (MonoidalCategory.curriedTensor C) (ComplexShape.down ℕ) 0 (m + 1) m = 0 :=
     HomologicalComplex.mapBifunctor.d₁_eq_zero _ _ _ _ _ _ _
       (fun h => by simp [ComplexShape.down_Rel] at h)
@@ -1487,8 +1494,8 @@ lemma eilenbergZilber_comm_case_0q {S T : SSet.{v}} (q n m : ℕ)
 /-- The Eilenberg–Zilber chain map condition: `eilenbergZilber_f` commutes with
 the differentials. Case-splits on the `(p, q)` summand. -/
 lemma eilenbergZilber_comm (S T : SSet.{v}) (n m : ℕ) (hnm : n = m + 1) :
-    eilenbergZilber_f (C := C) S T n ≫ (singChain C (S ⊗ₛ T)).d n m =
-    ((singChain C S).tensorObj (singChain C T)).d n m ≫
+    eilenbergZilber_f (C := C) S T n ≫ (singChain (C := C) (S ⊗ₛ T)).d n m =
+    ((singChain (C := C) S).tensorObj (singChain (C := C) T)).d n m ≫
       eilenbergZilber_f (C := C) S T m := by
   apply HomologicalComplex.mapBifunctor.hom_ext
   intro p q hpq
@@ -1504,10 +1511,10 @@ lemma eilenbergZilber_comm (S T : SSet.{v}) (n m : ℕ) (hnm : n = m + 1) :
 The cross product of singular chains, packaged as a chain map from the tensor
 product of singular chain complexes to the singular chain complex of the monoidal product:
 ```
-  eilenbergZilber : (singChain C S).tensorObj (singChain C T) ⟶ singChain C (S ⊗ T)
+  eilenbergZilber : (singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ T)
 ``` -/
 noncomputable def eilenbergZilber (S T : SSet.{v}) :
-    (singChain C S).tensorObj (singChain C T) ⟶ singChain C (S ⊗ₛ T) where
+    (singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ₛ T) where
   f n := eilenbergZilber_f (C := C) S T n
   comm' n m hnm := by
     have h : n = m + 1 := by rw [ComplexShape.down_Rel] at hnm; omega
@@ -1533,20 +1540,20 @@ commutes. We package this as a `NatTrans` between two functors
 
 For simplicial maps `f : S₁ ⟶ S₂` and `g : T₁ ⟶ T₂`:
 ```
-  eilenbergZilber S₁ T₁ ≫ (SCF C).map (f ⊗ g) =
-    tensorHom ((SCF C).map f) ((SCF C).map g) ≫ eilenbergZilber S₂ T₂
+  eilenbergZilber S₁ T₁ ≫ (SCF (C := C)).map (f ⊗ g) =
+    tensorHom ((SCF (C := C)).map f) ((SCF (C := C)).map g) ≫ eilenbergZilber S₂ T₂
 ``` -/
 lemma eilenbergZilber_natural {S₁ S₂ T₁ T₂ : SSet.{v}} (f : S₁ ⟶ S₂) (g : T₁ ⟶ T₂) :
-    eilenbergZilber (C := C) S₁ T₁ ≫ (SCF C).map (f ⊗ₘₛ g) =
-    HomologicalComplex.tensorHom ((SCF C).map f) ((SCF C).map g) ≫
+    eilenbergZilber (C := C) S₁ T₁ ≫ (SCF (C := C)).map (f ⊗ₘₛ g) =
+    HomologicalComplex.tensorHom ((SCF (C := C)).map f) ((SCF (C := C)).map g) ≫
       eilenbergZilber (C := C) S₂ T₂ := by
   apply HomologicalComplex.Hom.ext; funext n
   apply HomologicalComplex.mapBifunctor.hom_ext; intro p q h
   simp only [HomologicalComplex.comp_f, Category.assoc, eilenbergZilber]
-  change HomologicalComplex.ιTensorObj (singChain C S₁) (singChain C T₁) p q n (by omega) ≫
-      eilenbergZilber_f S₁ T₁ n ≫ ((SCF C).map (f ⊗ₘₛ g)).f n =
-    HomologicalComplex.ιTensorObj (singChain C S₁) (singChain C T₁) p q n (by omega) ≫
-      (HomologicalComplex.tensorHom ((SCF C).map f) ((SCF C).map g)).f n ≫
+  change HomologicalComplex.ιTensorObj (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
+      eilenbergZilber_f S₁ T₁ n ≫ ((SCF (C := C)).map (f ⊗ₘₛ g)).f n =
+    HomologicalComplex.ιTensorObj (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
+      (HomologicalComplex.tensorHom ((SCF (C := C)).map f) ((SCF (C := C)).map g)).f n ≫
         eilenbergZilber_f S₂ T₂ n
   rw [reassoc_of% (ι_eilenbergZilber_f (C := C) S₁ T₁ p q n h)]
   rw [HomologicalComplex.ι_mapBifunctorMap_assoc, ι_eilenbergZilber_f]
@@ -1578,9 +1585,23 @@ noncomputable def eilenbergZilberNatTrans :
   { app := fun p => eilenbergZilber (C := C) p.1 p.2
     naturality := fun _ _ f => (eilenbergZilber_natural f.1 f.2).symm }
 
+end EilenbergZilberAssembly
+end MonoidalCoherence
+end FreeForgetful
+end BasicChainComplex
+
 end HomologyLean.SingularHomology.SSetEZ
 
-
+section TopCatEilenbergZilber
+variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C]
+  [CategoryWithHomology C] [MonoidalCategory C] [SymmetricCategory C]
+  [MonoidalPreadditive C] [MonoidalClosed C] [HasForget.{v} C]
+  [MonoidalUnitorRepresentable (C := C)] [(forget C).IsRightAdjoint]
+  [(forget C).leftAdjoint.Monoidal] [(forget C).LaxMonoidal]
+  [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+  [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
+  [MonoidalLinear ℤ C]
+  [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)]
 
 /-! ### `TopCat.toSSet` preserves binary products
 
@@ -1608,12 +1629,12 @@ open HomologyLean.SingularHomology.SSetEZ in
 /-- Internal form of the TopCat Eilenberg–Zilber nat trans, using the private `SCF` abbreviation.
 See `TopCat.eilenbergZilberNatTrans` for the public API. -/
 noncomputable def TopCat.eilenbergZilberNatTrans' :
-    Functor.prod (TopCat.toSSet ⋙ SCF C) (TopCat.toSSet ⋙ SCF C) ⋙
+    Functor.prod (TopCat.toSSet ⋙ SCF (C := C)) (TopCat.toSSet ⋙ SCF (C := C)) ⋙
       MonoidalCategory.tensor (C := ChainComplex C ℕ) ⟶
-    MonoidalCategory.tensor (C := TopCat) ⋙ TopCat.toSSet ⋙ SCF C :=
+    MonoidalCategory.tensor (C := TopCat) ⋙ TopCat.toSSet ⋙ SCF (C := C) :=
   (TopCat.toSSet.prod TopCat.toSSet).whiskerLeft
       (HomologyLean.SingularHomology.SSetEZ.eilenbergZilberNatTrans (C := C)) ≫
-    Functor.whiskerRight toSSet_prodNatIso.inv (SCF C)
+    Functor.whiskerRight toSSet_prodNatIso.inv (SCF (C := C))
 
 open HomologyLean.SingularHomology.SSetEZ AlgebraicTopology in
 /-- **The Eilenberg–Zilber cross product for topological spaces.**
@@ -1627,3 +1648,5 @@ noncomputable def TopCat.eilenbergZilberNatTrans :
     MonoidalCategory.tensor (C := TopCat) ⋙
       (singularChainComplexFunctor.{v} C).obj (𝟙_ C) :=
   TopCat.eilenbergZilberNatTrans'
+
+end TopCatEilenbergZilber
