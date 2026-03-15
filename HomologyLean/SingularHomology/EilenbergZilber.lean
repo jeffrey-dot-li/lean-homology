@@ -97,6 +97,14 @@ local notation:50 S " ⊗ₛ " T => (MonoidalCategory.tensorObj (C := SSet) S T)
     SSet.stdSimplex.objEquiv.symm (g ≫ f) :=
   rfl
 
+/-- Precomposing `yonedaEquiv.symm x` with a morphism `h : A ⟶ B` of simplicial sets
+is the same as applying `h` to `x` first:
+`yonedaEquiv.symm x ≫ h = yonedaEquiv.symm (h.app _ x)`. -/
+@[simp] lemma yonedaEquiv_symm_comp {A B : SSet.{v}} {m : SimplexCategory}
+    (x : A.obj (Opposite.op m)) (h : A ⟶ B) :
+    SSet.yonedaEquiv.symm x ≫ h = SSet.yonedaEquiv.symm (h.app _ x) := by
+  apply SSet.yonedaEquiv.injective; simp [SSet.yonedaEquiv_comp]
+
 lemma SimplexCategory.eqToHom_comp_δ {n n' : ℕ} (hn : n = n') (i : Fin (n' + 2)) :
     eqToHom (show (⦋n⦌ : SimplexCategory) = ⦋n'⦌ by rw [hn]) ≫ SimplexCategory.δ i =
       SimplexCategory.δ (i.cast (by omega)) ≫
@@ -339,6 +347,8 @@ def simplexCrossProduct {S T : SSet.{v}} {p q n : ℕ}
   universalSimplexCrossProduct p q hn ≫
     ((SCF C).map (SSet.yonedaEquiv.symm s ⊗ₘₛ SSet.yonedaEquiv.symm t)).f n
 
+-- TODO: make `simplexCrossProduct'` the primary definition and provide
+-- curried `simplexCrossProduct` as a wrapper.
 /-- Variant of `simplexCrossProduct` as an explicit set-level map:
 takes a pair `(s, t)` of simplices and returns an element of
 `𝟙_ C ⟶ C_n(S ⊗ T; 𝟙_ C)` (where `n = p + q`). -/
@@ -547,7 +557,7 @@ lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
 
 /-- The cross product of two 0-simplex coprojections factors through the
 coprojection of the product simplex, up to the left unitor. -/
-theorem crossProduct_normalized' {S T : SSet.{v}}
+theorem crossProduct_normalized {S T : SSet.{v}}
     (s : S _⦋0⦌) (t : T _⦋0⦌) :
     MonoidalCategory.tensorHom (simplexCoprojection (C := C) s)
       (simplexCoprojection t) ≫ chainCrossProduct (C := C) =
@@ -592,11 +602,7 @@ lemma crossProduct_natural_pure_tensor {S S' T T' : SSet.{v}}
   -- `(yonedaEquiv.symm s ⊗ₘₛ yonedaEquiv.symm t) ≫ (f ⊗ₘₛ g)
   --  = yonedaEquiv.symm (f.app _ s) ⊗ₘₛ yonedaEquiv.symm (g.app _ t)`
   rw [MonoidalCategory.tensorHom_comp_tensorHom]
-  -- `yonedaEquiv.symm s ≫ f = yonedaEquiv.symm (f.app _ s)` by Yoneda naturality
-  have yoneda_nat : ∀ {A B : SSet.{v}} {m : SimplexCategory} (x : A.obj (Opposite.op m)) (h : A ⟶ B),
-      SSet.yonedaEquiv.symm x ≫ h = SSet.yonedaEquiv.symm (h.app _ x) := by
-    intros; apply SSet.yonedaEquiv.injective; simp [SSet.yonedaEquiv_comp]
-  rw [yoneda_nat, yoneda_nat]
+  rw [yonedaEquiv_symm_comp, yonedaEquiv_symm_comp]
 
 /-- Naturality of the chain-level cross product: given simplicial maps `f : S ⟶ S'`
 and `g : T ⟶ T'`, the cross product commutes with the induced chain maps:
@@ -948,7 +954,7 @@ lemma simplexCrossProduct_zero_right {S T : SSet.{v}} {n : ℕ}
     rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
     simp only [SSet.stdSimplex.objEquiv, Equiv.symm_apply_apply, Category.id_comp,
       SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
-    congr 1; simp [Equiv.ulift]
+    simp [Equiv.ulift]
   }
 
 /-- For `p = 0`, the cross product of a `0`-simplex `c` in `S` with an `n`-simplex `s`
@@ -979,13 +985,17 @@ lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
     rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
     simp only [SSet.stdSimplex.objEquiv, Equiv.symm_apply_apply, Category.id_comp,
       SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
-    congr 1; simp [Equiv.ulift]
+    simp [Equiv.ulift]
   }
 
 /-! ### Coprojection-level and simplex-level Leibniz rules -/
 
-/-- Key lemma: `(ι s ⊗ₘ ι t) ≫ chainCrossProduct = (λ_).hom ≫ simplexCrossProduct s t`. -/
-private lemma gen_key {S T : SSet.{v}} {a b n : ℕ} (hn : n = a + b)
+/-- The chain-level cross product absorbs coprojection tensors: tensoring two
+simplex coprojections and composing with `chainCrossProduct` equals the left
+unitor composed with the simplex-level cross product.
+`(ι s ⊗ₘ ι t) ≫ chainCrossProduct = (λ_).hom ≫ simplexCrossProduct s t`. -/
+private lemma coprojection_tensorHom_chainCrossProduct
+    {S T : SSet.{v}} {a b n : ℕ} (hn : n = a + b)
     (s : S _⦋a⦌) (t : T _⦋b⦌) :
     (simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection t) ≫
       chainCrossProduct (C := C) hn =
@@ -1009,7 +1019,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
           (𝟙 ((singChain C Δ[p + 1]).X (p + 1)) ⊗ₘ
             (singChain C Δ[q + 1]).d (q + 1) q)) ≫
         chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega) := by
-  rw [gen_key]
+  rw [coprojection_tensorHom_chainCrossProduct]
   simp only [simplexCrossProduct, Category.assoc]
   -- yonedaEquiv.symm (idSimplex n) = 𝟙 Δ[n]
   have yoneda_id : ∀ (n : ℕ), SSet.yonedaEquiv.symm (idSimplex n) = 𝟙 Δ[n] := by
@@ -1025,7 +1035,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
   rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
   · -- Goal 1: left face sum
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← gen_key]
+    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← coprojection_tensorHom_chainCrossProduct]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
     conv_rhs =>
       enter [1, 1, 2]
@@ -1048,7 +1058,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
         eqToHom_refl, Category.id_comp]
   · -- Goal 2: right face sum
     congr 1
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← gen_key]
+    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← coprojection_tensorHom_chainCrossProduct]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
     conv_rhs =>
       enter [1, 2]
@@ -1153,29 +1163,6 @@ theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
   congr 1
   exact simplexCrossProduct_boundary (C := C) p q s t
 
-/-! ### Boundary of the identity 1-simplex -/
-
-/-- The boundary of the identity 1-simplex in `Δ[1]`:
-`simplexCoprojection (idSimplex 1) ≫ d₁₀ = simplexCoprojection (faceSimplex 0) - simplexCoprojection (faceSimplex 1)`,
-where `faceSimplex 0` and `faceSimplex 1` are the two vertex inclusions `Δ[0] → Δ[1]`. -/
-lemma boundary_identity_1simplex :
-    simplexCoprojection (C := C) (idSimplex 1) ≫ (singChain C Δ[1]).d 1 0 =
-    simplexCoprojection (C := C) (faceSimplex 0) -
-    simplexCoprojection (faceSimplex 1) := by
-  simp only [singChain]
-  dsimp [SCF, SSet.singularChainComplexFunctor]
-  simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
-  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
-  rw [Fin.sum_univ_two]
-  simp only [Fin.val_zero, pow_zero, one_smul, Fin.val_one, pow_one, neg_smul, sub_eq_add_neg]
-  simp only [simplexCoprojection]
-  erw [Sigma.ι_comp_map', Sigma.ι_comp_map']
-  simp only [Category.id_comp, sub_eq_add_neg]
-  congr 1 <;> congr 1 <;> {
-    dsimp [faceSimplex, idSimplex, SimplicialObject.δ]
-    simp [SSet.stdSimplex.map_apply]
-  }
-
 /-! ### Edge cases for the Leibniz rule -/
 
 /-- Edge case `(p+1, 0)`: the Leibniz rule when the right factor has degree 0. -/
@@ -1188,9 +1175,9 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   apply chainCrossProduct.ext; ext ⟨s, t⟩
   simp only [chainTensorHomEquiv_apply, Category.assoc]
   congr 1
-  -- LHS: unfold crossProduct(p+1,0) via gen_key and simplexCrossProduct_zero_right
+  -- LHS: unfold crossProduct(p+1,0) via coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_right
   rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
-  rw [gen_key]
+  rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_right (C := C)]
   -- LHS: expand d(S⊗T) into face map sum
   -- The indices are (p+1+0, p+0) which need to match (p+1, p)
@@ -1234,8 +1221,8 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
       have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s j
       simp only [eqToHom_refl, Category.id_comp] at this
       exact this]
-  -- RHS: use gen_key and simplexCrossProduct_zero_right
-  rw [gen_key]
+  -- RHS: use coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_right
+  rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_right (C := C)]
   -- Both sides: (λ_).hom ≫ ι(shuffleSimplex ...)
   -- Show δⱼ(shuffleSimplex s t default) = shuffleSimplex (S.δ j s) t default
@@ -1269,9 +1256,9 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
   apply chainCrossProduct.ext; ext ⟨s, t⟩
   simp only [chainTensorHomEquiv_apply, Category.assoc]
   congr 1
-  -- LHS: use gen_key to rewrite to simplexCrossProduct, then simplexCrossProduct_zero_left
+  -- LHS: use coprojection_tensorHom_chainCrossProduct to rewrite to simplexCrossProduct, then simplexCrossProduct_zero_left
   rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
-  rw [gen_key]
+  rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_left (C := C)]
   -- LHS: expand d(S⊗T) into face map sum
   rw [Category.assoc, singChain_d_eq_alternatingFaceMapObjD (C := C) (S ⊗ₛ T) q rfl]
@@ -1312,8 +1299,8 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
       have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl t j
       simp only [eqToHom_refl, Category.id_comp] at this
       exact this]
-  -- RHS: use gen_key and simplexCrossProduct_zero_left
-  rw [gen_key]
+  -- RHS: use coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_left
+  rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_left (C := C)]
   -- Both sides: (λ_).hom ≫ ι(shuffleSimplex ...)
   congr 2
@@ -1328,7 +1315,6 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
     simp only [SSet.tensorObj_map_snd, ← FunctorToTypes.map_comp_apply]
     -- Show the op-morphisms are equal by reducing to SimplexCategory via ext
     -- Both eqToHom ≫ sndHom default compose to a cast, so both sides are δ j (mod cast).
-    change T.map _ t = T.map _ t
     refine congrFun (congrArg T.map ?_) t
     simp only [← op_comp]; congr 1
     -- In SimplexCategory: δ j ≫ eqToHom ≫ sndHom default = eqToHom ≫ sndHom default ≫ δ j
@@ -1368,17 +1354,6 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
       snd_default q _
     congr 1
 
-/-- Edge case `(0, 1)`: the Leibniz rule when both factors are at the boundary
-of their range (left = 0, right = 1). This is the base case needed for
-`chainCrossProduct_leibniz_left_zero` when `q = 0`. -/
-theorem chainCrossProduct_leibniz_left_zero_zero {S T : SSet.{v}} :
-    chainCrossProduct (C := C) (show 0 + 1 = 0 + 1 from rfl) ≫
-      (singChain C (S ⊗ₛ T)).d (0 + 1) (0 + 0) =
-    (𝟙 ((singChain C S).X 0) ⊗ₘ
-        (singChain C T).d 1 0) ≫
-      chainCrossProduct (C := C) (show 0 + 0 = 0 + 0 from rfl) := by
-  exact chainCrossProduct_leibniz_left_zero (C := C) 0
-
 /-! ### Tensor product of chain complexes: instances -/
 
 instance curriedTensor_additive :
@@ -1415,7 +1390,7 @@ noncomputable def eilenbergZilber_f (S T : SSet.{v}) (n : ℕ) :
 
 /-- Inclusion of the `(p, q)` summand followed by `eilenbergZilber_f` equals
 `chainCrossProduct`. -/
-lemma ι_eilenbergZilber_f (S T : SSet.{v}) (p q n : ℕ) (h : p + q = n) :
+@[simp] lemma ι_eilenbergZilber_f (S T : SSet.{v}) (p q n : ℕ) (h : p + q = n) :
     ιTensorObj (singChain C S) (singChain C T) p q n h ≫
       eilenbergZilber_f (C := C) S T n =
     chainCrossProduct (C := C) h.symm :=
@@ -1617,13 +1592,6 @@ noncomputable instance : CartesianMonoidalCategory TopCat := .ofHasFiniteProduct
 
 noncomputable instance : TopCat.toSSet.IsRightAdjoint :=
   ⟨SSet.toTop, ⟨sSetTopAdj⟩⟩
-
-/-- The canonical iso `toSSet.obj (X ⨯ Y) ≅ toSSet.obj X ⨯ toSSet.obj Y` in `SSet`,
-from the fact that `toSSet` preserves binary products (as a right adjoint). -/
-noncomputable def TopCat.toSSet_prodIso (X Y : TopCat) :
-    TopCat.toSSet.obj (X ⨯ Y) ≅
-    TopCat.toSSet.obj X ⨯ TopCat.toSSet.obj Y :=
-  CategoryTheory.Limits.PreservesLimitPair.iso TopCat.toSSet X Y
 
 /-- `TopCat.toSSet` commutes with monoidal products, naturally in both variables.
 
