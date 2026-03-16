@@ -31,6 +31,7 @@ variable (C : Type u) [Category.{v} C] [MonoidalCategory C] [HasForget.{v} C]
 
 /-- The forgetful functor `forget C` is naturally isomorphic to `Hom(𝟙_ C, -)`. -/
 class MonoidalUnitorRepresentable where
+  /-- The natural isomorphism identifying the forgetful functor with `Hom(𝟙_ C, -)`. -/
   forgetIso : forget C ≅ Hom[𝟙_ C |-]
 
 -- `forget (Type u) = 𝟭 _` and `Hom[PUnit |-]` sends `X` to `(PUnit → X) ≃ X`.

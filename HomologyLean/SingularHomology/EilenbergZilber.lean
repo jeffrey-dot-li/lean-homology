@@ -51,8 +51,7 @@ local notation:50 S " ⊗ₛ " T => (MonoidalCategory.tensorObj (C := SSet) S T)
 
 @[simp] lemma yonedaEquiv_symm_objEquiv_symm_app {n n' : SimplexCategory} {m : SimplexCategoryᵒᵖ}
     (f : n ⟶ n') (g : m.unop ⟶ n) :
-    (SSet.yonedaEquiv.{v}.symm (SSet.stdSimplex.objEquiv.symm f)).app m
-      (SSet.stdSimplex.objEquiv.symm g) =
+    (SSet.stdSimplex.obj n').map g.op (SSet.stdSimplex.objEquiv.symm f) =
     SSet.stdSimplex.objEquiv.symm (g ≫ f) :=
   rfl
 
@@ -652,7 +651,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           simp only [SimplicialObject.δ, ← FunctorToTypes.map_comp_apply, ← op_comp]
           refine Prod.ext ?_ ?_
           · simp only [SSet.tensorObj_map_fst]
-            rw [yonedaEquiv_symm_objEquiv_symm_app]
+            rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
               Category.assoc, Category.comp_id]
             congr 1
@@ -660,7 +659,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             slice_lhs 1 2 => rw [SimplexCategory.eqToHom_comp_δ (by omega)]
             simp [Category.assoc]
           · simp only [SSet.tensorObj_map_snd]
-            rw [yonedaEquiv_symm_objEquiv_symm_app]
+            rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
               Category.assoc]
             congr 1
@@ -846,7 +845,6 @@ def chainCrossProduct {S T : SSet.{v}} {p q n : ℕ}
 /-- Applying `chainTensorHomEquiv` to `chainCrossProduct` recovers
 `simplexCrossProduct'`: the chain-level cross product is the unique lift of
 the simplex-level cross product. -/
-@[simp]
 lemma chainCrossProduct.spec {S T : SSet.{v}} {p q n : ℕ}
     (hn : n = p + q := by omega) :
     chainTensorHomEquiv (S := S) (T := T) _
