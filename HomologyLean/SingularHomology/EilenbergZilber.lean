@@ -340,7 +340,7 @@ lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
   have : (default : Shuffle 0 0).sign = 1 := by simp [Shuffle.sign, Shuffle.invCount]
   rw [this, one_smul]
   dsimp [simplexCoprojection, SCF, SSet.singularChainComplexFunctor]
-  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp only [Category.id_comp]
   congr 1
   show (SSet.yonedaEquiv.symm s ⊗ₘₛ SSet.yonedaEquiv.symm t).app _ _ = prodSimplex s t
@@ -355,7 +355,7 @@ lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
     simplexCoprojection (C := C) s ≫ ((SCF (C := C)).map f).f n =
     simplexCoprojection (f.app _ s) := by
   dsimp [simplexCoprojection, SCF, SSet.singularChainComplexFunctor]
-  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp only [Category.id_comp]
 
 /-- Factoring a coprojection through the identity simplex: `ι s` equals
@@ -418,7 +418,7 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {S : SSet.{v}} {n m : ℕ} (h : n
   simp only [eqToHom_refl, Category.id_comp]
   dsimp [simplexCoprojection, singChain, SCF, SSet.singularChainComplexFunctor,
     SimplicialObject.δ, SimplicialObject.whiskering]
-  erw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp
 /-! ### Universal Leibniz rule for the simplex-level cross product
 
@@ -654,7 +654,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           simp only [SimplicialObject.δ, ← FunctorToTypes.map_comp_apply, ← op_comp]
           refine Prod.ext ?_ ?_
           · simp only [SSet.tensorObj_map_fst]
-            erw [yonedaEquiv_symm_objEquiv_symm_app]
+            rw [yonedaEquiv_symm_objEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
               Category.assoc, Category.comp_id]
             congr 1
@@ -662,7 +662,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             slice_lhs 1 2 => rw [SimplexCategory.eqToHom_comp_δ (by omega)]
             simp [Category.assoc]
           · simp only [SSet.tensorObj_map_snd]
-            erw [yonedaEquiv_symm_objEquiv_symm_app]
+            rw [yonedaEquiv_symm_objEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
               Category.assoc]
             congr 1
@@ -776,7 +776,10 @@ private lemma freeGen_chainGroupIsoFree {S : SSet.{v}} {p : ℕ}
     ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (S _⦋p⦌) s)
   simp only [types_comp_apply] at hnat
   dsimp [coyoneda] at hnat
-  erw [← hnat]; clear hnat
+  change MonoidalUnitorRepresentable.forgetIso.hom.app (Free.obj (S _⦋p⦌))
+      ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (S _⦋p⦌) s) ≫ φ =
+    simplexCoprojection s
+  rw [← hnat]; clear hnat
   change MonoidalUnitorRepresentable.forgetIso.hom.app _
     (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map φ) s) = _
   rw [Adjunction.unit_leftAdjointUniq_hom_app]
@@ -882,7 +885,14 @@ private lemma freeGen_δ {C : Type u} [Category.{v} C] [MonoidalCategory C] [Has
     ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (A × B) (a, b))
   simp only [types_comp_apply] at hnat
   dsimp [coyoneda] at hnat
-  erw [← hnat]; clear hnat
+  change MonoidalUnitorRepresentable.forgetIso.hom.app (Free.obj (A ⊗ B))
+      ((Adjunction.ofIsRightAdjoint (forget C)).unit.app (A × B) (a, b)) ≫ δ =
+    (λ_ (𝟙_ C)).inv ≫
+      (MonoidalUnitorRepresentable.forgetIso.hom.app (Free.obj A)
+          ((Adjunction.ofIsRightAdjoint (forget C)).unit.app A a) ⊗ₘ
+        MonoidalUnitorRepresentable.forgetIso.hom.app (Free.obj B)
+          ((Adjunction.ofIsRightAdjoint (forget C)).unit.app B b))
+  rw [← hnat]; clear hnat
   change MonoidalUnitorRepresentable.forgetIso.hom.app _
     (((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ ≫ (forget C).map δ) (a, b)) = _
   rw [Adjunction.unit_app_tensor_comp_map_δ]
@@ -939,14 +949,14 @@ lemma chainTensorHomEquiv_apply [(forget C).LaxMonoidal]
     (((Adjunction.ofIsRightAdjoint (forget C)).homEquiv _ _)
       (Functor.Monoidal.μIso Free _ _).symm.hom (s, t))
   simp only [types_comp_apply] at hnat2
-  erw [hnat2]; dsimp [coyoneda]
+  rw [hnat2]; dsimp [coyoneda]
   rw [Adjunction.homEquiv_unit]
   simp only [types_comp_apply]
   have hnat3 := congr_fun ((MonoidalUnitorRepresentable.forgetIso (C := C)).hom.naturality
     (Functor.OplaxMonoidal.δ Free _ _))
     ((Adjunction.ofIsRightAdjoint (forget C)).unit.app _ (s, t))
   simp only [types_comp_apply] at hnat3
-  erw [hnat3]; dsimp [coyoneda]
+  rw [hnat3]; dsimp [coyoneda]
   rw [Category.assoc]
   simp only [types_tensorObj_def] at *
   rw [← Category.assoc, freeGen_δ, Category.assoc,
@@ -1098,11 +1108,10 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     intro n
     dsimp [idSimplex]
     ext d x : 2
-    erw [yonedaEquiv_symm_objEquiv_symm_app]
-    simp only [Category.comp_id]
-    exact ULift.ext _ _ rfl
+    simpa using
+      (yonedaEquiv_symm_objEquiv_symm_app (f := 𝟙 ⦋n⦌) (g := x.down))
   rw [yoneda_id, yoneda_id, MonoidalCategory.id_tensorHom_id]
-  slice_lhs 3 4 => erw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
+  slice_lhs 3 4 => rw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
   simp only [Category.id_comp]
   rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
