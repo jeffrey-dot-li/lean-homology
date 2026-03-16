@@ -205,8 +205,8 @@ private lemma fstHom_insertLeftStep_comp_δ {p q : ℕ} (ν : Shuffle p q) (j : 
       dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom,
         SimplexCategory.eqToHom_toOrderHom, Fin.castOrderIso]
       -- Both sides are succAbove with same Fin.val index; unfold and close by cases
-      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_succ, Fin.val_cast]
-      split_ifs <;> simp_all [Fin.val_castSucc, Fin.val_succ, Fin.val_cast])).trans hface)
+      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+      split_ifs <;> simp_all)).trans hface)
   exact fun _ _ h => congr_arg _ (Fin.ext h)
 
 /-- Left insertion face factorization (snd component):
@@ -227,8 +227,8 @@ private lemma sndHom_insertLeftStep_comp_δ {p q : ℕ} (ν : Shuffle p q) (j : 
     congrArg (fun x => (x.2 : ℕ)) ((harg _ _ (by
       dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom,
         SimplexCategory.eqToHom_toOrderHom, Fin.castOrderIso]
-      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_succ, Fin.val_cast]
-      split_ifs <;> simp_all [Fin.val_castSucc, Fin.val_succ, Fin.val_cast])).trans hface)
+      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+      split_ifs <;> simp_all)).trans hface)
   exact fun _ _ h => congr_arg _ (Fin.ext h)
 
 /-- Right insertion face factorization (fst component):
@@ -379,7 +379,9 @@ lemma crossProduct_natural_pure_tensor {S S' T T' : SSet.{v}}
     simplexCrossProduct (C := C) (f.app _ s) (g.app _ t) hn := by
   subst hn
   simp only [simplexCrossProduct, Category.assoc]
-  -- Combine `.f n` components: `(SCF (C := C)).map φ).f n ≫ ((SCF (C := C)).map ψ).f n = ((SCF (C := C)).map (φ ≫ ψ)).f n`
+  -- Combine `.f n` components:
+  -- `((SCF (C := C)).map φ).f n ≫ ((SCF (C := C)).map ψ).f n
+  --   = ((SCF (C := C)).map (φ ≫ ψ)).f n`.
   rw [← HomologicalComplex.comp_f, ← Functor.map_comp]
   congr 1
   -- `(yonedaEquiv.symm s ⊗ₘₛ yonedaEquiv.symm t) ≫ (f ⊗ₘₛ g)
@@ -488,15 +490,16 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   -- expand .1/.2 through the tensor map, simplify yoneda terms.
   simp only [SSet.tensorHom_app_apply]
   unfold shuffleSimplex faceSimplex idSimplex
-  simp only [SSet.tensorHom_app_apply, SSet.stdSimplex.map_apply, Quiver.Hom.unop_op,
-    Equiv.apply_symm_apply, Category.id_comp, Category.comp_id, yonedaEquiv_symm_app,
-    FunctorToTypes.map_comp_apply]
+  simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
+    Category.comp_id]
   -- Step 5: Expand .1/.2 of (S ⊗ T).map f.op pair on the RHS using tensorObj_map_fst/snd
   simp only [SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
   -- Step 6: Normalize Δ[n].map f.op (objEquiv.symm g) → objEquiv.symm (g ≫ f.unop),
   -- then cancel objEquiv ∘ objEquiv.symm
   simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply]
-  -- Step 7: Collapse double sum ∑ μ, μ.sign • ∑ r, (-1)^r • ... into ∑ (μ,r), (μ.sign * (-1)^r) • ...
+  -- Step 7: Collapse the double sum
+  -- `∑ μ, μ.sign • ∑ r, (-1)^r • ...` into
+  -- `∑ (μ, r), (μ.sign * (-1)^r) • ...`.
   simp_rw [Finset.smul_sum, smul_smul]
   -- Step 8: Split inner sum into diagonal + non-diagonal vertices.
   let isDiag := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + (q + 1) + 2)) =>
@@ -525,9 +528,6 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         -- Goal: δ r (map eqToHom (swap_pair)) = δ r (map eqToHom (pair))
         -- Suffices to show the underlying OrderHom compositions agree.
         simp only [SimplicialObject.δ, ← FunctorToTypes.map_comp_apply, ← op_comp]
-        congr 1; congr 1
-        -- Goal: (δ r ≫ eqToHom).op = (δ r ≫ eqToHom).op — these are the same, ✓
-        -- But actually the pair arguments differ. Let me use Prod.ext.
         refine Prod.ext ?_ ?_
         · simp only [SSet.tensorObj_map_fst, SSet.stdSimplex.map_apply,
             Quiver.Hom.unop_op, Equiv.apply_symm_apply, Category.assoc]
@@ -564,7 +564,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         obtain ⟨hμ, hr⟩ := h
         have hr' : Shuffle.insertLeftIndex ν₁ j₁ = Shuffle.insertLeftIndex ν₂ j₂ := by
           have heq := eq_of_heq hr
-          exact Fin.ext (by simp [Fin.ext_iff] at heq; exact heq)
+          exact Fin.ext (by simpa using congrArg (fun x => x.val) heq)
         obtain ⟨hj, hν⟩ := Shuffle.insertLeftStep_injective j₁ j₂ ν₁ ν₂ hμ hr'
         exact Prod.ext hj hν
       · intro ⟨μ, r⟩ hmem
@@ -600,14 +600,12 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           -- After simplifying, need Prod.ext with the two helper lemmas
           simp only [SimplicialObject.δ, ← FunctorToTypes.map_comp_apply, ← op_comp]
           refine Prod.ext ?_ ?_
-          · simp only [SSet.tensorObj_map_fst, yonedaEquiv_symm_app_apply,
-              SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
-              Category.assoc, Category.comp_id, Category.id_comp]
+          · simp only [SSet.tensorObj_map_fst, SSet.stdSimplex.map_apply,
+              Quiver.Hom.unop_op, Equiv.apply_symm_apply, Category.assoc]
             exact congrArg SSet.stdSimplex.objEquiv.symm
               (fstHom_insertLeftStep_comp_δ ν j).symm
-          · simp only [SSet.tensorObj_map_snd, yonedaEquiv_symm_app_apply,
-              SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
-              Category.assoc, Category.comp_id, Category.id_comp]
+          · simp only [SSet.tensorObj_map_snd, SSet.stdSimplex.map_apply,
+              Quiver.Hom.unop_op, Equiv.apply_symm_apply, Category.assoc]
             exact congrArg SSet.stdSimplex.objEquiv.symm
               (sndHom_insertLeftStep_comp_δ ν j).symm
     · -- Step 13: Right bijection via insertRightStep
@@ -625,7 +623,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         obtain ⟨hμ, hr⟩ := h
         have hr' : Shuffle.insertRightIndex ν₁ k₁ = Shuffle.insertRightIndex ν₂ k₂ := by
           have heq := eq_of_heq hr
-          exact Fin.ext (by simp [Fin.ext_iff] at heq; exact heq)
+          exact Fin.ext (by simpa using congrArg (fun x => x.val) heq)
         obtain ⟨hk, hν⟩ := Shuffle.insertRightStep_injective k₁ k₂ ν₁ ν₂ hμ hr'
         exact Prod.ext hk hν
       · intro ⟨μ, r⟩ hmem
@@ -655,22 +653,22 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           congr 1
           simp only [SimplicialObject.δ, ← FunctorToTypes.map_comp_apply, ← op_comp]
           refine Prod.ext ?_ ?_
-          · simp only [Prod.fst, SSet.tensorObj_map_fst]
+          · simp only [SSet.tensorObj_map_fst]
             erw [yonedaEquiv_symm_objEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
-              Category.assoc, Category.comp_id, Category.id_comp]
+              Category.assoc, Category.comp_id]
             congr 1
             conv_lhs => rw [(fstHom_insertRightStep_comp_δ ν k).symm]
             slice_lhs 1 2 => rw [SimplexCategory.eqToHom_comp_δ (by omega)]
-            simp [Category.assoc, eqToHom_trans]
-          · simp only [Prod.snd, SSet.tensorObj_map_snd]
+            simp [Category.assoc]
+          · simp only [SSet.tensorObj_map_snd]
             erw [yonedaEquiv_symm_objEquiv_symm_app]
             simp only [SSet.stdSimplex.map_apply, Quiver.Hom.unop_op, Equiv.apply_symm_apply,
-              Category.assoc, Category.comp_id, Category.id_comp]
+              Category.assoc]
             congr 1
             rw [(sndHom_insertRightStep_comp_δ ν k).symm]
             slice_lhs 1 2 => rw [SimplexCategory.eqToHom_comp_δ (by omega)]
-            simp [Category.assoc, eqToHom_trans]
+            simp [Category.assoc]
 
 /-! ### Zero-index cross product lemmas -/
 
@@ -699,8 +697,7 @@ lemma simplexCrossProduct_zero_right {S T : SSet.{v}} {n : ℕ}
   refine Prod.ext ?_ ?_ <;> {
     change (SSet.yonedaEquiv.symm _).app _ (Δ[_].map _ (SSet.stdSimplex.objEquiv.symm _)) = _
     rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
-    simp only [SSet.stdSimplex.objEquiv, Equiv.symm_apply_apply, Category.id_comp,
-      SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
+    simp only [SSet.stdSimplex.objEquiv, SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
     simp [Equiv.ulift]
   }
 
@@ -730,8 +727,7 @@ lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
   refine Prod.ext ?_ ?_ <;> {
     change (SSet.yonedaEquiv.symm _).app _ (Δ[_].map _ (SSet.stdSimplex.objEquiv.symm _)) = _
     rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
-    simp only [SSet.stdSimplex.objEquiv, Equiv.symm_apply_apply, Category.id_comp,
-      SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
+    simp only [SSet.stdSimplex.objEquiv, SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
     simp [Equiv.ulift]
   }
 
@@ -1049,7 +1045,8 @@ noncomputable instance hasZeroObject_of_v : HasZeroObject C :=
 
 /-! ### Eilenberg–Zilber chain map
 
-The cross product assembled into a chain map `(singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ T)`.
+The cross product assembled into a chain map
+`(singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ T)`.
 -/
 
 -- Selective open: `open HomologicalComplex` would bring the `Monoidal` namespace prefix
@@ -1106,11 +1103,12 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     exact ULift.ext _ _ rfl
   rw [yoneda_id, yoneda_id, MonoidalCategory.id_tensorHom_id]
   slice_lhs 3 4 => erw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
-  simp only [Category.id_comp, Category.assoc]
+  simp only [Category.id_comp]
   rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
   · -- Goal 1: left face sum
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← coprojection_tensorHom_chainCrossProduct]
+    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
+      ← coprojection_tensorHom_chainCrossProduct]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
     conv_rhs =>
       enter [1, 1, 2]
@@ -1133,7 +1131,8 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
         eqToHom_refl, Category.id_comp]
   · -- Goal 2: right face sum
     congr 1
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul, ← coprojection_tensorHom_chainCrossProduct]
+    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
+      ← coprojection_tensorHom_chainCrossProduct]
     rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
     conv_rhs =>
       enter [1, 2]
@@ -1203,7 +1202,8 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
         ← Category.id_comp (((SCF (C := C)).map fs).f (p + 1)),
         ← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
   -- Now each summand has ... ≫ (d ⊗ 𝟙) ≫ (fs_* ⊗ ft_*) ≫ chainCrossProduct.
-  -- Use crossProduct_natural backwards: (fs_* ⊗ ft_*) ≫ chainCrossProduct = chainCrossProduct ≫ (fs ⊗ ft)_*
+  -- Use `crossProduct_natural` backwards:
+  -- `(fs_* ⊗ ft_*) ≫ chainCrossProduct = chainCrossProduct ≫ (fs ⊗ ft)_*`.
   -- Term 1: navigate to (fs_* ⊗ ft_*) ≫ chainCrossProduct at position [2, 2] of the first summand
   conv_rhs =>
     enter [1, 2, 2]
@@ -1233,7 +1233,7 @@ theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
         chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
   apply chainCrossProduct.ext
   ext ⟨s, t⟩
-  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  simp only [chainTensorHomEquiv_apply]
   rw [Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
   exact simplexCrossProduct_boundary (C := C) p q s t
@@ -1248,9 +1248,10 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
         𝟙 ((singChain (C := C) T).X 0)) ≫
       chainCrossProduct (C := C) (show p + 0 = p + 0 from rfl) := by
   apply chainCrossProduct.ext; ext ⟨s, t⟩
-  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  simp only [chainTensorHomEquiv_apply]
   congr 1
-  -- LHS: unfold crossProduct(p+1,0) via coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_right
+  -- LHS: unfold `crossProduct (p + 1, 0)` via
+  -- `coprojection_tensorHom_chainCrossProduct` and `simplexCrossProduct_zero_right`.
   rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
   rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_right (C := C)]
@@ -1258,10 +1259,10 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   -- The indices are (p+1+0, p+0) which need to match (p+1, p)
   rw [Category.assoc,
     show (singChain (C := C) (S ⊗ₛ T)).d (p + 1 + 0) (p + 0) =
-      (singChain (C := C) (S ⊗ₛ T)).d (p + 1) p from by congr 1 <;> omega,
+      (singChain (C := C) (S ⊗ₛ T)).d (p + 1) p from rfl,
     singChain_d_eq_alternatingFaceMapObjD (C := C) (S ⊗ₛ T) p rfl]
   simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-    Preadditive.comp_sum, Preadditive.comp_zsmul, Category.assoc]
+    Preadditive.comp_sum, Preadditive.comp_zsmul]
   -- RHS: fuse (ι s ⊗ ι t) ≫ (d_S ⊗ 𝟙) into ((ι s ≫ d_S) ⊗ ι t)
   conv_rhs =>
     rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
@@ -1311,7 +1312,8 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   rw [← FunctorToTypes.map_comp_apply]
   refine Prod.ext ?_ ?_
   · -- First component: S.map ((eqToHom ≫ δⱼ) ≫ fstHom).op s = S.map (eqToHom ≫ fstHom ≫ δⱼ).op s
-    -- Both reduce to S.map (eqToHom ≫ δⱼ ≫ fstHom).op s vs S.map (eqToHom ≫ fstHom).op (S.map δⱼ.op s)
+    -- Both reduce to `S.map (eqToHom ≫ δⱼ ≫ fstHom).op s`
+    -- versus `S.map (eqToHom ≫ fstHom).op (S.map δⱼ.op s)`.
     simp only [SSet.tensorObj_map_fst, ← FunctorToTypes.map_comp_apply]
     congr 1
   · -- Second component: T.map ((eqToHom ≫ δⱼ) ≫ sndHom).op t = T.map (eqToHom ≫ sndHom).op t
@@ -1329,16 +1331,17 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
       (chainCrossProduct (C := C) (p := 0) (q := q) :
         _ ⟶ (singChain (C := C) (S ⊗ₛ T)).X q) := by
   apply chainCrossProduct.ext; ext ⟨s, t⟩
-  simp only [chainTensorHomEquiv_apply, Category.assoc]
+  simp only [chainTensorHomEquiv_apply]
   congr 1
-  -- LHS: use coprojection_tensorHom_chainCrossProduct to rewrite to simplexCrossProduct, then simplexCrossProduct_zero_left
+  -- LHS: use `coprojection_tensorHom_chainCrossProduct` to rewrite to
+  -- `simplexCrossProduct`, then `simplexCrossProduct_zero_left`.
   rw [← Category.assoc (simplexCoprojection s ⊗ₘ _)]
   rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_left (C := C)]
   -- LHS: expand d(S⊗T) into face map sum
   rw [Category.assoc, singChain_d_eq_alternatingFaceMapObjD (C := C) (S ⊗ₛ T) q rfl]
   simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-    Preadditive.comp_sum, Preadditive.comp_zsmul, Category.assoc]
+    Preadditive.comp_sum, Preadditive.comp_zsmul]
   -- RHS: fuse (ι s ⊗ ι t) ≫ (𝟙 ⊗ d_T) into (ι s ⊗ (ι t ≫ d_T))
   conv_rhs =>
     rw [← Category.assoc, MonoidalCategory.tensorHom_comp_tensorHom]
@@ -1396,12 +1399,12 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
     ext ⟨i, hi⟩
     simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
       SimplexCategory.Hom.toOrderHom_mk, SimplexCategory.eqToHom_toOrderHom,
-      SimplexCategory.len_mk, Shuffle.sndHom, OrderHom.snd_coe, Fin.val_cast]
+      SimplexCategory.len_mk, Shuffle.sndHom, OrderHom.snd_coe]
     -- After unfolding, both sides are (succAbove j ⟨i, _⟩).val applied through default shuffles
     -- For default (0,n)-shuffle, (default x).2 = x (modulo cast)
     -- For the default (0,n)-shuffle, (default x).2 = x.cast, so both sides reduce to
     -- (δ j ⟨i, _⟩).val after cast normalization.
-    show ((default : Shuffle 0 (q + 1)).1 _).2.val = _
+    change ((default : Shuffle 0 (q + 1)).1 _).2.val = _
     dsimp [Unique_Shuffle_0_n]
     -- LHS: (Fin.cast _ (δ j ⟨i, hi⟩)).val, RHS: (δ j (Fin.cast _ ⟨i, _⟩)).val
     -- Both are (δ j i).val since cast doesn't change the underlying Nat.
@@ -1452,13 +1455,13 @@ lemma eilenbergZilber_comm_case_pq {S T : SSet.{v}} (p q n m : ℕ)
     (show (p + 1) + q = p + (q + 1) by omega)]
   simp only [Category.assoc, ι_eilenbergZilber_f,
     show (ComplexShape.down ℕ).ε₁ (ComplexShape.down ℕ) (ComplexShape.down ℕ) (p + 1, q + 1) = 1
-    from rfl, one_smul, Preadditive.zsmul_comp, Preadditive.comp_zsmul]
+    from rfl, one_smul]
   convert chainCrossProduct_leibniz (C := C) (S := S) (T := T) p q using 1
   congr 1
   · simp [MonoidalCategory.curriedTensor]
   · rw [Units.smul_def, Preadditive.zsmul_comp, Category.assoc, ι_eilenbergZilber_f]
     congr 1
-    simp [ComplexShape.ε₂, ComplexShape.ε]
+    simp
 
 /-- Chain map condition on the `(p+1, 0)` summand.
 Dispatches to `chainCrossProduct_leibniz_right_zero`. -/
@@ -1535,7 +1538,9 @@ lemma eilenbergZilber_comm (S T : SSet.{v}) (n m : ℕ) (hnm : n = m + 1) :
 The cross product of singular chains, packaged as a chain map from the tensor
 product of singular chain complexes to the singular chain complex of the monoidal product:
 ```
-  eilenbergZilber : (singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ T)
+  eilenbergZilber :
+    (singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶
+      singChain (C := C) (S ⊗ T)
 ``` -/
 noncomputable def eilenbergZilber (S T : SSet.{v}) :
     (singChain (C := C) S).tensorObj (singChain (C := C) T) ⟶ singChain (C := C) (S ⊗ₛ T) where
@@ -1573,10 +1578,13 @@ lemma eilenbergZilber_natural {S₁ S₂ T₁ T₂ : SSet.{v}} (f : S₁ ⟶ S�
       eilenbergZilber (C := C) S₂ T₂ := by
   apply HomologicalComplex.Hom.ext; funext n
   apply HomologicalComplex.mapBifunctor.hom_ext; intro p q h
-  simp only [HomologicalComplex.comp_f, Category.assoc, eilenbergZilber]
-  change HomologicalComplex.ιTensorObj (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
+  simp only [HomologicalComplex.comp_f, eilenbergZilber]
+  change
+      HomologicalComplex.ιTensorObj
+        (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
       eilenbergZilber_f S₁ T₁ n ≫ ((SCF (C := C)).map (f ⊗ₘₛ g)).f n =
-    HomologicalComplex.ιTensorObj (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
+    HomologicalComplex.ιTensorObj
+      (singChain (C := C) S₁) (singChain (C := C) T₁) p q n (by omega) ≫
       (HomologicalComplex.tensorHom ((SCF (C := C)).map f) ((SCF (C := C)).map g)).f n ≫
         eilenbergZilber_f S₂ T₂ n
   rw [reassoc_of% (ι_eilenbergZilber_f (C := C) S₁ T₁ p q n h)]
