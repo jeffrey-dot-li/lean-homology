@@ -5,7 +5,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "export PATH=\"$PWD/.devenv/profile/bin:$PATH\"; exec uvx lean-lsp-mcp"
+        "export PATH=\"$PWD/.devenv/profile/bin:$PATH\"; exec uvx --from git+https://github.com/jeffrey-dot-li/lean-lsp-mcp@working lean-lsp-mcp"
       ]
     }
   }
