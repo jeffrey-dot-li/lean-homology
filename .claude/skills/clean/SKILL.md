@@ -16,6 +16,13 @@ Target: $ARGUMENTS
 3. After each fix, re-run `lean_diagnostic_messages severity="error"` to confirm no new errors were introduced.
 4. After clearing a batch of warnings, show the user a summary of what was fixed.
 
+## Lean Linter Workflow
+
+- Treat `lean_diagnostic_messages` and `runLinter` as different signals. `lean_diagnostic_messages` tells you whether the file currently compiles in the editor; `lake exe runLinter` checks extra style linters and may report issues from imported files too.
+- If `runLinter` output looks stale or disagrees with the source you just edited, rebuild the target module first: `lake build <Module>` and then rerun `lake exe runLinter <Module>`.
+- After changing a declaration that affects linter behavior directly (especially `@[simp]` lemmas and `simpNF` issues), do **not** trust an old terminal run. Always rerun `lake build <Module> && lake exe runLinter <Module>`.
+- When linting a module, separate errors in the target file from errors coming from imports before deciding what to fix in `/clean`.
+
 ## What belongs here
 
 - **Deprecation warnings**: replace deprecated names with their canonical Mathlib successors (use `lean_hover_info` or `lean_leansearch` to find the replacement).
