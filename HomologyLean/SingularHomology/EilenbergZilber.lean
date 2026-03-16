@@ -442,6 +442,14 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {S : SSet.{v}} {n m : ℕ} (h : n
   dsimp [simplexCoprojection, singChain, SCF, SSet.singularChainComplexFunctor,
     SimplicialObject.δ, SimplicialObject.whiskering]
   simp [CategoryTheory.Limits.Sigma.ι_comp_map']
+
+private lemma simplexCoprojection_comp_δ {S : SSet.{v}} {n : ℕ}
+    (s : S _⦋n + 1⦌) (i : Fin (n + 2)) :
+    simplexCoprojection (C := C) s ≫
+      (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
+        S).δ i =
+    simplexCoprojection (C := C) (S.δ i s) := by
+  simpa using simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s i
 /-! ### Universal Leibniz rule for the simplex-level cross product
 
 **Proof sketch** (after expanding ∂ into face maps):
@@ -1146,8 +1154,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     conv_rhs => rw [MonoidalCategory.tensorHom_def, MonoidalLinear.smul_whiskerRight,
       Preadditive.zsmul_comp, ← MonoidalCategory.tensorHom_def]
     congr 1; congr 1
-    rw [← simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl (idSimplex (p + 1)) j,
-        eqToHom_refl, Category.id_comp]
+    rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (p + 1)) j]
   · -- Goal 2: right face sum
     congr 1
     simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
@@ -1172,8 +1179,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
         MonoidalLinear.whiskerLeft_smul, Preadditive.zsmul_comp,
         ← MonoidalCategory.tensorHom_def']
     congr 1; congr 1; congr 1
-    rw [← simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl (idSimplex (q + 1)) j,
-        eqToHom_refl, Category.id_comp]
+    rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (q + 1)) j]
 
 /-- Simplex-level Leibniz rule for `chainCrossProduct`: the cross product of
 `(s, t)` composed with the boundary equals the signed sum of face-map cross products.
@@ -1301,20 +1307,13 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   rw [Preadditive.zsmul_comp]
   congr 1
   -- LHS: fold ι(shuffleSimplex ...) ≫ δⱼ as ι(δⱼ(shuffleSimplex ...))
-  have fold_lhs := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl
+  have fold_lhs := simplexCoprojection_comp_δ (C := C)
     (shuffleSimplex s t default (show p + 1 = (p + 1) + 0 by omega)) j
-  simp only [eqToHom_refl, Category.id_comp] at fold_lhs
   rw [fold_lhs]
   -- RHS: fold ι s ≫ δⱼ as ι(δⱼ(s))
   conv_rhs =>
     enter [1, 1]
-    rw [show simplexCoprojection (C := C) s ≫
-        (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
-          S).δ j =
-      simplexCoprojection (C := C) (S.δ j s) from by
-      have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s j
-      simp only [eqToHom_refl, Category.id_comp] at this
-      exact this]
+    rw [simplexCoprojection_comp_δ (C := C) s j]
   -- RHS: use coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_right
   rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_right (C := C)]
@@ -1381,20 +1380,13 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
   rw [Preadditive.zsmul_comp]
   congr 1
   -- LHS: fold ι(shuffleSimplex ...) ≫ δⱼ as ι(δⱼ(shuffleSimplex ...))
-  have fold_lhs := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl
+  have fold_lhs := simplexCoprojection_comp_δ (C := C)
     (shuffleSimplex s t default (show q + 1 = 0 + (q + 1) by omega)) j
-  simp only [eqToHom_refl, Category.id_comp] at fold_lhs
   rw [fold_lhs]
   -- RHS: fold ι t ≫ δⱼ as ι(δⱼ(t))
   conv_rhs =>
     enter [1, 2]
-    rw [show simplexCoprojection (C := C) t ≫
-        (((SimplicialObject.whiskering (Type v) C).obj ((sigmaConst (C := C)).obj (𝟙_ C))).obj
-          T).δ j =
-      simplexCoprojection (C := C) (T.δ j t) from by
-      have := simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl t j
-      simp only [eqToHom_refl, Category.id_comp] at this
-      exact this]
+    rw [simplexCoprojection_comp_δ (C := C) t j]
   -- RHS: use coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_left
   rw [coprojection_tensorHom_chainCrossProduct]
   rw [simplexCrossProduct_zero_left (C := C)]
