@@ -355,8 +355,7 @@ lemma simplexCrossProduct_zero_zero {S T : SSet.{v}}
     simplexCoprojection (C := C) s ≫ ((SCF (C := C)).map f).f n =
     simplexCoprojection (f.app _ s) := by
   dsimp [simplexCoprojection, SCF, SSet.singularChainComplexFunctor]
-  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
-  simp only [Category.id_comp]
+  simp [CategoryTheory.Limits.Sigma.ι_comp_map']
 
 /-- Factoring a coprojection through the identity simplex: `ι s` equals
 `ι (objEquiv.symm (𝟙 ⦋n⦌))` composed with the chain map induced by `yonedaEquiv.symm s`.
@@ -418,8 +417,7 @@ lemma simplexCoprojection_comp_eqToHom_comp_δ {S : SSet.{v}} {n m : ℕ} (h : n
   simp only [eqToHom_refl, Category.id_comp]
   dsimp [simplexCoprojection, singChain, SCF, SSet.singularChainComplexFunctor,
     SimplicialObject.δ, SimplicialObject.whiskering]
-  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
-  simp
+  simp [CategoryTheory.Limits.Sigma.ι_comp_map']
 /-! ### Universal Leibniz rule for the simplex-level cross product
 
 **Proof sketch** (after expanding ∂ into face maps):
@@ -576,12 +574,12 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         · refine ⟨(j, ν), Finset.mem_univ _, ?_⟩
           apply Sigma.ext hμ_eq.symm
           apply heq_of_eq; apply Fin.ext
-          simp [Fin.val_cast] at hr_eq ⊢; omega
+          simpa [Fin.val_cast] using hr_eq
         · exfalso
           have hnotleft := Shuffle.insertRightStep_not_isLeftType ν k
           apply hnotleft
           have hrv : r.val = (Shuffle.insertRightIndex ν k).val := by
-            simp [Fin.val_cast] at hr_eq; omega
+            simpa using hr_eq.symm
           subst hμ_eq
           have : isLeftType (Shuffle.insertRightStep ν k) r = Shuffle.isLeftStep
             (Shuffle.insertRightStep ν k) ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩ := rfl
@@ -640,9 +638,9 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
             (Shuffle.insertLeftStep ν j) ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩ := rfl
           rw [this]
           convert hleft using 2; congr 1
-          simp [Fin.val_cast] at hr_eq⊢; omega
+          simpa using hr_eq.symm
         · exact ⟨(k, ν), Finset.mem_univ _,
-            Sigma.ext hμ_eq.symm (heq_of_eq (Fin.ext (by simp [Fin.val_cast] at hr_eq ⊢; omega)))⟩
+            Sigma.ext hμ_eq.symm (heq_of_eq (Fin.ext (by simpa using hr_eq)))⟩
       · -- Summand equality (right case)
         intro ⟨k, ν⟩ _
         dsimp only
@@ -1437,7 +1435,7 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
     -- Now: (δ j ⟨i, hi⟩).val = (δ j (↑default ⟨i, ⋯⟩).2).val
     -- Show the argument to δ j has the same val
     have : ((default : Shuffle 0 q).1 (⟨i, by
-        simp [SimplexCategory.len_mk] at hi; omega⟩ : Fin (0 + q + 1))).2.val = i :=
+        simpa [SimplexCategory.len_mk] using hi⟩ : Fin (0 + q + 1))).2.val = i :=
       snd_default q _
     congr 1
 
