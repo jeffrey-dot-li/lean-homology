@@ -450,6 +450,22 @@ private lemma simplexCoprojection_comp_δ {S : SSet.{v}} {n : ℕ}
         S).δ i =
     simplexCoprojection (C := C) (S.δ i s) := by
   simpa using simplexCoprojection_comp_eqToHom_comp_δ (C := C) rfl s i
+
+-- These generic `tensorHom`/scalar linearity lemmas should be upstreamed to
+-- `Mathlib/CategoryTheory/Monoidal/Linear.lean` when this file is PR'd.
+omit [HasCoproducts C] in
+private lemma zsmul_tensorHom [MonoidalPreadditive C] [MonoidalLinear ℤ C] {W X Y Z : C}
+    (r : ℤ) (f : W ⟶ X) (g : Y ⟶ Z) :
+    (r • f) ⊗ₘ g = r • (f ⊗ₘ g) := by
+  rw [MonoidalCategory.tensorHom_def, MonoidalLinear.smul_whiskerRight,
+    Preadditive.zsmul_comp, ← MonoidalCategory.tensorHom_def]
+
+omit [HasCoproducts C] in
+private lemma tensorHom_zsmul [MonoidalPreadditive C] [MonoidalLinear ℤ C] {W X Y Z : C}
+    (r : ℤ) (f : W ⟶ X) (g : Y ⟶ Z) :
+    f ⊗ₘ (r • g) = r • (f ⊗ₘ g) := by
+  rw [MonoidalCategory.tensorHom_def', MonoidalLinear.whiskerLeft_smul,
+    Preadditive.zsmul_comp, ← MonoidalCategory.tensorHom_def']
 /-! ### Universal Leibniz rule for the simplex-level cross product
 
 **Proof sketch** (after expanding ∂ into face maps):
@@ -1151,8 +1167,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     rw [← Preadditive.zsmul_comp, ← Preadditive.zsmul_comp]
     congr 1
     conv_rhs => enter [1]; rw [Preadditive.zsmul_comp]
-    conv_rhs => rw [MonoidalCategory.tensorHom_def, MonoidalLinear.smul_whiskerRight,
-      Preadditive.zsmul_comp, ← MonoidalCategory.tensorHom_def]
+    conv_rhs => rw [zsmul_tensorHom]
     congr 1; congr 1
     rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (p + 1)) j]
   · -- Goal 2: right face sum
@@ -1301,9 +1316,7 @@ theorem chainCrossProduct_leibniz_right_zero {S T : SSet.{v}} (p : ℕ) :
   -- Match term by term
   apply Finset.sum_congr rfl; intro j _
   -- Pull (-1)^j out of the tensor on the RHS
-  conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def]
-  rw [MonoidalLinear.smul_whiskerRight, Preadditive.zsmul_comp,
-      ← MonoidalCategory.tensorHom_def]
+  conv_rhs => enter [1]; rw [zsmul_tensorHom]
   rw [Preadditive.zsmul_comp]
   congr 1
   -- LHS: fold ι(shuffleSimplex ...) ≫ δⱼ as ι(δⱼ(shuffleSimplex ...))
@@ -1374,9 +1387,7 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
   -- Match term by term
   apply Finset.sum_congr rfl; intro j _
   -- Pull (-1)^j out of the tensor on the RHS
-  conv_rhs => enter [1]; rw [MonoidalCategory.tensorHom_def']
-  rw [MonoidalLinear.whiskerLeft_smul, Preadditive.zsmul_comp,
-      ← MonoidalCategory.tensorHom_def']
+  conv_rhs => enter [1]; rw [tensorHom_zsmul]
   rw [Preadditive.zsmul_comp]
   congr 1
   -- LHS: fold ι(shuffleSimplex ...) ≫ δⱼ as ι(δⱼ(shuffleSimplex ...))
