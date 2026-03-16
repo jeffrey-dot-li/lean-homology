@@ -274,6 +274,10 @@ private abbrev idSimplex (n : ℕ) : Δ[n] _⦋n⦌ := SSet.stdSimplex.objEquiv.
 private abbrev faceSimplex {n : ℕ} (j : Fin (n + 2)) : Δ[n + 1] _⦋n⦌ :=
   SSet.stdSimplex.objEquiv.symm (SimplexCategory.δ j)
 
+private lemma faceSimplex_eq_delta_idSimplex {n : ℕ} (j : Fin (n + 2)) :
+    faceSimplex j = (Δ[n + 1] : SSet).δ j (idSimplex (n + 1)) := by
+  simp [faceSimplex, idSimplex, SimplicialObject.δ, SSet.stdSimplex.map_apply]
+
 section BasicChainComplex
 variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [MonoidalCategory C]
 
@@ -367,6 +371,27 @@ lemma simplexCoprojection_factor {S : SSet.{v}} {n : ℕ} (s : S _⦋n⦌) :
       ((SCF (C := C)).map (SSet.yonedaEquiv.symm s)).f n := by
   rw [simplexCoprojection_comp_SCF_map, yonedaEquiv_symm_app]
   simp
+
+/-- The pair of simplices obtained by applying `yonedaEquiv.symm s` and `yonedaEquiv.symm t`
+to the two projections of a shuffle is exactly `shuffleSimplex s t μ`. -/
+private lemma yoneda_pair_eq_shuffleSimplex {S T : SSet.{v}} {p q n : ℕ}
+    (s : S _⦋p⦌) (t : T _⦋q⦌) (μ : Shuffle p q) (hn : n = p + q := by omega) :
+    ((SSet.yonedaEquiv.symm s).app _ <|
+        Δ[p].map (eqToHom (congrArg SimplexCategory.mk hn)).op
+          (Δ[p].map (Shuffle.fstHom μ).op
+            (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋p⦌))),
+      (SSet.yonedaEquiv.symm t).app _ <|
+        Δ[q].map (eqToHom (congrArg SimplexCategory.mk hn)).op
+          (Δ[q].map (Shuffle.sndHom μ).op
+            (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋q⦌)))) =
+      shuffleSimplex s t μ hn := by
+  simp only [shuffleSimplex]
+  refine Prod.ext ?_ ?_ <;> {
+    change (SSet.yonedaEquiv.symm _).app _ (Δ[_].map _ (SSet.stdSimplex.objEquiv.symm _)) = _
+    rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
+    simp only [SSet.stdSimplex.objEquiv, SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
+    simp [Equiv.ulift]
+  }
 
 lemma crossProduct_natural_pure_tensor {S S' T T' : SSet.{v}}
     (f : S ⟶ S') (g : T ⟶ T') {p q n : ℕ}
@@ -689,14 +714,9 @@ lemma simplexCrossProduct_zero_right {S T : SSet.{v}} {n : ℕ}
     dsimp [Unique_Shuffle_n_0]; split_ifs <;> rfl
   rw [hd, one_smul, simplexCoprojection_comp_SCF_map]
   congr 1
-  simp only [SSet.tensorHom_app_apply, shuffleSimplex, SSet.tensorObj_map_fst,
-    SSet.tensorObj_map_snd]
-  refine Prod.ext ?_ ?_ <;> {
-    change (SSet.yonedaEquiv.symm _).app _ (Δ[_].map _ (SSet.stdSimplex.objEquiv.symm _)) = _
-    rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
-    simp only [SSet.stdSimplex.objEquiv, SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
-    simp [Equiv.ulift]
-  }
+  simpa only [SSet.tensorHom_app_apply] using
+    (yoneda_pair_eq_shuffleSimplex (s := s) (t := c) (μ := default)
+      (hn := show n = n + 0 by omega))
 
 /-- For `p = 0`, the cross product of a `0`-simplex `c` in `S` with an `n`-simplex `s`
 in `T` reduces to a single coprojection: there is a unique `(0, n)`-shuffle with sign `1`. -/
@@ -719,14 +739,9 @@ lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
     · rfl
   rw [hd, one_smul, simplexCoprojection_comp_SCF_map]
   congr 1
-  simp only [SSet.tensorHom_app_apply, shuffleSimplex, SSet.tensorObj_map_fst,
-    SSet.tensorObj_map_snd]
-  refine Prod.ext ?_ ?_ <;> {
-    change (SSet.yonedaEquiv.symm _).app _ (Δ[_].map _ (SSet.stdSimplex.objEquiv.symm _)) = _
-    rw [SSet.stdSimplex.map_apply, yonedaEquiv_symm_app]
-    simp only [SSet.stdSimplex.objEquiv, SSet.tensorObj_map_fst, SSet.tensorObj_map_snd]
-    simp [Equiv.ulift]
-  }
+  simpa only [SSet.tensorHom_app_apply] using
+    (yoneda_pair_eq_shuffleSimplex (s := c) (t := s) (μ := default)
+      (hn := show n = 0 + n by omega))
 
 section FreeForgetful
 variable [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
@@ -1124,8 +1139,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     apply Finset.sum_congr rfl; intro j _
     conv_lhs =>
       enter [2, 1, 1, 1]
-      rw [show faceSimplex j = (Δ[p + 1] : SSet).δ j (idSimplex (p + 1)) from by
-        simp [faceSimplex, idSimplex, SimplicialObject.δ, SSet.stdSimplex.map_apply]]
+      rw [faceSimplex_eq_delta_idSimplex]
     rw [← Preadditive.zsmul_comp, ← Preadditive.zsmul_comp]
     congr 1
     conv_rhs => enter [1]; rw [Preadditive.zsmul_comp]
@@ -1148,8 +1162,7 @@ private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
     apply Finset.sum_congr rfl; intro j _
     conv_lhs =>
       enter [2, 1, 2]
-      rw [show faceSimplex j = (Δ[q + 1] : SSet).δ j (idSimplex (q + 1)) from by
-        simp [faceSimplex, idSimplex, SimplicialObject.δ, SSet.stdSimplex.map_apply]]
+      rw [faceSimplex_eq_delta_idSimplex]
     rw [← Preadditive.zsmul_comp]
     conv_rhs =>
       enter [1, 2]; rw [← Preadditive.zsmul_comp]
