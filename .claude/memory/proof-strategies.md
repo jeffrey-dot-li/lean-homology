@@ -118,6 +118,25 @@ definitionally equal?" If yes, restructure to restore definitional equality — 
 
 ---
 
+## Audit `erw` before keeping it
+
+When cleaning a proof for Mathlib style, do **not** assume an existing `erw` is essential.
+In `EilenbergZilber.lean`, most `erw`s fell into one of these easier patterns:
+
+1. **Plain `rw`/`simp` already works.** Many `erw`s were just ordinary rewrites followed by
+   `𝟙 ≫ f = f`, so `rw [lemma]` or `simp [lemma]` was enough.
+2. **The goal needs reshaping, not stronger rewriting.** For naturality statements, `rw`
+   failed only because the target was not syntactically in the `lhs ≫ f` form. A short
+   `change ... ≫ f = _` made `rw [← hnat]` work.
+3. **The lemma needs explicit instantiation.** If the goal has an arbitrary term that is only
+   definitionally `objEquiv.symm g` or similar, instantiate the bridge lemma explicitly rather
+   than asking `rw` to guess through the coercion layer.
+
+Rule of thumb: try `rw`/`simp` first, then `change`, and only keep `erw` if both fail for a
+real definitional-equality reason.
+
+---
+
 ## `slice_lhs`/`slice_rhs` for categorical compositions
 
 When the goal is `a ≫ b ≫ c ≫ d = ...` and you need to rewrite a specific pair (e.g.,

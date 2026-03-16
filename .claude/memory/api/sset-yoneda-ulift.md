@@ -50,6 +50,25 @@ When a goal contains `(yonedaEquiv.symm x).app m (Δ[n].map g (objEquiv.symm f))
 
 No `erw` needed anywhere.
 
+## Arbitrary `x : Δ[n].obj d`
+
+When the goal is
+
+```lean
+(SSet.yonedaEquiv.symm (SSet.stdSimplex.objEquiv.symm (𝟙 ⦋n⦌))).app d x = ...
+```
+
+with `x : Δ[n].obj d`, plain `rw [yonedaEquiv_symm_objEquiv_symm_app]` fails because `x` is
+not syntactically `SSet.stdSimplex.objEquiv.symm g`, even though it is definitionally so.
+Instead, instantiate the lemma explicitly with `g := x.down`:
+
+```lean
+simpa using
+  (yonedaEquiv_symm_objEquiv_symm_app (f := 𝟙 ⦋n⦌) (g := x.down))
+```
+
+This removes the last `erw`-style `ULift` bridge without adding a new helper lemma.
+
 ## Key Mathlib lemmas
 
 | Lemma | What it does |
