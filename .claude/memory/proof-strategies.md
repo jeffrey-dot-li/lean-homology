@@ -53,6 +53,24 @@ slice_lhs 3 4 => erw [Functor.map_id, ...]     -- targets morphisms 3-4
 - `have` with manual restatement: **last resort only**, when the subexpression genuinely
   can't be targeted by `conv`/`slice` (e.g., it spans both sides of the equation).
 
+**`tactic =>` inside `conv`/`slice` for multi-step rewrites:**
+When the rewrite requires multiple steps (e.g., unfold an equiv, apply a spec lemma),
+use `tactic =>` inside the conv block to drop back into tactic mode on the isolated
+subexpression. Use **`rewrite`** (not `rw`) — `rw` tries `rfl` after rewriting, which
+closes the conv goal prematurely and leaves the wrong term in the outer goal.
+
+```lean
+-- Goal: ... ≫ (f ⊗ₘ g) ≫ crossProduct ≫ ... = ...
+-- Want to rewrite (f ⊗ₘ g) ≫ crossProduct to (λ_ _).hom ≫ crossProduct'(s, c)
+slice_lhs 2 3 =>
+  tactic =>
+    rewrite [← Iso.inv_comp_eq (λ_ (𝟙_ C)), ← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec ...) (s, c₀)
+```
+
+Key: `rewrite` applies the substitution without the `rfl` closer, so the conv block
+sees the fully rewritten term and propagates it correctly to the outer goal.
+
 ### Extract rewrite lemmas to avoid unfolding
 - If the proof needs to unfold a definition, push through it, and re-fold — that's a missing lemma.
 - Example: `mι_comp_map` captures `mι s ≫ chain_map f = mι (f_*(s))` without ever exposing `colimit.ι_desc` or `TopCat.toSSet` internals.
