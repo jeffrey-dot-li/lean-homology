@@ -1708,4 +1708,266 @@ noncomputable def TopCat.eilenbergZilberNatTrans :
       (singularChainComplexFunctor.{v} C).obj (𝟙_ C) :=
   TopCat.eilenbergZilberNatTrans'
 
+namespace HomologyLean.SingularHomology
+
+/-- The standard topological `p`-simplex. -/
+abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
+  SimplexCategory.toTop.obj (SimplexCategory.mk p)
+
+notation "Δ[" p "]" => stdSimplex p
+
+/-- Singular chains with coefficients in the monoidal unit. -/
+abbrev SCF : TopCat.{v} ⥤ ChainComplex C ℕ :=
+  (singularChainComplexFunctor.{v} C).obj (𝟙_ C)
+
+/-- The singular chain complex of a topological space with coefficients in `𝟙_ C`. -/
+abbrev singChain (X : TopCat.{v}) : ChainComplex C ℕ :=
+  (SCF (C := C)).obj X
+
+/-- A singular `n`-simplex in `X`. -/
+abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
+  (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
+
+/-- Convenience constructor from a map `Δ[n] ⟶ X` to the corresponding singular simplex. -/
+noncomputable abbrev SingularSimplex.ofΔ {X : TopCat.{v}} {n : ℕ} (f : stdSimplex n ⟶ X) :
+    SingularSimplex X n :=
+  ULift.up f
+
+lemma SingularSimplex.ofΔ_down {X : TopCat.{v}} {n : ℕ} (f : stdSimplex n ⟶ X) :
+    (SingularSimplex.ofΔ (X := X) (n := n) f).down = f := by
+  rfl
+
+notation "⟪" f "⟫ₛ" => SingularSimplex.ofΔ f
+
+/-- The coprojection of a singular simplex into the corresponding chain group. -/
+noncomputable abbrev simplexCoprojection {X : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) : 𝟙_ C ⟶ (singChain (C := C) X).X n :=
+  Sigma.ι (fun _ : SingularSimplex X n => 𝟙_ C) s
+
+omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
+  [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)] [(forget C).IsRightAdjoint]
+  [(forget C).leftAdjoint.Monoidal] [(forget C).LaxMonoidal]
+  [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+  [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
+  [MonoidalLinear ℤ C]
+  [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)] in
+@[simp] lemma simplexCoprojection_comp_SCF_map {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (f : X ⟶ Y) :
+    simplexCoprojection (C := C) s ≫ ((SCF (C := C)).map f).f n =
+      simplexCoprojection (C := C) (⟪s.down ≫ f⟫ₛ : SingularSimplex Y n) := by
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor,
+    SingularSimplex.ofΔ]
+  rw [CategoryTheory.Limits.Sigma.ι_comp_map']
+  simp only [Category.id_comp]
+  rfl
+
+/-- The topological Eilenberg-Zilber chain map, obtained from the public natural transformation. -/
+noncomputable abbrev eilenbergZilber (X Y : TopCat.{v}) :
+    (singChain (C := C) X).tensorObj (singChain (C := C) Y) ⟶
+      singChain (C := C) (X ⨯ Y) :=
+  (TopCat.eilenbergZilberNatTrans (C := C)).app (X, Y)
+
+/-- The degreewise cross product map induced by the topological Eilenberg-Zilber chain map. -/
+noncomputable def chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
+    (h : p + q = n) :
+    (singChain (C := C) X).X p ⊗ (singChain (C := C) Y).X q ⟶
+      (singChain (C := C) (X ⨯ Y)).X n :=
+  HomologicalComplex.ιTensorObj
+      (singChain (C := C) X) (singChain (C := C) Y) p q n h ≫
+    (eilenbergZilber (C := C) X Y).f n
+
+/-! ### Universal-property API for the topological cross product -/
+
+/-- The simplex-level topological cross product, obtained by transporting the SSet-level
+simplex cross product along the product comparison isomorphism
+`TopCat.toSSet_prodNatIso.inv.app (X, Y)`.
+
+This definition serves as an **opaque intermediate** in downstream proofs.
+The typical usage pattern is:
+
+1. Use `simplexCoprojection_comp_chainCrossProduct` to collapse chain-level
+   tensor/unitor/cross-product plumbing into `simplexCrossProduct s t`.
+2. Unfold this definition with `dsimp only [simplexCrossProduct]` to expose
+   `SSetEZ.simplexCrossProduct s t ≫ (SCF.map toSSet_prodNatIso.inv.app).f n`.
+3. Fold the `toSSet_prodNatIso` transport into the adjacent `SCF.map` via
+   `← Functor.map_comp`, producing a single `SCF.map (toSSet_prodNatIso.inv.app ≫ f)`.
+4. Apply SSet-level case lemmas (e.g., `SSetEZ.simplexCrossProduct_zero_right`)
+   where no `toSSet_prodNatIso` bridge is needed, then fold back with
+   `SSetEZ.simplexCoprojection_comp_SCF_map`.
+
+**Do not** write TopCat-specific case lemmas that expand `simplexCrossProduct`
+into a concrete coprojection (e.g., `simplexCrossProduct_zero_right`). Such
+lemmas require evaluating `toSSet_prodNatIso.inv.app` on specific simplices,
+which is painful and unnecessary.
+
+**Chain-level identities** (e.g., the Leibniz rule `chainCrossProduct ≫ d = ...`)
+should **not** go through `simplexCrossProduct` at all. Instead, unfold
+`chainCrossProduct` to `ιTensorObj ≫ eilenbergZilber.f`, use the chain map
+condition `eilenbergZilber.comm'`, and decompose the tensor differential via
+`mapBifunctor.d_eq` / `ι_D₁` / `ι_D₂` / `d₁_eq_zero` / `d₂_eq`. -/
+noncomputable def simplexCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
+    (s : SingularSimplex X p) (t : SingularSimplex Y q)
+    (hn : n = p + q := by omega) :
+    𝟙_ C ⟶ (singChain (C := C) (X ⨯ Y)).X n :=
+  (HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct
+      (C := C) (S := TopCat.toSSet.obj X) (T := TopCat.toSSet.obj Y) s t hn) ≫
+    (((SSet.singularChainComplexFunctor.{v} C).obj (𝟙_ C)).map
+      (TopCat.toSSet_prodNatIso.inv.app (X, Y))).f n
+
+/-- Curried form of `simplexCrossProduct`. -/
+noncomputable def simplexCrossProduct' {X Y : TopCat.{v}} {p q n : ℕ}
+    (hn : n = p + q := by omega) :
+    SingularSimplex X p × SingularSimplex Y q →
+      Hom[𝟙_ C |-].obj ((singChain (C := C) (X ⨯ Y)).X n) :=
+  fun ⟨s, t⟩ => simplexCrossProduct (C := C) s t hn
+
+/-- Universal property for morphisms out of `C_p(X) ⊗ C_q(Y)`:
+such morphisms are determined by their values on pairs of singular simplices.
+
+This is the TopCat transport of the SSet generator-level universal property. -/
+noncomputable def chainTensorHomEquiv {X Y : TopCat.{v}} {p q : ℕ} (M : C) :
+    ((singChain (C := C) X).X p ⊗ (singChain (C := C) Y).X q ⟶ M) ≃
+      (SingularSimplex X p × SingularSimplex Y q → Hom[𝟙_ C |-].obj M) := by
+  sorry
+
+/-- Evaluating `chainTensorHomEquiv` on a pair of simplex coprojections. -/
+lemma chainTensorHomEquiv_apply {X Y : TopCat.{v}} {p q : ℕ} {M : C}
+    (f : (singChain (C := C) X).X p ⊗ (singChain (C := C) Y).X q ⟶ M)
+    (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    chainTensorHomEquiv (C := C) M f (s, t) =
+      (λ_ (𝟙_ C)).inv ≫
+        MonoidalCategory.tensorHom (simplexCoprojection (C := C) s)
+          (simplexCoprojection (C := C) t) ≫
+        f := by
+  sorry
+
+/-- Universal-property characterization of `chainCrossProduct`: under
+`chainTensorHomEquiv`, it corresponds to the simplex-level cross product. -/
+lemma chainCrossProduct.spec {X Y : TopCat.{v}} {p q n : ℕ}
+    (h : p + q = n) :
+    chainTensorHomEquiv (C := C) ((singChain (C := C) (X ⨯ Y)).X n)
+      (chainCrossProduct (C := C) (X := X) (Y := Y) h) =
+    simplexCrossProduct' (C := C) (X := X) (Y := Y) h.symm := by
+  sorry
+
+/-- Two morphisms out of `C_p(X) ⊗ C_q(Y)` are equal if they agree on all pairs
+of simplex generators. -/
+lemma chainCrossProduct.ext {X Y : TopCat.{v}} {p q : ℕ} {M : C}
+    {f g : (singChain (C := C) X).X p ⊗ (singChain (C := C) Y).X q ⟶ M}
+    (h :
+      chainTensorHomEquiv (C := C) M f =
+        chainTensorHomEquiv (C := C) M g) :
+    f = g := by
+  sorry
+
+/-- Evaluating `chainCrossProduct` on a pair of simplex generators produces the
+corresponding simplex-level cross product. This packages the `ρ_`/`tensorHom`
+bookkeeping needed to pass from `chainCrossProduct.spec` to an actual basis
+evaluation formula.
+
+**This is the primary entry point for downstream proofs** (e.g., homotopy
+invariance): use it to collapse chain-level plumbing into `simplexCrossProduct s t`,
+then follow the usage pattern documented on `simplexCrossProduct`. -/
+lemma simplexCoprojection_comp_chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
+    (h : p + q = n) (s : SingularSimplex X p) (t : SingularSimplex Y q) :
+    simplexCoprojection (C := C) s ≫
+      (ρ_ ((singChain (C := C) X).X p)).inv ≫
+      (𝟙 ((singChain (C := C) X).X p) ⊗ₘ simplexCoprojection (C := C) t) ≫
+      chainCrossProduct (C := C) (X := X) (Y := Y) h =
+    simplexCrossProduct (C := C) s t h.symm := by
+  slice_lhs 1 2 => erw [MonoidalCategory.rightUnitor_inv_naturality]
+  simp only [Category.assoc]
+  rw [← MonoidalCategory.tensorHom_id]
+  rw [← Category.assoc (simplexCoprojection (C := C) s ⊗ₘ _)]
+  erw [MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+  rw [Category.id_comp]
+  have key : (simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection (C := C) t) ≫
+      chainCrossProduct (C := C) (X := X) (Y := Y) h =
+      (λ_ (𝟙_ C)).hom ≫ simplexCrossProduct (C := C) s t h.symm := by
+    rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
+    rw [← chainTensorHomEquiv_apply]
+    exact congrFun (chainCrossProduct.spec (C := C) (X := X) (Y := Y) h) (s, t)
+  have hkey' :
+      (ρ_ (𝟙_ C)).inv ≫
+          ((simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection (C := C) t) ≫
+            chainCrossProduct (C := C) (X := X) (Y := Y) h) =
+        (ρ_ (𝟙_ C)).inv ≫ ((λ_ (𝟙_ C)).hom ≫ simplexCrossProduct (C := C) s t h.symm) := by
+    simpa only [Category.assoc] using congrArg (fun k => (ρ_ (𝟙_ C)).inv ≫ k) key
+  rw [hkey']
+  have hunit : (ρ_ (𝟙_ C)).inv ≫ (λ_ (𝟙_ C)).hom = 𝟙 _ := by
+    erw [MonoidalCategory.unitors_equal]
+    exact (ρ_ _).inv_hom_id
+  simpa only [Category.assoc, Category.id_comp] using
+    congrArg (fun k => k ≫ simplexCrossProduct (C := C) s t h.symm) hunit
+
+/-- TopCat transport of the `q = 0` simplex cross-product formula. -/
+lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
+    simplexCrossProduct (C := C) s c (show n = n + 0 by omega) =
+      simplexCoprojection (C := C)
+        (⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ :
+          SingularSimplex (X ⨯ Y) n) := by
+  rw [simplexCrossProduct, HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct_zero_right,
+    HomologyLean.SingularHomology.SSetEZ.simplexCoprojection_comp_SCF_map]
+  sorry
+
+/-- The product comparison isomorphism for `TopCat.toSSet` sends the pair of
+singular simplices `(s, t)` to the singular simplex of `X × Y` induced by
+`prod.lift s.down t.down`. -/
+@[simp] lemma toSSet_prodNatIso_inv_app_prodSimplex {X Y : TopCat.{v}} {n : ℕ}
+    (s : SingularSimplex X n) (t : SingularSimplex Y n) :
+    (TopCat.toSSet_prodNatIso.inv.app (X, Y)).app (Opposite.op ⦋n⦌)
+      (HomologyLean.SingularHomology.SSetEZ.prodSimplex s t) =
+    (⟪prod.lift s.down t.down⟫ₛ : SingularSimplex (X ⨯ Y) n) := by
+  sorry
+
+omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
+  [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)] [(forget C).IsRightAdjoint]
+  [(forget C).leftAdjoint.Monoidal] [(forget C).LaxMonoidal]
+  [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+  [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
+  [MonoidalLinear ℤ C]
+  [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)] in
+/-- Temporary check that the TopCat transport API is strong enough to recover
+the `0`-simplex cross-product formula from the SSet theorem. -/
+lemma simplexCrossProduct_zero_zero {X Y : TopCat.{v}}
+    (s : SingularSimplex X 0) (t : SingularSimplex Y 0) :
+    simplexCrossProduct (C := C) s t =
+      simplexCoprojection (C := C) (⟪prod.lift s.down t.down⟫ₛ : SingularSimplex (X ⨯ Y) 0) := by
+  rw [simplexCrossProduct, HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct_zero_zero,
+    HomologyLean.SingularHomology.SSetEZ.simplexCoprojection_comp_SCF_map]
+  exact congrArg (simplexCoprojection (C := C)) (toSSet_prodNatIso_inv_app_prodSimplex s t)
+
+omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
+  [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)] [(forget C).IsRightAdjoint]
+  [(forget C).leftAdjoint.Monoidal] [(forget C).LaxMonoidal]
+  [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
+  [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
+  [MonoidalLinear ℤ C]
+  [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)] in
+/-- The boundary of the fundamental singular `1`-simplex of `Δ[1]` is the difference
+of the two endpoint `0`-simplices. -/
+lemma boundary_identity_1simplex_generic :
+    simplexCoprojection (C := C)
+        (⟪𝟙 (stdSimplex 1 : TopCat.{v})⟫ₛ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 1) ≫
+      (singChain (C := C) (stdSimplex 1 : TopCat.{v})).d 1 0 =
+    simplexCoprojection (C := C)
+        (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
+          SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) -
+      simplexCoprojection (C := C)
+        (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
+          SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) := by
+  simp only [singChain]
+  dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
+  simp only [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD]
+  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul]
+  rw [Fin.sum_univ_two]
+  simp only [Fin.val_zero, pow_zero, one_smul, Fin.val_one, pow_one, neg_smul, sub_eq_add_neg]
+  simp only [simplexCoprojection]
+  erw [Sigma.ι_comp_map', Sigma.ι_comp_map']
+  simp only [Category.id_comp]
+  congr 1
+
+end HomologyLean.SingularHomology
+
 end TopCatEilenbergZilber

@@ -220,7 +220,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
     simp only []
     dsimp [SSetEZ.shuffleSimplex, c₀, Hmap, SSetEZ.prodSimplex]
     simp only [Shuffle.fstHom_default_zero_right, Shuffle.sndHom_default_zero_right,
-      FunctorToTypes.map_comp_apply, FunctorToTypes.map_id_apply]
+        FunctorToTypes.map_id_apply]
     erw [toSSet_prodNatIso_inv_app_prodSimplex]
     -- Rewrite toSSet.obj(X).map(eqToHom ...).op s ↦ eqToHom ≫ s.down, avoiding toSSet internals
     simp only [TopCat.toSSet_obj_map_eqToHom_op_down]
@@ -243,7 +243,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
     simp only []
     dsimp [SSetEZ.shuffleSimplex, c₁, Hmap, SSetEZ.prodSimplex]
     simp only [Shuffle.fstHom_default_zero_right, Shuffle.sndHom_default_zero_right,
-      FunctorToTypes.map_comp_apply, FunctorToTypes.map_id_apply]
+        FunctorToTypes.map_id_apply]
     erw [toSSet_prodNatIso_inv_app_prodSimplex]
     simp only [TopCat.toSSet_obj_map_eqToHom_op_down]
     dsimp [TopCat.toSSet]
@@ -284,7 +284,7 @@ theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') (n : ℕ) :
     ((singularHomologyFunctor C n).obj (𝟙_ C)).map f =
       ((singularHomologyFunctor C n).obj (𝟙_ C)).map g := by
-  sorry
+  exact (singularChain_chainHomotopy_of_homotopy (C := C) H).homologyMap_eq n |>.symm
 
 /-- Homotopy equivalent spaces have isomorphic singular homology. -/
 noncomputable def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}}
@@ -297,8 +297,10 @@ noncomputable def singularHomology_iso_of_homotopyEquiv {X Y : TopCat.{v}}
   hom := ((singularHomologyFunctor C n).obj (𝟙_ C)).map f
   inv := ((singularHomologyFunctor C n).obj (𝟙_ C)).map g
   hom_inv_id := by
-    sorry
+    rw [← Functor.map_comp, singularHomology_map_eq_of_homotopy (C := C) hfg n]
+    exact ((singularHomologyFunctor C n).obj (𝟙_ C)).map_id X
   inv_hom_id := by
-    sorry
+    rw [← Functor.map_comp, singularHomology_map_eq_of_homotopy (C := C) hgf n]
+    exact ((singularHomologyFunctor C n).obj (𝟙_ C)).map_id Y
 
 end HomologyLean.SingularHomology.HomotopyInvariance2
