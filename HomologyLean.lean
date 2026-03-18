@@ -1,4 +1,5 @@
 import HomologyLean.Basic
+import HomologyLean.Tactic.NamePartsTest
 
 -- Cellular Homology
 import HomologyLean.CellularHomology.CellularChainComplex
