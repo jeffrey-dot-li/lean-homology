@@ -28,9 +28,8 @@ elab "name_parts " pat:term : tactic => withMainContext do
   -- Elaborate the pattern with inPattern=true so that ?name holes become natural mvars
   -- (not syntheticOpaque). Natural mvars can be assigned by isDefEq, avoiding stuck
   -- typeclass issues that occur when two named holes appear under the same operator.
-  let pat' ← runTermElab do
-    let p ← withTheReader Term.Context (fun ctx => { ctx with inPattern := true }) do
-      Term.elabTermEnsuringType pat targetType
+  let pat' ← withTheReader Term.Context (fun ctx => { ctx with inPattern := true }) do
+    let p ← Term.elabTermEnsuringType pat targetType
     unless ← isDefEq p target do
       Term.synthesizeSyntheticMVars (postpone := .partial)
       unless ← isDefEq p target do
@@ -47,21 +46,43 @@ elab "name_parts " pat:term : tactic => withMainContext do
       | _ => 0
     if numIdx < mvarCounterBefore then continue
     if let some val ← getExprMVarAssignment? mvarId then
-      let val ← instantiateMVars val
-      let ty ← inferType val
-      bindings := bindings.push (decl.userName, ty, val, numIdx)
+      try
+        let val ← instantiateMVars val
+        let ty ← inferType val
+        bindings := bindings.push (decl.userName, ty, val, numIdx)
+      catch _ => pure ()
   -- Sort by mvar index so bindings appear in pattern order (left-to-right)
   let sortedBindings := bindings.qsort (fun a b => a.2.2.2 < b.2.2.2)
   if sortedBindings.isEmpty then
     throwError "name_parts: no named holes (?A, ?B, ...) found in the pattern"
-  -- Replace the goal with the unified pattern, then layer on let-bindings.
-  liftMetaTactic1 fun g => do
-    let g ← g.replaceTargetDefEq pat'
+  -- Check that all fvars in values are in the goal's local context. If any value
+  -- references an fvar from elaboration (e.g. a typeclass instance), we can't use
+  -- `define` for it. Collect only those bindings whose values are "safe".
+  let lctx := (← goal.getDecl).lctx
+  let safeBindings := sortedBindings.filter fun (_, _, val, _) =>
+    !val.hasAnyFVar fun fvarId => !lctx.contains fvarId
+  -- Phase 1: introduce let-bindings on the current goal for safe bindings.
+  let fvarBindings ← liftMetaTacticAux fun g => do
     let mut g := g
-    for (name, ty, val, _) in sortedBindings.reverse do
+    let mut fvars : Array (FVarId × Expr) := #[]
+    for (name, ty, val, _) in safeBindings.reverse do
       let g' ← g.define name ty val
-      let (_, g'') ← g'.intro1P
+      let (fvar, g'') ← g'.intro1P
+      fvars := fvars.push (fvar, val)
       g := g''
-    pure g
+    pure (fvars, [g])
+  -- Phase 2: fold — replace occurrences of each value with its fvar in the goal,
+  -- so the infoview displays the new names instead of the raw expressions.
+  -- Folding is best-effort: if kabstract/replaceTargetDefEq fails, skip that binding.
+  withMainContext do
+    liftMetaTactic1 fun g => do
+      let mut g := g
+      for (fvar, val) in fvarBindings do
+        try
+          let target ← g.getType
+          let folded := (← kabstract target val).instantiate1 (mkFVar fvar)
+          g ← g.replaceTargetDefEq folded
+        catch _ => pure ()
+      pure g
 
 end HomologyLean.Tactic.NameParts
