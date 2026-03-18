@@ -24,27 +24,31 @@ elab "name_parts " pat:term : tactic => withMainContext do
   let goal ← getMainGoal
   let target ← goal.getType
   let targetType ← inferType target
-  let mvarCounterBefore := (← getMCtx).mvarCounter
+  -- Snapshot mvar IDs before elaboration so we only collect mvars we created.
+  -- (Cannot use mvarCounter — its sequential index differs from Name.num indices.)
+  let mut mvarIdsBefore : Std.HashSet MVarId := {}
+  for (mvarId, _) in (← getMCtx).decls do
+    mvarIdsBefore := mvarIdsBefore.insert mvarId
   -- Elaborate the pattern with inPattern=true so that ?name holes become natural mvars
   -- (not syntheticOpaque). Natural mvars can be assigned by isDefEq, avoiding stuck
   -- typeclass issues that occur when two named holes appear under the same operator.
-  let pat' ← withTheReader Term.Context (fun ctx => { ctx with inPattern := true }) do
+  let _pat' ← withTheReader Term.Context (fun ctx => { ctx with inPattern := true }) do
     let p ← Term.elabTermEnsuringType pat targetType
     unless ← isDefEq p target do
       Term.synthesizeSyntheticMVars (postpone := .partial)
       unless ← isDefEq p target do
         throwError "name_parts: pattern does not unify with the goal"
     instantiateMVars p
-  -- Collect named metavariables that were created during elaboration and assigned by unification.
-  -- Named holes (`?A`) get a non-anonymous userName; anonymous holes (`_`) are skipped.
+  -- Collect named metavariables that were created during elaboration and assigned by
+  -- unification. Only consider mvars not in the pre-elaboration snapshot.
   let mctx ← getMCtx
   let mut bindings : Array (Name × Expr × Expr × Nat) := #[]
   for (mvarId, decl) in mctx.decls do
+    if mvarIdsBefore.contains mvarId then continue
     if decl.userName.isAnonymous then continue
     let numIdx := match mvarId.name with
       | .num _ n => n
       | _ => 0
-    if numIdx < mvarCounterBefore then continue
     if let some val ← getExprMVarAssignment? mvarId then
       try
         let val ← instantiateMVars val

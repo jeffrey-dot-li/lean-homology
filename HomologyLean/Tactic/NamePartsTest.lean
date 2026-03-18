@@ -1,6 +1,7 @@
 import HomologyLean.Tactic.NameParts
 import Mathlib.CategoryTheory.Preadditive.Basic
 import Mathlib.CategoryTheory.Linear.Basic
+import Mathlib.CategoryTheory.Limits.Shapes.BinaryProducts
 
 open CategoryTheory
 
@@ -116,6 +117,48 @@ example (p q : Prop) (hp : p) (hq : q) : p ∧ q := by
   guard_target = A ∧ B
   exact ⟨hp, hq⟩
 
+-- Naming one side of a non-trivial equality: `?A = _` names only the LHS
+example (a b c : Nat) (h : a + b = c) : a + b = c := by
+  name_parts ?A = _
+  guard_target = A = c
+  exact h
+
 end BasicFunctionality
+
+section NoContextPollution
+/-! ### Regression test: no context pollution after complex sub-proofs
+
+When a `have ... := by` sub-proof uses tactics like `apply prod.hom_ext` that leave
+metavariable artifacts in the shared elaboration context, `name_parts` must not
+materialize those artifacts as unwanted `let`-bindings. The fix: snapshot mvar IDs
+before elaboration and only collect mvars created by the pattern elaboration itself.
+-/
+
+open Lean Elab Tactic Meta in
+elab "guard_hyp_count " n:num : tactic => withMainContext do
+  let lctx ← getLCtx
+  let count := lctx.decls.toList.filterMap id |>.length
+  let expected := n.getNat
+  unless count == expected do
+    throwError "guard_hyp_count: expected {expected} hypotheses, got {count}"
+
+set_option linter.unusedTactic false in
+open Limits in
+example {C : Type*} [Category C] [Preadditive C] [HasBinaryProducts C]
+    {X Y Z : C} (f g : X ⟶ Y ⨯ Z)
+    (hfst : f ≫ prod.fst = g ≫ prod.fst)
+    (hsnd : f ≫ prod.snd = g ≫ prod.snd) :
+    f + g = g + f := by
+  have key : f = g := by
+    apply prod.hom_ext
+    · exact hfst
+    · exact hsnd
+  guard_hyp_count 13
+  name_parts ?LHS = ?RHS
+  guard_hyp_count 15   -- exactly +2 (LHS, RHS), no pollution
+  guard_target = LHS = RHS
+  subst key; abel
+
+end NoContextPollution
 
 end HomologyLean.Tactic.NamePartsTest

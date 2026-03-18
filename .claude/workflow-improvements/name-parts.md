@@ -1,6 +1,6 @@
 # `name_parts` — pattern-match goal structure and bind names
 
-**Status**: Implemented (v1), one known issue remaining
+**Status**: Implemented (v2), context pollution fixed
 **File**: `HomologyLean/Tactic/NameParts.lean` (~85 lines)
 **Tests**: `HomologyLean/Tactic/NamePartsTest.lean`
 **Motivation**: `singularChain_chainHomotopy_of_homotopy` in `HomotopyInvariance2.lean`
@@ -41,7 +41,7 @@ The tactic (in `NameParts.lean`):
 
 1. Elaborates the pattern with `inPattern := true` so `?name` holes become **natural** metavariables (not `syntheticOpaque`). This is the key insight — natural mvars can be assigned by `isDefEq`, avoiding stuck typeclass issues.
 2. Unifies the elaborated pattern against the goal type via `isDefEq`.
-3. Collects named mvar assignments, filtering for fvars that are safe (present in the goal's local context).
+3. Collects named mvar assignments, filtering by mvar ID snapshot (only mvars created during our elaboration) and by fvar safety (values must only reference fvars in the goal's local context).
 4. Introduces `let` bindings via `MVarId.define` + `intro1P` (Phase 1).
 5. Folds occurrences of each value with its new fvar via `kabstract` + `replaceTargetDefEq` (Phase 2, best-effort per binding).
 
@@ -49,22 +49,19 @@ The tactic (in `NameParts.lean`):
 
 - **`inPattern := true`**: The `?name` syntax normally creates `syntheticOpaque` mvars. Under `inPattern`, they become `natural`, which allows `isDefEq` to assign them freely. Without this, two named holes under the same operator (e.g. `?A + ?B`) cause "typeclass instance problem is stuck" errors because the elaborator can't resolve `HAdd ?A ?B ?out` when both `?A` and `?B` are syntheticOpaque.
 
+- **Mvar ID snapshot**: Before elaboration, all existing `MVarId`s are collected into a `HashSet`. After elaboration, only mvars *not* in this set are considered. This prevents stale mvars from prior sub-proofs (which share the `MetavarContext`) from being picked up. The original approach of comparing `mvarCounter` was wrong because `MVarId.name.num` indices use a different counter than `MetavarContext.mvarCounter`.
+
 - **Safe binding filter**: After elaboration, some mvar assignments may reference fvars created internally by the elaborator (typeclass instances, etc.) that don't exist in the goal's local context. These are filtered out with `hasAnyFVar` before calling `define`.
 
 - **Best-effort folding**: Phase 2 wraps each `kabstract`/`replaceTargetDefEq` in `try/catch`. If a particular binding can't be folded (e.g. complex expressions with proof terms), the let-binding still exists in the context — just the goal display won't show the name.
 
-## Known issue: context pollution
+## Fixed: context pollution (v2)
 
-**Bug**: The current implementation runs `Term.elabTermEnsuringType` directly in the tactic's `TermElabM` context (not sandboxed in `runTermElab`). This means typeclass resolution during pattern elaboration introduces fvars into the **goal's local context** — dozens of extra hypotheses like `inst✝⁴⁷`, `Y₂✝`, `c✝⁴`, etc. appear after `name_parts` runs.
+**Bug (v1)**: The original implementation used `mvarCounter` to filter which mvars were "new" (created by our elaboration). But `mvarCounter` is a sequential allocation counter, while `MVarId.name` uses `.num _ n` where `n` is a hygiene counter — a completely different numbering. This meant old mvars from prior sub-proofs (e.g. `apply prod.hom_ext`) passed the filter and got materialized as unwanted let-bindings.
 
-**Why `runTermElab` was removed**: The sandboxed `runTermElab` created its own elaboration context. The matched values (mvar assignments) then contained fvars from that sandbox, causing "unknown free variable" errors when passed to `MVarId.define` on the real goal.
+**Fix**: Snapshot the full set of `MVarId`s before elaboration (`Std.HashSet MVarId`), then only collect mvars whose ID is *not* in the snapshot. This correctly excludes all pre-existing mvars regardless of their name encoding.
 
-**Planned fix**: Re-introduce `runTermElab` for elaboration, but resolve the fvar issue by either:
-- Abstracting matched values over sandbox-local fvars before `define`
-- Using `Lean.Meta.abstractMVars` or `zetaReduce` to eliminate sandbox references
-- Running elaboration in a temporary mvar context that shares the goal's lctx but isolates new fvars
-
-This is the main remaining work item.
+**Result**: In the regression test (`NamePartsTest.lean`), hypothesis count goes from 13 → 15 after `name_parts ?LHS = ?RHS` (exactly +2), where v1 produced 13 → 25 (+12 pollutants).
 
 ## What works today
 
