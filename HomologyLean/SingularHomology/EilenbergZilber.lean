@@ -1714,7 +1714,7 @@ namespace HomologyLean.SingularHomology
 abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
   SimplexCategory.toTop.obj (SimplexCategory.mk p)
 
-notation "Δ[" p "]" => stdSimplex p
+local notation "Δ[" p "]" => stdSimplex p
 
 /-- Singular chains with coefficients in the monoidal unit. -/
 abbrev SCF : TopCat.{v} ⥤ ChainComplex C ℕ :=
@@ -1727,17 +1727,6 @@ abbrev singChain (X : TopCat.{v}) : ChainComplex C ℕ :=
 /-- A singular `n`-simplex in `X`. -/
 abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
   (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
-
-/-- Convenience constructor from a map `Δ[n] ⟶ X` to the corresponding singular simplex. -/
-noncomputable abbrev SingularSimplex.ofΔ {X : TopCat.{v}} {n : ℕ} (f : stdSimplex n ⟶ X) :
-    SingularSimplex X n :=
-  ULift.up f
-
-lemma SingularSimplex.ofΔ_down {X : TopCat.{v}} {n : ℕ} (f : stdSimplex n ⟶ X) :
-    (SingularSimplex.ofΔ (X := X) (n := n) f).down = f := by
-  rfl
-
-notation "⟪" f "⟫ₛ" => SingularSimplex.ofΔ f
 
 /-- The coprojection of a singular simplex into the corresponding chain group. -/
 noncomputable abbrev simplexCoprojection {X : TopCat.{v}} {n : ℕ}
@@ -1754,9 +1743,8 @@ omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [Mon
 @[simp] lemma simplexCoprojection_comp_SCF_map {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (f : X ⟶ Y) :
     simplexCoprojection (C := C) s ≫ ((SCF (C := C)).map f).f n =
-      simplexCoprojection (C := C) (⟪s.down ≫ f⟫ₛ : SingularSimplex Y n) := by
-  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor,
-    SingularSimplex.ofΔ]
+      simplexCoprojection (C := C) (ULift.up (s.down ≫ f) : SingularSimplex Y n) := by
+  dsimp [simplexCoprojection, SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]
   rw [CategoryTheory.Limits.Sigma.ι_comp_map']
   simp only [Category.id_comp]
   rfl
@@ -1905,7 +1893,7 @@ lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
     (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
     simplexCrossProduct (C := C) s c (show n = n + 0 by omega) =
       simplexCoprojection (C := C)
-        (⟪prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)⟫ₛ :
+        (ULift.up (prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)) :
           SingularSimplex (X ⨯ Y) n) := by
   rw [simplexCrossProduct, HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct_zero_right,
     HomologyLean.SingularHomology.SSetEZ.simplexCoprojection_comp_SCF_map]
@@ -1918,7 +1906,7 @@ singular simplices `(s, t)` to the singular simplex of `X × Y` induced by
     (s : SingularSimplex X n) (t : SingularSimplex Y n) :
     (TopCat.toSSet_prodNatIso.inv.app (X, Y)).app (Opposite.op ⦋n⦌)
       (HomologyLean.SingularHomology.SSetEZ.prodSimplex s t) =
-    (⟪prod.lift s.down t.down⟫ₛ : SingularSimplex (X ⨯ Y) n) := by
+    (ULift.up (prod.lift s.down t.down) : SingularSimplex (X ⨯ Y) n) := by
   sorry
 
 omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [MonoidalClosed C]
@@ -1933,7 +1921,7 @@ the `0`-simplex cross-product formula from the SSet theorem. -/
 lemma simplexCrossProduct_zero_zero {X Y : TopCat.{v}}
     (s : SingularSimplex X 0) (t : SingularSimplex Y 0) :
     simplexCrossProduct (C := C) s t =
-      simplexCoprojection (C := C) (⟪prod.lift s.down t.down⟫ₛ : SingularSimplex (X ⨯ Y) 0) := by
+      simplexCoprojection (C := C) (ULift.up (prod.lift s.down t.down) : SingularSimplex (X ⨯ Y) 0) := by
   rw [simplexCrossProduct, HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct_zero_zero,
     HomologyLean.SingularHomology.SSetEZ.simplexCoprojection_comp_SCF_map]
   exact congrArg (simplexCoprojection (C := C)) (toSSet_prodNatIso_inv_app_prodSimplex s t)
@@ -1949,13 +1937,13 @@ omit [CategoryWithHomology C] [SymmetricCategory C] [MonoidalPreadditive C] [Mon
 of the two endpoint `0`-simplices. -/
 lemma boundary_identity_1simplex_generic :
     simplexCoprojection (C := C)
-        (⟪𝟙 (stdSimplex 1 : TopCat.{v})⟫ₛ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 1) ≫
+        (ULift.up (𝟙 (stdSimplex 1 : TopCat.{v})) : SingularSimplex (stdSimplex 1 : TopCat.{v}) 1) ≫
       (singChain (C := C) (stdSimplex 1 : TopCat.{v})).d 1 0 =
     simplexCoprojection (C := C)
-        (⟪SimplexCategory.toTop.map (SimplexCategory.δ 0)⟫ₛ :
+        (ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 0)) :
           SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) -
       simplexCoprojection (C := C)
-        (⟪SimplexCategory.toTop.map (SimplexCategory.δ 1)⟫ₛ :
+        (ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 1)) :
           SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) := by
   simp only [singChain]
   dsimp [SCF, singularChainComplexFunctor, SSet.singularChainComplexFunctor]

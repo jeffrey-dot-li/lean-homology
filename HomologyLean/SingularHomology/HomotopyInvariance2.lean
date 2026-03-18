@@ -35,6 +35,26 @@ when handling the `n + 0 = n` cast from the Eilenberg-Zilber zero-right formula.
 
 end ToTopEqToHom
 
+variable {ι : Type*} {V : Type*} [Category V] [Preadditive V]
+
+def chainHtpyMap {C D : ChainComplex V ℕ} (f : ∀ i, C.X i ⟶ D.X (i + 1)) :=
+  fun i j => if h : j = i + 1 then h ▸ f i else 0
+
+
+-- theorem dNext_nat' {C D : ChainComplex V ℕ} (i : ℕ) (f : ∀ i, C.X i ⟶ D.X (i + 1)) :
+--     dNext i (chainHtpyMap f) = C.d i ((ComplexShape.down ℕ).next i) ≫ f ((ComplexShape.down ℕ).next i) :=
+--   rfl
+
+/-- In a chain complex over `ℕ`, `C.d i (next i) ≫ (if i = next i + 1 then h ▸ P (next i) i else 0)`
+simplifies to `C.d i (next i) ≫ P (next i) i`. When `i > 0` the condition holds and the transport
+is trivial; when `i = 0` both sides vanish because `C.d 0 (next 0) = 0`. -/
+lemma ChainComplex.d_comp_dite_next {C D : ChainComplex V ℕ}
+    (i : ℕ) (P : ∀ n m, C.X n ⟶ D.X m) (hp : P 0 0 = 0) :
+    C.d i ((ComplexShape.down ℕ).next i) ≫
+      P ((ComplexShape.down ℕ).next i) i =
+    C.d i ((ComplexShape.down ℕ).next i) ≫ P ((ComplexShape.down ℕ).next i) i := by
+  sorry
+
 -- TODO: move these to EilenbergZilber.lean or Shuffle.lean
 section ShuffleZeroRight
 
@@ -61,31 +81,6 @@ variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [Catego
    [MonoidalLinear ℤ C]
    [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)]
 
-/-- The standard topological `p`-simplex. -/
-abbrev stdSimplex (p : ℕ) : TopCat.{v} :=
-  SimplexCategory.toTop.obj (SimplexCategory.mk p)
-
-/-- Singular chains with coefficients in the monoidal unit. -/
-abbrev SCF : TopCat.{v} ⥤ ChainComplex C ℕ :=
-  (singularChainComplexFunctor.{v} C).obj (𝟙_ C)
-
-/-- The singular chain complex of a topological space with coefficients in `𝟙_ C`. -/
-abbrev singChain (X : TopCat.{v}) : ChainComplex C ℕ :=
-  (SCF (C := C)).obj X
-
-/-- A singular `n`-simplex in `X`. -/
-abbrev SingularSimplex (X : TopCat.{v}) (n : ℕ) :=
-  (TopCat.toSSet.obj X).obj (Opposite.op (SimplexCategory.mk n))
-
-/-- Convenience constructor from a map `Δ[n] ⟶ X` to the corresponding singular simplex. -/
-noncomputable abbrev SingularSimplex.ofΔ {X : TopCat.{v}} {n : ℕ} (f : stdSimplex n ⟶ X) :
-    SingularSimplex X n :=
-  ULift.up f
-
-/- The coprojection of a singular simplex into the corresponding chain group. -/
-noncomputable abbrev simplexCoprojection {X : TopCat.{v}} {n : ℕ}
-    (s : SingularSimplex X n) : 𝟙_ C ⟶ (singChain (C := C) X).X n :=
-  Sigma.ι (fun _ : SingularSimplex X n => 𝟙_ C) s
 
 -- Reuse the same monoidal structure on chain complexes as in `EilenbergZilber.lean`.
 noncomputable instance chainComplexMonoidal : MonoidalCategory (ChainComplex C ℕ) :=
@@ -109,7 +104,7 @@ noncomputable def chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
 
 /-- The fundamental singular `1`-simplex of `Δ[1]`. -/
 abbrev intervalFundamentalSimplex : SingularSimplex (stdSimplex 1 : TopCat.{v}) 1 :=
-  SingularSimplex.ofΔ (𝟙 (stdSimplex 1 : TopCat.{v}))
+  ULift.up (𝟙 (stdSimplex 1 : TopCat.{v}))
 
 /-- Tensor on the right with the fundamental `1`-simplex of `Δ[1]`. -/
 noncomputable def tensorι₁ {X : TopCat.{v}} (n : ℕ) :
@@ -134,18 +129,16 @@ noncomputable def homotopyPrism {X Y : TopCat.{v}} {f g : X ⟶ Y}
 
 
 
-/-- A topological homotopy induces a chain homotopy between the induced singular chain maps.
-
-Dependency structure:
-- `boundary_identity_1simplex_generic`
-- `tensorι₁_comp_d`
-- the endpoint specializations of the EZ zero-right formula, derived inline from the
-  general zero-right cross-product behavior together with `homotopyMap_comp_delta0`
-  and `homotopyMap_comp_delta1`
-- the degree `(0, 1)` Leibniz step, derived inline from the general zero-edge EZ
-  Leibniz rule
-- `homotopyMap_comp_delta0`, `homotopyMap_comp_delta1` from `HomotopyMap.lean`. -/
-noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
+-- Dependency structure:
+-- - `boundary_identity_1simplex_generic`
+-- - `tensorι₁_comp_d`
+-- - the endpoint specializations of the EZ zero-right formula, derived inline from the
+--   general zero-right cross-product behavior together with `homotopyMap_comp_delta0`
+--   and `homotopyMap_comp_delta1`
+-- - the degree `(0, 1)` Leibniz step, derived inline from the general zero-edge EZ
+--   Leibniz rule
+-- - `homotopyMap_comp_delta0`, `homotopyMap_comp_delta1` from `HomotopyMap.lean`. -/
+noncomputable def singularChain_chainHomotopy_of_homotopy' {X Y : TopCat.{v}} {f g : X ⟶ Y}
     (H : ContinuousMap.Homotopy f.hom' g.hom') :
     Homotopy
       ((SCF.map g) : singChain (C := C) X ⟶ singChain (C := C) Y)
@@ -154,9 +147,9 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
   let chainH : singChain (C := C) (X ⨯ (stdSimplex 1 : TopCat.{v})) ⟶ singChain (C := C) Y :=
     (SCF.map Hmap)
   let c₀ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0 :=
-    SingularSimplex.ofΔ (SimplexCategory.toTop.map (SimplexCategory.δ 0))
+    ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 0))
   let c₁ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0 :=
-    SingularSimplex.ofΔ (SimplexCategory.toTop.map (SimplexCategory.δ 1))
+    ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 1))
   let endpointTerm := fun (c : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) (n : ℕ) =>
     (ρ_ ((singChain (C := C) X).X n)).inv ≫
       (𝟙 ((singChain (C := C) X).X n) ⊗ₘ simplexCoprojection (C := C) c) ≫
@@ -274,7 +267,6 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
         (show (ComplexShape.down ℕ).Rel 1 0 from by simp [ComplexShape.down_Rel]) 0 (by simp)]
     simp [ComplexShape.ε₂, ComplexShape.ε, MonoidalCategory.curriedTensor]
   open HomologyLean.CategoryTheory in
-
   match i with
   | 0 =>
     rw [dNext_eq_zero _ 0 (by simp [ComplexShape.down_Rel])]
@@ -292,6 +284,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
     rw [boundary_identity_1simplex_generic (C := C)]
     rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
     rw [←hBoundary₀ 0, ←hBoundary₁ 0]
+
     abel
   | n + 1 =>
     -- Higher degrees: use `tensorι₁_comp_d`, the general Leibniz rule at `(n, 0)`,
@@ -326,17 +319,17 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
       rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
       rw [show (ρ_ ((singChain (C := C) X).X (n + 1))).inv ≫
             (𝟙 ((singChain (C := C) X).X (n + 1)) ⊗ₘ
-              simplexCoprojection (SingularSimplex.ofΔ (SimplexCategory.toTop.map (SimplexCategory.δ 0)))) ≫
+              simplexCoprojection (ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 0)))) ≫
             chainCrossProduct (C := C) (show (n + 1) + 0 = n + 1 from by omega) ≫ chainH.f (n + 1) =
           endpointTerm c₀ (n + 1) from rfl,
         show (ρ_ ((singChain (C := C) X).X (n + 1))).inv ≫
             (𝟙 ((singChain (C := C) X).X (n + 1)) ⊗ₘ
-              simplexCoprojection (SingularSimplex.ofΔ (SimplexCategory.toTop.map (SimplexCategory.δ 1)))) ≫
+              simplexCoprojection (ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 1)))) ≫
             chainCrossProduct (C := C) (show (n + 1) + 0 = n + 1 from by omega) ≫ chainH.f (n + 1) =
           endpointTerm c₁ (n + 1) from rfl,
         hBoundary₀ (n + 1), hBoundary₁ (n + 1)]
     rw [hΔbdy]
-    abel
+
     simp only [Xbdy]
     have htensor_nat : tensorι₁ (n + 1) ≫
         ((singChain (C := C) X).d (n + 1) n ⊗ₘ 𝟙 ((singChain (C := C) (stdSimplex 1 : TopCat.{v})).X 1)) =
@@ -349,9 +342,223 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
       rw [← MonoidalCategory.tensorHom_id,
         MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id, Category.id_comp]
     simp only [← Category.assoc (tensorι₁ (n + 1)), htensor_nat, Category.assoc]
+    module
+    -- norm_num
+    -- rw [pow_succ, mul_neg_one, neg_smul]
+    -- abel
+
+/-- A topological homotopy induces a chain homotopy between the induced singular chain maps.
+
+Dependency structure:
+- `boundary_identity_1simplex_generic`
+- `tensorι₁_comp_d`
+- the endpoint specializations of the EZ zero-right formula, derived inline from the
+  general zero-right cross-product behavior together with `homotopyMap_comp_delta0`
+  and `homotopyMap_comp_delta1`
+- the degree `(0, 1)` Leibniz step, derived inline from the general zero-edge EZ
+  Leibniz rule
+- `homotopyMap_comp_delta0`, `homotopyMap_comp_delta1` from `HomotopyMap.lean`. -/
+noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
+    (H : ContinuousMap.Homotopy f.hom' g.hom') :
+    Homotopy
+      ((SCF.map g) : singChain (C := C) X ⟶ singChain (C := C) Y)
+      ((SCF.map f) : singChain (C := C) X ⟶ singChain (C := C) Y) := by
+  let Hmap : X ⨯ (stdSimplex 1 : TopCat.{v}) ⟶ Y := homotopyMap H
+  let chainH : singChain (C := C) (X ⨯ (stdSimplex 1 : TopCat.{v})) ⟶ singChain (C := C) Y :=
+    (SCF.map Hmap)
+  let c₀ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0 :=
+    ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 0))
+  let c₁ : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0 :=
+    ULift.up (SimplexCategory.toTop.map (SimplexCategory.δ 1))
+  let endpointTerm := fun (c : SingularSimplex (stdSimplex 1 : TopCat.{v}) 0) (n : ℕ) =>
+    (ρ_ ((singChain (C := C) X).X n)).inv ≫
+      (𝟙 ((singChain (C := C) X).X n) ⊗ₘ simplexCoprojection (C := C) c) ≫
+      chainCrossProduct (C := C) (X := X) (Y := (stdSimplex 1 : TopCat.{v}))
+        (show n + 0 = n from by omega) ≫
+      chainH.f n
+  let P := homotopyPrism (C := C) H
+  refine Homotopy.mk
+    (fun i j => if h : j = i + 1 then h ▸ P i else 0)
+    (by
+      intro i j h
+      dsimp
+      rw [dif_neg]
+      rw [ComplexShape.down_Rel] at h
+      omega)
+    ?_
+  intro i
+  rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel (i + 1) i by simp [ComplexShape.down_Rel])]
+  -- rw [dNext_eq _ (show (ComplexShape.down ℕ).Rel (n + 1) n by simp [ComplexShape.down_Rel])]
+  -- (ComplexShape.down ℕ).next i
+  -- dNext i (f(i, j)) = (SCF.obj X).d (i) ((ComplexShape.down ℕ).next i) >> f((ComplexShape.down ℕ).next i, i)
+  simp only [dif_pos trivial]
+  have hBoundary₀ : ∀ n, endpointTerm c₀ n = ((SCF.map g).f n : _ ) := by
+    intro n
+    apply Sigma.hom_ext
+    intro s
+    dsimp [endpointTerm]
+    -- Collapse ι s ≫ (ρ_).inv ≫ (𝟙 ⊗ₘ ι c₀) ≫ chainCrossProduct into simplexCrossProduct s c₀
+    slice_lhs 1 4 => erw [simplexCoprojection_comp_chainCrossProduct]
+    -- Step 2: unfold TopCat simplexCrossProduct into SSet cross product ≫ SCF.map(prodNatIso)
+    dsimp only [simplexCrossProduct]
+    -- Step 3: fold (SCF.map prodNatIso.inv.app).f n ≫ chainH.f n via functoriality
+    -- Step 3: fold (SCF.map prodNatIso.inv.app).f n ≫ (SCF.map Hmap).f n via functoriality
+    dsimp only [chainH]
+    rw [show (SCF.map Hmap).f n =
+      (((SSet.singularChainComplexFunctor C).obj (𝟙_ C)).map (TopCat.toSSet.map Hmap)).f n from rfl,
+      Category.assoc, ← HomologicalComplex.comp_f, ← Functor.map_comp]
+    rw [SSetEZ.simplexCrossProduct_zero_right (C := C),
+      SSetEZ.simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+    congr 1; apply ULift.ext
+    simp only []
+    dsimp [SSetEZ.shuffleSimplex, c₀, Hmap, SSetEZ.prodSimplex]
+    simp only [Shuffle.fstHom_default_zero_right, Shuffle.sndHom_default_zero_right,
+        FunctorToTypes.map_id_apply]
+    erw [toSSet_prodNatIso_inv_app_prodSimplex]
+    -- Rewrite toSSet.obj(X).map(eqToHom ...).op s ↦ eqToHom ≫ s.down, avoiding toSSet internals
+    simp only [TopCat.toSSet_obj_map_eqToHom_op_down]
+    dsimp [TopCat.toSSet]
+    convert homotopyMap_comp_delta0 H s.down using 2
+  have hBoundary₁ : ∀ n, endpointTerm c₁ n = ((SCF.map f).f n : _ ) := by
+    intro n
+    apply Sigma.hom_ext
+    intro s
+    dsimp [endpointTerm]
+    slice_lhs 1 4 => erw [simplexCoprojection_comp_chainCrossProduct]
+    dsimp only [simplexCrossProduct]
+    dsimp only [chainH]
+    rw [show (SCF.map Hmap).f n =
+      (((SSet.singularChainComplexFunctor C).obj (𝟙_ C)).map (TopCat.toSSet.map Hmap)).f n from rfl,
+      Category.assoc, ← HomologicalComplex.comp_f, ← Functor.map_comp]
+    rw [SSetEZ.simplexCrossProduct_zero_right (C := C),
+      SSetEZ.simplexCoprojection_comp_SCF_map, simplexCoprojection_comp_SCF_map]
+    congr 1; apply ULift.ext
+    simp only []
+    dsimp [SSetEZ.shuffleSimplex, c₁, Hmap, SSetEZ.prodSimplex]
+    simp only [Shuffle.fstHom_default_zero_right, Shuffle.sndHom_default_zero_right,
+        FunctorToTypes.map_id_apply]
+    erw [toSSet_prodNatIso_inv_app_prodSimplex]
+    simp only [TopCat.toSSet_obj_map_eqToHom_op_down]
+    dsimp [TopCat.toSSet]
+    convert homotopyMap_comp_delta1 H s.down using 2
+
+  conv_rhs => lhs; lhs; rw [dNext_nat]
+  simp only [P, homotopyPrism, Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc]
+  -- dsimp only [chainCrossProduct]
+  rw [chainH.comm (i + 1) (i)]
+  -- simp_rw [Category.assoc]
+  dsimp only [chainCrossProduct];
+  simp only [Category.assoc];
+  rw [reassoc_of% ((eilenbergZilber (C := C) X (stdSimplex 1)).comm'
+      (i+1) i (by simp [ComplexShape.down_Rel]))]
+  simp only [HomologicalComplex.tensorObj, HomologicalComplex.ιTensorObj]
+  rw [HomologicalComplex.mapBifunctor.d_eq]
+  conv_rhs => lhs; rhs; rhs; slice 2 3; rewrite [Preadditive.comp_add,
+      HomologicalComplex.mapBifunctor.ι_D₁, HomologicalComplex.mapBifunctor.ι_D₂,
+      -- HomologicalComplex.mapBifunctor.d₁_eq _ _ _ _ (show (ComplexShape.down ℕ).Rel (i ) i
+        -- from by simp [ComplexShape.down_Rel]) 1 (i + 1) (by simp),
+      HomologicalComplex.mapBifunctor.d₂_eq _ _ _ _ _ (show (ComplexShape.down ℕ).Rel 1 0
+        from by simp [ComplexShape.down_Rel]) (i) (show (i) + 0 = i by omega)
+      ]
+  simp only [ComplexShape.ε₂, ComplexShape.ε]
+
+  have hLeibniz (n : ℕ) :
+      chainCrossProduct (C := C) (X := X) (Y := (stdSimplex 1 : TopCat.{v}))
+          (show (n + 1) + 1 = (n + 1) + 1 from rfl) ≫
+        (singChain (C := C) (X ⨯ (stdSimplex 1 : TopCat.{v}))).d ((n + 1) + 1) (n + 1) =
+      ((singChain (C := C) X).d (n + 1) n ⊗ₘ
+          𝟙 ((singChain (C := C) (stdSimplex 1 : TopCat.{v})).X 1)) ≫
+        chainCrossProduct (C := C) (X := X) (Y := (stdSimplex 1 : TopCat.{v}))
+          (show n + 1 = n + 1 from rfl) +
+      ((-1 : ℤ) ^ (n + 1)) •
+        ((𝟙 ((singChain (C := C) X).X (n + 1)) ⊗ₘ
+            (singChain (C := C) (stdSimplex 1 : TopCat.{v})).d 1 0) ≫
+          chainCrossProduct (C := C) (X := X) (Y := (stdSimplex 1 : TopCat.{v}))
+            (show (n + 1) + 0 = n + 1 from by omega)) := by
+    dsimp only [chainCrossProduct]
+    rw [Category.assoc, (eilenbergZilber (C := C) X (stdSimplex 1)).comm'
+      ((n + 1) + 1) (n + 1) (by simp [ComplexShape.down_Rel]),
+      ← Category.assoc, ← Category.assoc]
+    congr 1
+    simp only [HomologicalComplex.tensorObj, HomologicalComplex.ιTensorObj]
+    rw [HomologicalComplex.mapBifunctor.d_eq, Preadditive.comp_add,
+      HomologicalComplex.mapBifunctor.ι_D₁, HomologicalComplex.mapBifunctor.ι_D₂,
+      HomologicalComplex.mapBifunctor.d₁_eq _ _ _ _ (show (ComplexShape.down ℕ).Rel (n + 1) n
+        from by simp [ComplexShape.down_Rel]) 1 (n + 1) (by simp),
+      HomologicalComplex.mapBifunctor.d₂_eq _ _ _ _ _ (show (ComplexShape.down ℕ).Rel 1 0
+        from by simp [ComplexShape.down_Rel]) (n + 1) (show (n + 1) + 0 = n + 1 by omega)]
+    simp [ComplexShape.ε₁, ComplexShape.ε₂, ComplexShape.ε, MonoidalCategory.curriedTensor]
+    rfl
+  -- rw [dNext_eq _ (show (ComplexShape.down ℕ).Rel (n + 1) n by simp [ComplexShape.down_Rel])]
+  open HomologyLean.CategoryTheory in
+  match i with
+  | 0 =>
+    simp only [ComplexShape.ε_zero,
+    ComplexShape.ε₂_def, MonoidalCategory.curriedTensor_obj_map,
+    MonoidalCategory.curriedTensor_obj_obj, Preadditive.add_comp, Preadditive.comp_add,
+    Category.assoc]
     norm_num
-    rw [pow_succ, mul_neg_one, neg_smul]
+    rw[ HomologicalComplex.mapBifunctor.d₁_eq_zero _ _ _ _ _ _ _
+        (fun h => by simp [ComplexShape.down_Rel] at h)]
+    norm_num
+    rw [← MonoidalCategory.id_tensorHom]
+    -- simp only [zero_comp, comp_zero, zero_add]
+    simp only [tensorι₁, Category.assoc]
+    rw [← Category.assoc (𝟙 _ ⊗ₘ simplexCoprojection (C := C) intervalFundamentalSimplex),
+      MonoidalCategory.tensorHom_comp_tensorHom, Category.comp_id]
+    rw [boundary_identity_1simplex_generic (C := C)]
+    rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+    rw [←hBoundary₀ 0, ←hBoundary₁ 0]
+    simp only [endpointTerm, chainCrossProduct, HomologicalComplex.tensorObj,
+      HomologicalComplex.ιTensorObj, Category.assoc]
     abel
+  | n + 1 =>
+    simp only [dite_true,
+      Preadditive.comp_zsmul, Category.assoc,TotalComplexShape.ε₂,
+      ComplexShape.ε, Nat.add_one_sub_one
+    ]
+    norm_num
+    simp only [Units.smul_def,
+      Int.reduceNeg, Units.val_pow_eq_pow_val,
+       Units.val_neg, Units.val_one, smul_smul,
+       ← pow_add, ← two_mul, pow_mul, neg_one_pow_two, one_pow, ]
+    norm_num
+    rw [← MonoidalCategory.id_tensorHom]
+    simp only [tensorι₁, Category.assoc]
+    simp only [MonoidalCategory.id_tensorHom]
+    rw [← MonoidalCategory.whiskerLeft_comp_assoc]
+    rw [boundary_identity_1simplex_generic (C := C)]
+    rw [← MonoidalCategory.id_tensorHom
+      (f := SingularHomology.simplexCoprojection
+        (ULift.up (SimplexCategory.toTop.{v}.map (SimplexCategory.δ 0))) -
+        SingularHomology.simplexCoprojection
+        (ULift.up (SimplexCategory.toTop.{v}.map (SimplexCategory.δ 1))))]
+    rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
+    rw [← hBoundary₀ (n + 1), ← hBoundary₁ (n + 1)]
+    rw [HomologicalComplex.mapBifunctor.d₁_eq _ _ _ _ (show (ComplexShape.down ℕ).Rel (n + 1) n
+        from by simp [ComplexShape.down_Rel]) 1 (n + 1) (by simp),
+        ComplexShape.ε₁,
+        ]
+    simp only [← MonoidalCategory.id_tensorHom]
+    simp only [endpointTerm, chainCrossProduct, HomologicalComplex.tensorObj,
+      HomologicalComplex.ιTensorObj, Category.assoc]
+    simp only [TotalComplexShape.ε₁]
+    simp only [c₀, c₁]
+    rw [MonoidalCategory.rightUnitor_inv_naturality_assoc]
+    simp only [singChain, ← Preadditive.comp_add, ← Preadditive.comp_zsmul]
+    abel
+    -- Proof normalization
+    generalize_proofs _ _ _ _ _ p3 _ p2 _ _ _ p1 _ p0
+    rw [Subsingleton.elim p0 p3]
+    rw [← add_assoc]
+    simp only [Int.reduceNeg, Int.zsmul_eq_mul, mul_one, Linear.comp_smul, right_eq_add]
+    norm_num
+    rw [Subsingleton.elim p1 p2]
+    simp only [Int.reduceNeg,
+      MonoidalCategory.curriedTensor_obj_obj, MonoidalCategory.whisker_exchange_assoc,
+      MonoidalCategory.whiskerRight_id, Category.assoc, Iso.inv_hom_id_assoc]
+    dsimp only [chainH, Hmap]
+    module
 
 /-- Homotopic maps induce equal maps on singular homology. -/
 theorem singularHomology_map_eq_of_homotopy {X Y : TopCat.{v}} {f g : X ⟶ Y}
