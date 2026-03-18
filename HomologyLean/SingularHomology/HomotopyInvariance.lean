@@ -67,26 +67,6 @@ variable {C : Type u} [Category.{v} C] [HasCoproducts C] [Preadditive C] [Catego
    [∀ (X : C), PreservesFiniteCoproducts (MonoidalCategory.tensorRight X)]
 
 
--- Reuse the same monoidal structure on chain complexes as in `EilenbergZilber.lean`.
-noncomputable instance chainComplexMonoidal : MonoidalCategory (ChainComplex C ℕ) :=
-  HomologicalComplex.monoidalCategory C (ComplexShape.down ℕ)
-
-/-- The topological Eilenberg-Zilber chain map, obtained from the public natural transformation. -/
-noncomputable abbrev eilenbergZilber (X Y : TopCat.{v}) :
-    (singChain (C := C) X).tensorObj (singChain (C := C) Y) ⟶
-      singChain (C := C) (X ⨯ Y) :=
-  (TopCat.eilenbergZilberNatTrans (C := C)).app (X, Y)
-
-/-- The degreewise cross product map induced by the public
-topological Eilenberg-Zilber chain map. -/
-noncomputable def chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ}
-    (h : p + q = n) :
-    (singChain (C := C) X).X p ⊗ (singChain (C := C) Y).X q ⟶
-      (singChain (C := C) (X ⨯ Y)).X n :=
-  HomologicalComplex.ιTensorObj
-      (singChain (C := C) X) (singChain (C := C) Y) p q n h ≫
-    (eilenbergZilber (C := C) X Y).f n
-
 /-- The fundamental singular `1`-simplex of `Δ[1]`. -/
 abbrev intervalFundamentalSimplex : SingularSimplex (stdSimplex 1 : TopCat.{v}) 1 :=
   ULift.up (𝟙 (stdSimplex 1 : TopCat.{v}))
@@ -209,7 +189,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
     convert homotopyMap_comp_delta1 H s.down using 2
   simp only [dNext_nat, P, homotopyPrism, Preadditive.zsmul_comp, Category.assoc]
   rw [chainH.comm (i + 1) (i)]
-  dsimp only [chainCrossProduct];
+  simp only [chainCrossProduct_eq]
   simp only [Category.assoc, reassoc_of% ((eilenbergZilber (C := C) X (stdSimplex 1)).comm'
       (i+1) i (by simp [ComplexShape.down_Rel]))]
   simp only [HomologicalComplex.tensorObj, HomologicalComplex.ιTensorObj]
@@ -242,7 +222,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
     rw [boundary_identity_1simplex_generic (C := C)]
     rw [tensorHom_sub, Preadditive.sub_comp, Preadditive.comp_sub]
     rw [←hBoundary₀ 0, ←hBoundary₁ 0]
-    simp only [endpointTerm, chainCrossProduct, HomologicalComplex.tensorObj,
+    simp only [endpointTerm, chainCrossProduct_eq, HomologicalComplex.tensorObj,
       HomologicalComplex.ιTensorObj, Category.assoc]
     abel
   | n + 1 =>
@@ -273,7 +253,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
         ComplexShape.ε₁,
         ]
     simp only [← MonoidalCategory.id_tensorHom, endpointTerm,
-      chainCrossProduct, HomologicalComplex.tensorObj,
+      chainCrossProduct_eq, HomologicalComplex.tensorObj,
       HomologicalComplex.ιTensorObj, Category.assoc]
     simp only [TotalComplexShape.ε₁]
     simp only [c₀, c₁]
