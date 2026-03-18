@@ -1,0 +1,7 @@
+# MCP server configuration (used by .mcp.json and .cursor/mcp.json)
+
+[lean-lsp]
+# repo = "https://github.com/jeffrey-dot-li/lean-lsp-mcp"
+repo = "https://github.com/oOo0oOo/lean-lsp-mcp"
+# commit = "working"
+commit = "v0.25.0"
