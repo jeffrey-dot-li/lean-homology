@@ -2968,4 +2968,16 @@ instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
       simp only [g, hcast] at this; exact this
     exact Prod.ext (Fin.eq_zero _) h2
 
+/-- The unique `(n,0)`-shuffle has sign `1`. -/
+lemma Shuffle.sign_default_zero_right {n : ℕ} : (default : Shuffle n 0).sign = 1 := by
+  simp [Shuffle.sign, Shuffle.invCount, Unique_Shuffle_n_0]
+
+/-- The unique `(0,n)`-shuffle has sign `1`. -/
+lemma Shuffle.sign_default_zero_left {n : ℕ} : (default : Shuffle 0 n).sign = 1 := by
+  have h := sign_eq_negOnePow_mul_swap_sign (u := (default : Shuffle 0 n))
+  have hswap : (default : Shuffle 0 n).swap = (default : Shuffle n 0) := by
+    exact Subsingleton.elim _ _
+  rw [Nat.zero_mul, pow_zero, one_mul, hswap, Shuffle.sign_default_zero_right] at h
+  exact h
+
 end HomologyLean.SingularHomology

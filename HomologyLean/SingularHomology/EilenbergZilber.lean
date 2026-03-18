@@ -725,18 +725,11 @@ lemma simplexCrossProduct_zero_right {S T : SSet.{v}} {n : ℕ}
     (s : S _⦋n⦌) (c : T _⦋0⦌) :
     simplexCrossProduct (C := C) s c (show n = n + 0 by omega) =
     simplexCoprojection (shuffleSimplex s c default (show n = n + 0 by omega)) := by
-  simp only [simplexCrossProduct, universalSimplexCrossProduct]
-  rw [Fintype.sum_unique, Preadditive.zsmul_comp]
-  have hd : (default : Shuffle n 0).sign = 1 := by
-    simp only [Shuffle.sign, Shuffle.invCount]
-    suffices h : (∑ r : Fin (n + 0),
-      if ((default : Shuffle n 0).1 (Fin.castSucc r)).1 <
-         ((default : Shuffle n 0).1 (Fin.succ r)).1
-      then ((default : Shuffle n 0).1 (Fin.castSucc r)).2.val else 0) = 0 by
-      rw [h]; ring
-    apply Finset.sum_eq_zero; intro i _
-    dsimp [Unique_Shuffle_n_0]; split_ifs <;> rfl
-  rw [hd, one_smul, simplexCoprojection_comp_SCF_map]
+  simp only [
+    simplexCrossProduct, universalSimplexCrossProduct,
+    Fintype.sum_unique, Shuffle.sign_default_zero_right,
+    one_smul, simplexCoprojection_comp_SCF_map
+  ]
   congr 1
   simpa only [SSet.tensorHom_app_apply] using
     (yoneda_pair_eq_shuffleSimplex (s := s) (t := c) (μ := default)
@@ -748,20 +741,11 @@ lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
     (c : S _⦋0⦌) (s : T _⦋n⦌) :
     simplexCrossProduct (C := C) c s (show n = 0 + n by omega) =
     simplexCoprojection (shuffleSimplex c s default (show n = 0 + n by omega)) := by
-  simp only [simplexCrossProduct, universalSimplexCrossProduct]
-  rw [Fintype.sum_unique, Preadditive.zsmul_comp]
-  have hd : (default : Shuffle 0 n).sign = 1 := by
-    simp only [Shuffle.sign, Shuffle.invCount]
-    suffices h : (∑ r : Fin (0 + n),
-      if ((default : Shuffle 0 n).1 (Fin.castSucc r)).1 <
-         ((default : Shuffle 0 n).1 (Fin.succ r)).1
-      then ((default : Shuffle 0 n).1 (Fin.castSucc r)).2.val else 0) = 0 by
-      rw [h]; ring
-    apply Finset.sum_eq_zero; intro i _
-    dsimp [Unique_Shuffle_0_n]; split_ifs with h
-    · exact absurd h (lt_irrefl _)
-    · rfl
-  rw [hd, one_smul, simplexCoprojection_comp_SCF_map]
+  simp only [
+    simplexCrossProduct, universalSimplexCrossProduct,
+    Fintype.sum_unique, Shuffle.sign_default_zero_left,
+    one_smul, simplexCoprojection_comp_SCF_map
+  ]
   congr 1
   simpa only [SSet.tensorHom_app_apply] using
     (yoneda_pair_eq_shuffleSimplex (s := c) (t := s) (μ := default)
@@ -1875,29 +1859,10 @@ lemma simplexCoprojection_comp_chainCrossProduct {X Y : TopCat.{v}} {p q n : ℕ
     rw [← Iso.inv_comp_eq (λ_ (𝟙_ C))]
     rw [← chainTensorHomEquiv_apply]
     exact congrFun (chainCrossProduct.spec (C := C) (X := X) (Y := Y) h) (s, t)
-  have hkey' :
-      (ρ_ (𝟙_ C)).inv ≫
-          ((simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection (C := C) t) ≫
-            chainCrossProduct (C := C) (X := X) (Y := Y) h) =
-        (ρ_ (𝟙_ C)).inv ≫ ((λ_ (𝟙_ C)).hom ≫ simplexCrossProduct (C := C) s t h.symm) := by
-    simpa only [Category.assoc] using congrArg (fun k => (ρ_ (𝟙_ C)).inv ≫ k) key
-  rw [hkey']
-  have hunit : (ρ_ (𝟙_ C)).inv ≫ (λ_ (𝟙_ C)).hom = 𝟙 _ := by
-    erw [MonoidalCategory.unitors_equal]
-    exact (ρ_ _).inv_hom_id
-  simpa only [Category.assoc, Category.id_comp] using
-    congrArg (fun k => k ≫ simplexCrossProduct (C := C) s t h.symm) hunit
+  simp only [key]
+  rw [reassoc_of% MonoidalCategory.unitors_equal]
+  simp
 
-/-- TopCat transport of the `q = 0` simplex cross-product formula. -/
-lemma simplexCrossProduct_zero_right {X Y : TopCat.{v}} {n : ℕ}
-    (s : SingularSimplex X n) (c : SingularSimplex Y 0) :
-    simplexCrossProduct (C := C) s c (show n = n + 0 by omega) =
-      simplexCoprojection (C := C)
-        (ULift.up (prod.lift s.down (SimplexCategory.toTop.map default ≫ c.down)) :
-          SingularSimplex (X ⨯ Y) n) := by
-  rw [simplexCrossProduct, HomologyLean.SingularHomology.SSetEZ.simplexCrossProduct_zero_right,
-    HomologyLean.SingularHomology.SSetEZ.simplexCoprojection_comp_SCF_map]
-  sorry
 
 /-- The product comparison isomorphism for `TopCat.toSSet` sends the pair of
 singular simplices `(s, t)` to the singular simplex of `X × Y` induced by

@@ -1,8 +1,14 @@
 import Mathlib.Algebra.Homology.Homotopy
-import HomologyLean.Tactic.NormalizeProofs
 import HomologyLean.CategoryTheory.SubTensorHom
 import HomologyLean.SingularHomology.HomotopyMap
 import HomologyLean.SingularHomology.EilenbergZilber
+import HomologyLean.Tactic.NameParts
+
+open Lean Elab Tactic Meta in
+elab "count_hyps" : tactic => withMainContext do
+  let lctx ← getLCtx
+  let count := lctx.decls.toList.filterMap id |>.length
+  logInfo m!"hypothesis count: {count}"
 
 noncomputable section
 
@@ -298,6 +304,7 @@ noncomputable def singularChain_chainHomotopy_of_homotopy {X Y : TopCat.{v}} {f 
       MonoidalCategory.curriedTensor_obj_obj, MonoidalCategory.whisker_exchange_assoc,
       MonoidalCategory.whiskerRight_id, Category.assoc, Iso.inv_hom_id_assoc]
     dsimp only [chainH, Hmap]
+    name_parts _ = ?LHS
     module
 
 /-- Homotopic maps induce equal maps on singular homology. -/
