@@ -1158,104 +1158,23 @@ variable [(forget C).LaxMonoidal] [MonoidalLinear ℤ C]
   [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
   [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
 
-
-/-- The universal Leibniz rule lifted to the coprojection/`chainCrossProduct` level. -/
-private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
-    ((simplexCoprojection (C := C) (idSimplex (p + 1)) ⊗ₘ
-        simplexCoprojection (idSimplex (q + 1))) ≫
-      chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl)) ≫
-      (singChain (C := C) (Δ[p + 1] ⊗ₛ Δ[q + 1])).d ((p + 1) + (q + 1)) (p + (q + 1)) =
-    ((simplexCoprojection (idSimplex (p + 1)) ⊗ₘ simplexCoprojection (idSimplex (q + 1))) ≫
-        ((singChain (C := C) Δ[p + 1]).d (p + 1) p ⊗ₘ
-          𝟙 ((singChain (C := C) Δ[q + 1]).X (q + 1)))) ≫
+/-- **Leibniz rule** (chain map condition): The chain-level cross product is compatible
+with the boundary operators. -/
+theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
+    chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl) ≫
+      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
+    ((singChain (C := C) S).d (p + 1) p ⊗ₘ
+        𝟙 ((singChain (C := C) T).X (q + 1))) ≫
       chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
     ((-1 : ℤ) ^ (p + 1)) •
-      ((simplexCoprojection (idSimplex (p + 1)) ⊗ₘ simplexCoprojection (idSimplex (q + 1))) ≫
-          (𝟙 ((singChain (C := C) Δ[p + 1]).X (p + 1)) ⊗ₘ
-            (singChain (C := C) Δ[q + 1]).d (q + 1) q)) ≫
-        chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega) := by
-  rw [coprojection_tensorHom_chainCrossProduct]
-  simp only [simplexCrossProduct, Category.assoc]
-  -- yonedaEquiv.symm (idSimplex n) = 𝟙 Δ[n]
-  have yoneda_id : ∀ (n : ℕ), SSet.yonedaEquiv.symm (idSimplex n) = 𝟙 Δ[n] := by
-    intro n
-    dsimp [idSimplex]
-    ext d x : 2
-    simpa using
-      (yonedaEquiv_symm_objEquiv_symm_app (f := 𝟙 ⦋n⦌) (g := x.down))
-  rw [yoneda_id, yoneda_id, MonoidalCategory.id_tensorHom_id]
-  slice_lhs 3 4 => rw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
-  simp only [Category.id_comp]
-  rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
+      ((𝟙 ((singChain (C := C) S).X (p + 1)) ⊗ₘ
+          (singChain (C := C) T).d (q + 1) q) ≫
+        chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
+  apply chainCrossProduct.ext
+  ext ⟨s, t⟩
+  simp only [chainTensorHomEquiv_apply]
+  rw [Preadditive.comp_add, Preadditive.comp_zsmul]
   congr 1
-  · -- Goal 1: left face sum
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
-      ← coprojection_tensorHom_chainCrossProduct]
-    rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
-    conv_rhs =>
-      enter [1, 1, 2]
-      rw [singChain_d_eq_alternatingFaceMapObjD (C := C) Δ[p + 1] p rfl]
-    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-      Preadditive.comp_sum, Preadditive.comp_zsmul,
-      sum_tensor, Preadditive.sum_comp]
-    apply Finset.sum_congr rfl; intro j _
-    conv_lhs =>
-      enter [2, 1, 1, 1]
-      rw [faceSimplex_eq_delta_idSimplex]
-    rw [← Preadditive.zsmul_comp, ← Preadditive.zsmul_comp]
-    congr 1
-    conv_rhs => enter [1]; rw [Preadditive.zsmul_comp]
-    conv_rhs => rw [zsmul_tensorHom]
-    congr 1; congr 1
-    rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (p + 1)) j]
-  · -- Goal 2: right face sum
-    congr 1
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
-      ← coprojection_tensorHom_chainCrossProduct]
-    rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc, Category.comp_id]
-    conv_rhs =>
-      enter [1, 2]
-      rw [singChain_d_eq_alternatingFaceMapObjD (C := C) Δ[q + 1] q rfl]
-    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-      Preadditive.comp_sum, Preadditive.comp_zsmul,
-      tensor_sum, Preadditive.sum_comp]
-    apply Finset.sum_congr rfl; intro j _
-    conv_lhs =>
-      enter [2, 1, 2]
-      rw [faceSimplex_eq_delta_idSimplex]
-    rw [← Preadditive.zsmul_comp]
-    conv_rhs =>
-      enter [1, 2]; rw [← Preadditive.zsmul_comp]
-    conv_rhs =>
-      enter [1]
-      rw [MonoidalCategory.tensorHom_def', Preadditive.zsmul_comp,
-        MonoidalLinear.whiskerLeft_smul, Preadditive.zsmul_comp,
-        ← MonoidalCategory.tensorHom_def']
-    congr 1; congr 1; congr 1
-    rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (q + 1)) j]
-
-/-- Simplex-level Leibniz rule for `chainCrossProduct`: the cross product of
-`(s, t)` composed with the boundary equals the signed sum of face-map cross products.
-
-This lifts `universalSimplexCrossProduct_boundary` from the standard simplices to
-arbitrary simplices `s : S _⦋p+1⦌`, `t : T _⦋q+1⦌`,
-by factoring through `ι(id) ≫ s_*` and using naturality + chain map condition. -/
-lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
-    (s : S _⦋p + 1⦌) (t : T _⦋q + 1⦌) :
-    (simplexCoprojection (C := C) s ⊗ₘ simplexCoprojection t) ≫
-      chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl) ≫
-      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
-    (simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫
-      ((singChain (C := C) S).d (p + 1) p ⊗ₘ
-          𝟙 ((singChain (C := C) T).X (q + 1))) ≫
-        chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
-    ((-1 : ℤ) ^ (p + 1)) •
-      ((simplexCoprojection s ⊗ₘ simplexCoprojection t) ≫
-        (𝟙 ((singChain (C := C) S).X (p + 1)) ⊗ₘ
-            (singChain (C := C) T).d (q + 1) q) ≫
-          chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
-  set fs := SSet.yonedaEquiv.symm s
-  set ft := SSet.yonedaEquiv.symm t
   simp only [MonoidalCategory.tensorHom_id, Int.reduceNeg, MonoidalCategory.id_tensorHom]
   -- Factor ι(s) = ι(id) ≫ s_* and ι(t) = ι(id) ≫ t_* via `simplexCoprojection_factor`,
   -- then fuse into (ι(id) ≫ s_* ⊗ₘ ι(id) ≫ t_*).
@@ -1267,8 +1186,7 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
   rw [MonoidalCategory.tensorHom_comp_whiskerRight_assoc,]
   rw [MonoidalCategory.tensorHom_comp_whiskerLeft_assoc]
   -- Apply chain map commutativity: s_* ≫ d_S = d_Δ ≫ s_* (and similarly for t_*).
-  simp only [Category.assoc]
-  simp only [HomologicalComplex.Hom.comm, Int.reduceNeg]
+  simp only [Category.assoc, HomologicalComplex.Hom.comm, Int.reduceNeg]
   -- Apply `crossProduct_natural_monoidal` to pull (… ≫ s_* ⊗ₘ … ≫ t_*) ≫ ×
   -- into (… ⊗ₘ …) ≫ × ≫ (s ⊗ t)_* in each summand (LHS and both RHS terms).
   rw [(crossProduct_natural_monoidal_assoc (C := C) _ _)]
@@ -1276,8 +1194,7 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
   repeat' rw [(crossProduct_natural_monoidal (C := C) _ _)]
   -- Use chain map commutativity for (s ⊗ t)_*: rewrite (s ⊗ t)_* ≫ d_{S⊗T}
   -- into d_{Δ⊗Δ} ≫ (s ⊗ t)_* on the LHS.
-  simp only [Category.assoc]
-  rw [((SCF (C := C)).map (fs ⊗ₘₛ ft)).comm ((p + 1) + (q + 1)) (p + (q + 1))]
+  simp only [Category.assoc, HomologicalComplex.Hom.comm, Int.reduceNeg]
   -- Factor out the common trailing ≫ (s ⊗ t)_* from both sides.
   simp only [← Category.assoc]
   rw [← Preadditive.zsmul_comp, ← Preadditive.add_comp]
@@ -1296,23 +1213,24 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
   rw [yoneda_id, yoneda_id, MonoidalCategory.id_tensorHom_id]
   slice_lhs 3 4 => rw [(SCF (C := C)).map_id, HomologicalComplex.id_f]
   simp only [Category.id_comp]
-  -- Apply the universal Leibniz rule, then distribute ≫ over + and •.
+  -- Apply the universal Leibniz rule, expand d as alternating face map sums,
+  -- and reduce to matching individual summands.
   rw [universalSimplexCrossProduct_boundary, Preadditive.comp_add, Preadditive.comp_zsmul]
+  -- Distribute (λ_).hom ≫ over the sums and unfold each simplexCrossProduct into
+  -- coprojection tensors ≫ chainCrossProduct.
+  simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
+    ← coprojection_tensorHom_chainCrossProduct]
+  -- Expand d as the alternating face map sum ∑ⱼ (-1)^j δⱼ.
+  simp only [singChain_d_eq_alternatingFaceMapObjD]
+  -- Unfold AlternatingFaceMapComplex.objD and distribute the sums through ⊗ₘ.
+  simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
+    Preadditive.comp_sum, Preadditive.comp_zsmul,
+    sum_tensor, tensor_sum, Preadditive.sum_comp]
   congr 1
-  · -- Goal 1: match the left face sum ∑ⱼ (-1)^j ι(δⱼ id) ⊗ₘ ι(id) ≫ ×
-    -- against (ι(id) ≫ d ⊗ₘ ι(id)) ≫ × by expanding d as the alternating face map sum.
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
-      ← coprojection_tensorHom_chainCrossProduct]
-    conv_rhs =>
-      enter [1, 1, 2]
-      rw [singChain_d_eq_alternatingFaceMapObjD (C := C) Δ[p + 1] p rfl]
-    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-      Preadditive.comp_sum, Preadditive.comp_zsmul,
-      sum_tensor, Preadditive.sum_comp]
+  · -- Goal 1: left face sum — match ∑ⱼ (-1)^j ι(δⱼ id) ⊗ₘ ι(id) ≫ ×
+    -- against ∑ⱼ (-1)^j (ι(id) ≫ δⱼ ⊗ₘ ι(id)) ≫ ×.
     apply Finset.sum_congr rfl; intro j _
-    conv_lhs =>
-      enter [2, 1, 1, 1]
-      rw [faceSimplex_eq_delta_idSimplex]
+    simp only [faceSimplex_eq_delta_idSimplex]
     rw [← Preadditive.zsmul_comp, ← Preadditive.zsmul_comp]
     congr 1
     conv_rhs => enter [1]; rw [Preadditive.zsmul_comp]
@@ -1320,21 +1238,11 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
     -- Rewrite ι(δⱼ(id)) as ι(id) ≫ δⱼ on the chain level.
     congr 1; congr 1
     rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (p + 1)) j]
-  · -- Goal 2: match the right face sum ∑ⱼ (-1)^j ι(id) ⊗ₘ ι(δⱼ id) ≫ ×
-    -- against (ι(id) ⊗ₘ ι(id) ≫ d) ≫ × by expanding d as the alternating face map sum.
+  · -- Goal 2: right face sum — match ∑ⱼ (-1)^j ι(id) ⊗ₘ ι(δⱼ id) ≫ ×
+    -- against ∑ⱼ (-1)^j (ι(id) ⊗ₘ ι(id) ≫ δⱼ) ≫ ×.
     congr 1
-    simp only [Preadditive.comp_sum, Preadditive.comp_zsmul,
-      ← coprojection_tensorHom_chainCrossProduct]
-    conv_rhs =>
-      enter [1, 2]
-      rw [singChain_d_eq_alternatingFaceMapObjD (C := C) Δ[q + 1] q rfl]
-    simp only [eqToHom_refl, Category.id_comp, AlternatingFaceMapComplex.objD,
-      Preadditive.comp_sum, Preadditive.comp_zsmul,
-      tensor_sum, Preadditive.sum_comp]
     apply Finset.sum_congr rfl; intro j _
-    conv_lhs =>
-      enter [2, 1, 2]
-      rw [faceSimplex_eq_delta_idSimplex]
+    simp only [faceSimplex_eq_delta_idSimplex]
     rw [← Preadditive.zsmul_comp]
     -- Pull the sign through the left-whiskered tensor to match the RHS shape.
     conv_rhs =>
@@ -1347,26 +1255,6 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
     -- Rewrite ι(δⱼ(id)) as ι(id) ≫ δⱼ on the chain level.
     congr 1; congr 1; congr 1
     rw [← simplexCoprojection_comp_δ (C := C) (idSimplex (q + 1)) j]
-
-
-/-- **Leibniz rule** (chain map condition): The chain-level cross product is compatible
-with the boundary operators. -/
-theorem chainCrossProduct_leibniz {S T : SSet.{v}} (p q : ℕ) :
-    chainCrossProduct (C := C) (show (p + 1) + (q + 1) = (p + 1) + (q + 1) from rfl) ≫
-      (singChain (C := C) (S ⊗ₛ T)).d ((p + 1) + (q + 1)) (p + (q + 1)) =
-    ((singChain (C := C) S).d (p + 1) p ⊗ₘ
-        𝟙 ((singChain (C := C) T).X (q + 1))) ≫
-      chainCrossProduct (C := C) (show p + (q + 1) = p + (q + 1) from rfl) +
-    ((-1 : ℤ) ^ (p + 1)) •
-      ((𝟙 ((singChain (C := C) S).X (p + 1)) ⊗ₘ
-          (singChain (C := C) T).d (q + 1) q) ≫
-        chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
-  apply chainCrossProduct.ext
-  ext ⟨s, t⟩
-  simp only [chainTensorHomEquiv_apply]
-  rw [Preadditive.comp_add, Preadditive.comp_zsmul]
-  congr 1
-  exact simplexCrossProduct_boundary (C := C) p q s t
 
 /-! ### Edge cases for the Leibniz rule -/
 
