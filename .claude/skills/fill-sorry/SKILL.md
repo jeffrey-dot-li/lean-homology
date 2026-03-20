@@ -17,6 +17,7 @@ Target: $ARGUMENTS
    - To retrieve "Try this" suggestions from `simp?`/`exact?`/`apply?`, use `lean_diagnostic_messages` with `severity="info"` on the relevant line — the suggestions are info-level diagnostics.
 4. If those fail, **simplify the goal first** before searching Mathlib:
    - Try `simp`, `dsimp`, `ext`, `change` to make the goal more concrete
+   - If the goal is a wall of text (20+ lines of compositions/sums), use `name_parts ?LHS = ?RHS` (or finer patterns like `?A + ?B = ?C + ?D`) to bind names to sub-expressions. This makes the structure visible and lets closing tactics like `module`/`abel`/`ring` work on the named form. See `proof-strategies.md` for full syntax and caveats.
    - Check `lean_goal` — often the simplified goal suggests the next step
    - Use `simpa using h` to see if existing hypotheses close it after simplification
 5. Only search Mathlib (`lean_state_search`, `lean_leansearch`, `lean_loogle`) when you have a **specific** lemma shape in mind, not as a fishing expedition.

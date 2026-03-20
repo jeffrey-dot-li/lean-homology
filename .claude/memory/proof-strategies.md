@@ -71,6 +71,48 @@ slice_lhs 2 3 =>
 Key: `rewrite` applies the substitution without the `rfl` closer, so the conv block
 sees the fully rewritten term and propagates it correctly to the outer goal.
 
+### `name_parts` for naming sub-expressions in huge goals (project tactic)
+
+**This is a custom tactic defined in `HomologyLean/Tactic/NameParts.lean`.** It does not
+exist in Lean or Mathlib — you must `import HomologyLean.Tactic.NameParts` to use it.
+
+When the goal is a wall of compositions/sums (e.g., 20+ lines of `≫`, `+`, `•`) and you
+need to reason about the *structure* without drowning in the *content*, use `name_parts`
+to bind names to sub-expressions via pattern matching:
+
+```lean
+-- Goal: (huge LHS) = (huge RHS)
+name_parts ?LHS = ?RHS
+-- Now: LHS : X ⟶ Y := (huge LHS), RHS : X ⟶ Y := (huge RHS)
+-- Goal: LHS = RHS
+
+-- Goal: a • f ≫ g + b • f ≫ h = c • f ≫ g + d • f ≫ h
+name_parts ?A + ?B = ?C + ?D
+-- Now: A := a • f ≫ g, B := b • f ≫ h, C := c • f ≫ g, D := d • f ≫ h
+-- Goal: A + B = C + D
+```
+
+**When to use:**
+- The goal is too large to read in the infoview and you want to name its structural parts
+- You want to decompose a big equality into named pieces before `module`, `abel`, `ring`
+- `set` would require copying out 5-line expressions verbatim (impractical with `⋯` witnesses)
+- `refine ?A = ?B` fails with "typeclass instance problem is stuck" (common on morphisms)
+
+**How it works:** Elaborates the pattern against the goal type (like `change`, not `refine`),
+so typeclass resolution succeeds. Named holes (`?A`, `?B`) become `let`-bindings in the
+context; anonymous holes (`_`) are matched but not named.
+
+**Caveats:**
+- **Associativity**: `a + b + c` is `(a + b) + c`, so `?A + ?B + ?C` gives `A = a + b`,
+  `B = c`, and `C` fails. Write `(?A + ?B) + ?C` to match the actual parse tree.
+- **Greedy matching**: `?A ≫ ?B` in `a ≫ b ≫ c ≫ d` gives `A = a`, `B = b ≫ c ≫ d`.
+- **Downstream tactics**: `module`, `abel`, `ring`, `subst`, `exact` all see through the
+  `let`-bindings. `rw` does NOT — it can't rewrite under `let`. Place `name_parts` right
+  before a closing tactic, not before `rw`/`simp_rw` chains.
+- **One side only**: `name_parts ?A = _` names only the LHS; the RHS stays as-is.
+
+---
+
 ### Extract rewrite lemmas to avoid unfolding
 - If the proof needs to unfold a definition, push through it, and re-fold — that's a missing lemma.
 - Example: `mι_comp_map` captures `mι s ≫ chain_map f = mι (f_*(s))` without ever exposing `colimit.ι_desc` or `TopCat.toSSet` internals.
