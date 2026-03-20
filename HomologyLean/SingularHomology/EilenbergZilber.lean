@@ -484,6 +484,20 @@ The RHS is two sums: one over `(j, ν)` with `ν : Shuffle p (q+1)`, one over
 3. **Cancel diagonal remainder** via `swapDiagonalSteps` sign-reversing involution.
 -/
 
+/-- From membership in the sigma finset of pairs satisfying `P`, recover the diagonal-vertex
+statement when `P μ r` is (propositionally) `Shuffle.isDiagonalVertex μ (r.cast castIdx)`. -/
+private lemma shuffle_diagOfSigmaMem {p q : ℕ}
+    (castIdx : p + (q + 1) + 2 = (p + 1) + (q + 1) + 1)
+    (P : Shuffle (p + 1) (q + 1) → Fin (p + (q + 1) + 2) → Prop)
+    [∀ μ, DecidablePred (P μ)]
+    {x : Σ _ : Shuffle (p + 1) (q + 1), Fin (p + (q + 1) + 2)}
+    (hx : x ∈ (Finset.univ : Finset (Shuffle (p + 1) (q + 1))).sigma
+      fun μ => Finset.filter (P μ) Finset.univ)
+    (hP : ∀ μ r, P μ r = Shuffle.isDiagonalVertex μ (r.cast castIdx)) :
+    Shuffle.isDiagonalVertex x.1 (x.2.cast castIdx) := by
+  rw [← hP x.1 x.2]
+  exact (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2
+
 /-- The boundary of the universal simplex cross product decomposes as a signed sum
 of face-map cross products (the "universal Leibniz rule"):
 ```
@@ -504,6 +518,7 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
         ((-1 : ℤ) ^ (j : ℕ)) •
           simplexCrossProduct (C := C) (idSimplex (p + 1)) (faceSimplex j) := by
   have hrel : (p + 1 + (q + 1) : ℕ) = (p + (q + 1)) + 1 := by omega
+  have castIdx : p + (q + 1) + 2 = (p + 1) + (q + 1) + 1 := by omega
   -- Expand d into alternating face map sum
   rw [universalSimplexCrossProduct, Preadditive.sum_comp]
   -- Navigate into each summand to rewrite d
@@ -548,9 +563,11 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   simp_rw [Finset.smul_sum, smul_smul]
   -- Step 8: Split inner sum into diagonal + non-diagonal vertices.
   let isDiag := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + (q + 1) + 2)) =>
-    Shuffle.isDiagonalVertex μ (r.cast (show p + (q + 1) + 2 = (p + 1) + (q + 1) + 1 from by omega))
+    Shuffle.isDiagonalVertex μ (r.cast castIdx)
   haveI isDiag_dec : ∀ μ, DecidablePred (isDiag μ) :=
     fun μ r => Shuffle.isDiagonalVertex_decidable μ _
+  have isDiag_eq_vertex (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + (q + 1) + 2)) :
+      isDiag μ r = Shuffle.isDiagonalVertex μ (r.cast castIdx) := rfl
   conv_lhs =>
     enter [2, x]
     rw [show ∑ r, _ = _ from
@@ -560,21 +577,18 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
   -- Step 10: Cancel the diagonal sum via sign-reversing involution.
   convert (zero_add _) using 2
   · -- Diagonal pairs `(μ, r)` as a sigma finset; cancel with `Finset.sum_involution`.
-    let castEq : p + (q + 1) + 2 = (p + 1) + (q + 1) + 1 := by omega
     rw [Finset.sum_sigma' (σ := fun _ : Shuffle (p + 1) (q + 1) => Fin (p + (q + 1) + 2))
         Finset.univ (fun μ => Finset.filter (isDiag μ) Finset.univ)]
     refine Finset.sum_involution
       (fun x hx =>
         Sigma.mk
-          (Shuffle.swapDiagonalSteps x.1 (x.2.cast castEq)
-            (by
-              simpa [isDiag] using (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2))
+          (Shuffle.swapDiagonalSteps x.1 (x.2.cast castIdx)
+            (shuffle_diagOfSigmaMem castIdx isDiag hx isDiag_eq_vertex))
           x.2)
       (fun x hx => by
         simp only [Int.reduceNeg, eqToHom_op]
-        have hr : Shuffle.isDiagonalVertex x.1 (x.2.cast castEq) :=
-          by simpa [isDiag] using (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2
-        have hsign := Shuffle.swapDiagonalSteps_neg_sign x.1 (x.2.cast castEq) hr
+        have hr := shuffle_diagOfSigmaMem castIdx isDiag hx isDiag_eq_vertex
+        have hsign := Shuffle.swapDiagonalSteps_neg_sign x.1 (x.2.cast castIdx) hr
         -- Sign flips on the swap; turn `f x + f (g x) = 0` into scaled morphism equality, then
         -- `congr` through `δ` / tensor via `fst/sndHom_swapDiagonalSteps_comp_δ`.
         rw [hsign, neg_mul, neg_smul]
@@ -592,20 +606,17 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
           simp [sndHom_swapDiagonalSteps_comp_δ x.1 x.2 hr]
       )
       (fun x hx _ => by
-        have hr : Shuffle.isDiagonalVertex x.1 (x.2.cast castEq) :=
-          by simpa [isDiag] using (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2
-        exact ne_of_apply_ne Sigma.fst (Shuffle.swapDiagonalSteps_ne x.1 (x.2.cast castEq) hr))
+        have hr := shuffle_diagOfSigmaMem castIdx isDiag hx isDiag_eq_vertex
+        exact ne_of_apply_ne Sigma.fst (Shuffle.swapDiagonalSteps_ne x.1 (x.2.cast castIdx) hr))
       (fun x hx => by
-        have hr : Shuffle.isDiagonalVertex x.1 (x.2.cast castEq) :=
-          by simpa [isDiag] using (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2
+        have hr := shuffle_diagOfSigmaMem castIdx isDiag hx isDiag_eq_vertex
         simp only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and, isDiag]
-        simpa using Shuffle.swapDiagonalSteps_vertex x.1 (x.2.cast castEq) hr)
+        simpa using Shuffle.swapDiagonalSteps_vertex x.1 (x.2.cast castIdx) hr)
       (fun x hx => by
         rcases x with ⟨μ, r⟩
-        have hr : Shuffle.isDiagonalVertex μ (r.cast castEq) :=
-          by simpa [isDiag] using (Finset.mem_filter.mp (Finset.mem_sigma.mp hx).2).2
+        have hr := shuffle_diagOfSigmaMem castIdx isDiag hx isDiag_eq_vertex
         dsimp
-        refine Sigma.ext (Shuffle.swapDiagonalSteps_involutive μ (r.cast castEq) hr) (by simp))
+        refine Sigma.ext (Shuffle.swapDiagonalSteps_involutive μ (r.cast castIdx) hr) (by simp))
   · -- Step 11: Split non-diagonal sum into left-type + right-type vertices.
     let isLeftType := fun (μ : Shuffle (p + 1) (q + 1)) (r : Fin (p + (q + 1) + 2)) =>
       Shuffle.isLeftStep μ ⟨min r.val ((p + 1) + (q + 1) - 1), by omega⟩
