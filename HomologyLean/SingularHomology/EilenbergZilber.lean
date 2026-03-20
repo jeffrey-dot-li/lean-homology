@@ -1084,17 +1084,12 @@ section MonoidalAdditive
 variable [MonoidalPreadditive C]
 
 /-! ### Tensor product of chain complexes: instances -/
-
-section TensorAdditiveInstances
-variable [MonoidalPreadditive C]
-
-instance curriedTensor_additive :
+instance curriedTensor_additive [MonoidalPreadditive C] :
     (MonoidalCategory.curriedTensor C).Additive where
   map_add {X Y} f g := by
     apply NatTrans.ext; funext Z
     exact MonoidalPreadditive.add_whiskerRight f g
 
-end TensorAdditiveInstances
 
 instance hasCoproducts_zero_of_v : HasCoproducts.{0} C :=
   hasCoproducts_shrink.{0, v}
@@ -1131,13 +1126,12 @@ lemma ι_eilenbergZilber_f (S T : SSet.{v}) (p q n : ℕ) (h : p + q = n) :
       eilenbergZilber_f (C := C) S T n =
     chainCrossProduct (C := C) h.symm :=
   ι_mapBifunctorDesc _ _ _ h
-section MonoidalCoherence
-variable [(forget C).LaxMonoidal]
+
+section MonoidalLinear
+variable [(forget C).LaxMonoidal] [MonoidalLinear ℤ C]
   [(Adjunction.ofIsRightAdjoint (forget C)).IsMonoidal]
   [NatTrans.IsMonoidal (MonoidalUnitorRepresentable.forgetIso (C := C)).hom]
 
-section MonoidalLinear
-variable [MonoidalLinear ℤ C]
 
 /-- The universal Leibniz rule lifted to the coprojection/`chainCrossProduct` level. -/
 private lemma universalSimplexCrossProduct_coprojection_boundary (p q : ℕ) :
@@ -1236,6 +1230,10 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
           chainCrossProduct (C := C) (show p + (q + 1) = (p + 1) + q from by omega)) := by
   set fs := SSet.yonedaEquiv.symm s
   set ft := SSet.yonedaEquiv.symm t
+  simp only [MonoidalCategory.tensorHom_id, Int.reduceNeg, MonoidalCategory.id_tensorHom]
+  -- rw [←yonedaEquiv_symm_app]
+  -- rw [simplexCoprojection_comp_SCF_map, yonedaEquiv_symm_app]
+
   rw [simplexCoprojection_factor s, simplexCoprojection_factor t,
       ← MonoidalCategory.tensorHom_comp_tensorHom]
   simp only [Category.assoc]
@@ -1245,30 +1243,35 @@ lemma simplexCrossProduct_boundary {S T : SSet.{v}} (p q : ℕ)
   -- apply chain map comm fs_* ≫ d_S = d_Δ ≫ fs_*, then unfuse back
   conv_rhs =>
     enter [1, 2]
-    rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc,
-        ((SCF (C := C)).map fs).comm (p + 1) p, Category.comp_id,
+    rw [MonoidalCategory.tensorHom_comp_whiskerRight_assoc,
+        ((SCF (C := C)).map fs).comm (p + 1) p,
         ← Category.id_comp (((SCF (C := C)).map ft).f (q + 1)),
-        ← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
+        -- ← MonoidalCategory.tensorHom_comp_tensorHom_assoc
+        ]
   -- RHS Term 2: fuse (fs_* ⊗ ft_*) ≫ (𝟙 ⊗ d_T) into (fs_* ⊗ ft_* ≫ d_T),
   -- apply chain map comm ft_* ≫ d_T = d_Δ ≫ ft_*, then unfuse back
   conv_rhs =>
     enter [2, 2, 2]
-    rw [MonoidalCategory.tensorHom_comp_tensorHom_assoc,
-        ((SCF (C := C)).map ft).comm (q + 1) q, Category.comp_id,
+    rw [MonoidalCategory.tensorHom_comp_whiskerLeft_assoc,
+        ((SCF (C := C)).map ft).comm (q + 1) q,
         ← Category.id_comp (((SCF (C := C)).map fs).f (p + 1)),
-        ← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
+    ]
   -- Now each summand has ... ≫ (d ⊗ 𝟙) ≫ (fs_* ⊗ ft_*) ≫ chainCrossProduct.
   -- Use `crossProduct_natural` backwards:
   -- `(fs_* ⊗ ft_*) ≫ chainCrossProduct = chainCrossProduct ≫ (fs ⊗ ft)_*`.
   -- Term 1: navigate to (fs_* ⊗ ft_*) ≫ chainCrossProduct at position [2, 2] of the first summand
-  conv_rhs =>
-    enter [1, 2, 2]
-    rw [(crossProduct_natural (C := C) fs ft).symm]
-  -- Term 2: navigate to (fs_* ⊗ ft_*) ≫ chainCrossProduct at position [2, 2, 2] of the zsmul term
-  conv_rhs =>
-    enter [2, 2, 2, 2]
-    rw [(crossProduct_natural (C := C) fs ft
-      (show p + (q + 1) = (p + 1) + q from by omega)).symm]
+  -- simp only [Category.id_comp, MonoidalCategory.tensorHom_comp_tensorHom_assoc,
+  --   simplexCoprojection_comp_SCF_map, Int.reduceNeg,
+  -- ]
+
+  -- simp only [Category.id_comp, ]
+
+  -- (simp only [MonoidalCategory.tensorHom_comp_tensorHom_assoc  ])
+  -- (simp only [simplexCoprojection_comp_SCF_map])
+  -- simp
+  simp only [← MonoidalCategory.tensorHom_comp_tensorHom_assoc]
+  repeat' rw [(crossProduct_natural (C := C) _ _).symm]
+
   -- Factor out trailing ≫ (fs ⊗ ft)_* from both summands by left-associating
   simp only [← Category.assoc]
   rw [← Preadditive.zsmul_comp, ← Preadditive.add_comp]
@@ -1406,9 +1409,7 @@ theorem chainCrossProduct_leibniz_left_zero {S T : SSet.{v}} (q : ℕ) :
   -- Cancel (-1) ^ ↑j
   congr 1
   -- LHS: fold ι(shuffleSimplex ...) ≫ δⱼ as ι(δⱼ(shuffleSimplex ...))
-  rw [coprojection_tensorHom_chainCrossProduct_assoc,
-  simplexCrossProduct_zero_left (C := C)]
-  --
+  rw [coprojection_tensorHom_chainCrossProduct_assoc, simplexCrossProduct_zero_left (C := C)]
   simp only [simplexCoprojection_comp_δ]
   -- RHS: use coprojection_tensorHom_chainCrossProduct and simplexCrossProduct_zero_left
   rw [coprojection_tensorHom_chainCrossProduct]
@@ -1528,20 +1529,7 @@ lemma eilenbergZilber_comm_case_0q {S T : SSet.{v}} (q n m : ℕ)
     from by simp [ComplexShape.ε₂, ComplexShape.ε], one_smul, Category.assoc, ι_eilenbergZilber_f]
   convert chainCrossProduct_leibniz_left_zero (C := C) (S := S) (T := T) m using 1
   simp [MonoidalCategory.curriedTensor]
-/-- The Eilenberg–Zilber chain map condition: `eilenbergZilber_f` commutes with
-the differentials. Case-splits on the `(p, q)` summand. -/
-lemma eilenbergZilber_comm (S T : SSet.{v}) (n m : ℕ) (hnm : n = m + 1) :
-    eilenbergZilber_f (C := C) S T n ≫ (singChain (C := C) (S ⊗ₛ T)).d n m =
-    ((singChain (C := C) S).tensorObj (singChain (C := C) T)).d n m ≫
-      eilenbergZilber_f (C := C) S T m := by
-  apply HomologicalComplex.mapBifunctor.hom_ext
-  intro p q hpq
-  change p + q = n at hpq
-  rcases p with _ | p <;> rcases q with _ | q
-  · omega
-  · exact eilenbergZilber_comm_case_0q q n m hpq hnm
-  · exact eilenbergZilber_comm_case_p0 p n m hpq hnm
-  · exact eilenbergZilber_comm_case_pq p q n m hpq hnm
+
 /-- **Eilenberg–Zilber cross product chain map** for simplicial sets.
 
 The cross product of singular chains, packaged as a chain map from the tensor
@@ -1556,7 +1544,14 @@ noncomputable def eilenbergZilber (S T : SSet.{v}) :
   f n := eilenbergZilber_f (C := C) S T n
   comm' n m hnm := by
     have h : n = m + 1 := by rw [ComplexShape.down_Rel] at hnm; omega
-    exact eilenbergZilber_comm (C := C) S T n m h
+    apply HomologicalComplex.mapBifunctor.hom_ext
+    intro p q hpq
+    change p + q = n at hpq
+    rcases p with _ | p <;> rcases q with _ | q
+    · omega
+    · exact eilenbergZilber_comm_case_0q q n m hpq h
+    · exact eilenbergZilber_comm_case_p0 p n m hpq h
+    · exact eilenbergZilber_comm_case_pq p q n m hpq h
 
 /-! ### Eilenberg–Zilber as a natural transformation
 
@@ -1639,7 +1634,6 @@ lemma ι_eilenbergZilberNatTrans_app_f (S T : SSet.{v}) (p q n : ℕ) (h : p + q
 
 end EilenbergZilberAssembly
 end MonoidalLinear
-end MonoidalCoherence
 end MonoidalAdditive
 end MonoidalFree
 end FreeForgetful
