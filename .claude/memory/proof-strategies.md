@@ -376,6 +376,31 @@ For eliminating `h ▸` transports when `subst` fails, see **[`api/transport-cas
 — use `generalize` to create a fresh variable, then `rcases`. If that also fails (due to
 successor-indexed defs like `SimplexCategory.δ`), decompose into a transport-only helper lemma.
 
+### `rw` fails with "motive is not type correct" on dependent proof terms
+
+When `rw [k]` (where `k : f x = y`) fails because the goal contains a **proof term** that
+depends on `f x` (e.g., `simplexCrossProduct ... ⋯` where `⋯` carries `f x` in its type),
+the motive abstraction is ill-typed. Neither `rw`, `simp only [k]`, nor `conv` can help.
+
+**Symptom**: "motive is not type correct ... `leftFace._proof_1`" or similar, where a proof
+argument's type mentions the term being rewritten.
+
+**Fix**: Use `generalize_proofs` + `generalize` + `subst` to introduce a fresh variable:
+
+```lean
+have k : f x = y := ...
+generalize_proofs at *        -- expose hidden proof terms as named hypotheses
+generalize f x = r at *       -- replace f x with fresh variable r everywhere (including proofs)
+subst k                        -- k : r = y, so subst eliminates r
+```
+
+**Why it works**: `generalize` replaces `f x` with a fresh variable `r` uniformly (including
+inside dependent types), making `k : r = y`. Then `subst k` eliminates `r` — which `subst`
+can do because `r` is now a free variable.
+
+**When to use**: Any time `rw` fails on an expression that appears inside proof terms (`⋯`)
+in the goal — common with index proofs in `simplexCrossProduct`, `chainCrossProduct`, etc.
+
 ### `rw`/`erw` can't rewrite under `∑` binders; universe mismatches block `simp_rw`
 
 `rw`/`erw` don't descend into lambda binders (`∑ x, f x` has a lambda). `simp_rw` does,
