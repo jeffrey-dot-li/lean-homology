@@ -805,40 +805,6 @@ theorem universalSimplexCrossProduct_boundary (p q : ℕ) :
     generalize Cplx.next (p + 1 + (q + 1)) = r at *
     subst h
     exact universalSimplexCrossProduct_boundary p q
-/-! ### Zero-index cross product lemmas -/
-
-/-- For `q = 0`, the cross product of an `n`-simplex `s` in `S` with a `0`-simplex `c`
-in `T` reduces to a single coprojection: there is a unique `(n, 0)`-shuffle with sign `1`,
-so the shuffle sum collapses. -/
-lemma simplexCrossProduct_zero_right {S T : SSet.{v}} {n : ℕ}
-    (s : S _⦋n⦌) (c : T _⦋0⦌) :
-    simplexCrossProduct (C := C) s c (show n = n + 0 by omega) =
-    simplexCoprojection (shuffleSimplex s c default (show n = n + 0 by omega)) := by
-  simp only [
-    simplexCrossProduct, universalSimplexCrossProduct,
-    Fintype.sum_unique, Shuffle.sign_default_zero_right,
-    one_smul, simplexCoprojection_comp_SCF_map
-  ]
-  congr 1
-  simpa only [SSet.tensorHom_app_apply] using
-    (yoneda_pair_eq_shuffleSimplex (s := s) (t := c) (μ := default)
-      (hn := show n = n + 0 by omega))
-
-/-- For `p = 0`, the cross product of a `0`-simplex `c` in `S` with an `n`-simplex `s`
-in `T` reduces to a single coprojection: there is a unique `(0, n)`-shuffle with sign `1`. -/
-lemma simplexCrossProduct_zero_left {S T : SSet.{v}} {n : ℕ}
-    (c : S _⦋0⦌) (s : T _⦋n⦌) :
-    simplexCrossProduct (C := C) c s (show n = 0 + n by omega) =
-    simplexCoprojection (shuffleSimplex c s default (show n = 0 + n by omega)) := by
-  simp only [
-    simplexCrossProduct, universalSimplexCrossProduct,
-    Fintype.sum_unique, Shuffle.sign_default_zero_left,
-    one_smul, simplexCoprojection_comp_SCF_map
-  ]
-  congr 1
-  simpa only [SSet.tensorHom_app_apply] using
-    (yoneda_pair_eq_shuffleSimplex (s := c) (t := s) (μ := default)
-      (hn := show n = 0 + n by omega))
 
 section FreeForgetful
 variable [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
