@@ -17,7 +17,7 @@ The following was proved by Aristotle:
     k.val ≤ (insertRightIndex ν k).val
 
 - private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
-    (r : Fin (p + q + 1)) :
+    (r : Fin (p + q)) :
     (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val
 
 - lemma shuffle_fst_succ_le {p q : ℕ} (ν : Shuffle p q) (i : Fin (p + q + 1))
@@ -27,7 +27,7 @@ The following was proved by Aristotle:
 - lemma insertLeftStep_face {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
     ∀ (k : Index (p + q)),
       (insertLeftStep ν j).1 (Fin.succAbove
-        (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p + 1) + q + 1))
+        (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p) + q + 1))
         (k.cast (by omega))) =
       (j.succAbove (ν.1 k).1, (ν.1 k).2)
 
@@ -180,7 +180,7 @@ private lemma coordSum_lt {p q : ℕ} (u : Shuffle p q)
     · exact absurd (Prod.ext (Fin.ext h1') (Fin.ext h2')) hinj
 
 /-- At every position `r`, the coordinate sum equals `r.val`. -/
-private lemma coordSum_eq {p q : ℕ} (u : Shuffle p q) (r : Fin (p + q + 1)) :
+lemma coordSum_eq {p q : ℕ} (u : Shuffle p q) (r : Fin (p + q + 1)) :
     (u.1 r).1.val + (u.1 r).2.val = r.val := by
   have castSucc_lt_succ : ∀ i : Fin (p + q), i.castSucc < i.succ := by
     intro i; simp [Fin.lt_def]
@@ -1367,16 +1367,16 @@ a sign-reversing involution that swaps the two steps around the removed vertex. 
 /-- A `(μ, r)` pair is a **diagonal term** if vertex `r` has one adjacent left
 step and one adjacent right step (in either order LR or RL).
 Boundary vertices (r = 0 or r = last) are never diagonal. -/
-def isDiagonalVertex {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) : Prop :=
+def isDiagonalVertex {p q : ℕ} (μ : Shuffle (p ) (q ))
+    (r : Index (p  + q)) : Prop :=
   if h₁ : 0 < r.val then
-    if h₂ : r.val < (p + 1) + (q + 1) then
+    if h₂ : r.val < (p ) + (q) then
       (isLeftStep μ ⟨r.val - 1, by omega⟩ ∧ ¬ isLeftStep μ ⟨r.val, h₂⟩) ∨
       (¬ isLeftStep μ ⟨r.val - 1, by omega⟩ ∧ isLeftStep μ ⟨r.val, h₂⟩)
     else False
   else False
 
-instance isDiagonalVertex_decidable {p q : ℕ} (μ : Shuffle (p + 1) (q + 1)) :
+instance isDiagonalVertex_decidable {p q : ℕ} (μ : Shuffle (p) (q)) :
     DecidablePred (isDiagonalVertex μ) := by
   intro r; unfold isDiagonalVertex; split_ifs <;> infer_instance
 
@@ -1389,7 +1389,7 @@ their images are disjoint. -/
 /-- Left insertion always produces a non-diagonal vertex: the two steps
 adjacent to the inserted vertex are both left steps (LL pattern). -/
 lemma insertLeftStep_not_diagonal {p q : ℕ}
-    (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    (ν : Shuffle p (q)) (j : Fin (p + 2)) :
     ¬isDiagonalVertex (insertLeftStep ν j)
       ((insertLeftIndex ν j).cast (by omega)) := by
   by_contra h_contra
@@ -1398,7 +1398,7 @@ lemma insertLeftStep_not_diagonal {p q : ℕ}
   generalize_proofs at *;
   split_ifs at h_contra ; simp_all +decide [ Shuffle.isLeftStep ];
   cases h : ( ν.insertLeftIndex j : ℕ ) <;> simp_all +decide [ Fin.castSucc, Fin.succ ];
-  · aesop;
+  · grind;
   · unfold Shuffle.insertLeftStep at * ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
     unfold Shuffle.insertLeftStepFun at * ; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
     cases h_contra <;> simp_all +decide [ Fin.succAbove ];
@@ -2041,21 +2041,21 @@ lemma insertLeft_insertRight_disjoint {p q : ℕ}
 
 /-- Left insertion produces a left-type vertex: the step at (or just before)
 the inserted vertex is a left step.  Here `isLeftType` checks `isLeftStep`
-at index `min r.val ((p+1)+(q+1)-1)`. -/
+at index `min r.val ((p+1)+(q)-1)`. -/
 lemma insertLeftStep_isLeftType {p q : ℕ}
-    (ν : Shuffle p (q + 1)) (j : Fin (p + 2)) :
+    (ν : Shuffle p (q)) (j : Fin (p + 2)) :
     isLeftStep (insertLeftStep ν j)
-      ⟨min (insertLeftIndex ν j).val ((p + 1) + (q + 1) - 1), by omega⟩ := by
-  cases min_cases ( ν.insertLeftIndex j : ℕ ) ( p + 1 + ( q + 1 ) - 1 ) <;> simp_all +decide [ Shuffle.isLeftStep ];
+      ⟨min (insertLeftIndex ν j).val ((p + 1) + (q) - 1), by omega⟩ := by
+  cases min_cases ( ν.insertLeftIndex j : ℕ ) ( p + 1 + ( q ) - 1 ) <;> simp_all +decide [ Shuffle.isLeftStep ];
   · have := insertLeftStep_isLeftStep_at ν j ( by omega ) ; aesop;
-  · -- Since the first component of the last element is (insertLeftIndex ν j).val, which is j.val + (q + 1), and the second component is 0, the pair (j, 0) is indeed the last element.
-    have h_last : (insertLeftIndex ν j).val = j.val + (q + 1) := by
-      have h_last : (insertLeftIndex ν j).val ≤ j.val + (q + 1) := by
+  · -- Since the first component of the last element is (insertLeftIndex ν j).val, which is j.val + (q ), and the second component is 0, the pair (j, 0) is indeed the last element.
+    have h_last : (insertLeftIndex ν j).val = j.val + (q) := by
+      have h_last : (insertLeftIndex ν j).val ≤ j.val + (q) := by
         apply_rules [ insertLeftIndex_le ]
       generalize_proofs at *; (
       linarith [ Fin.is_lt j ])
     generalize_proofs at *;
-    norm_num [ show ( ( ν.insertLeftStep j ) : Fin ( p + 1 + ( q + 1 ) + 1 ) → Index ( p + 1 ) × Index ( q + 1 ) ) = insertLeftStepFun ν j from rfl, insertLeftStepFun ] at *;
+    norm_num [ show ( ( ν.insertLeftStep j ) : Fin ( p + 1 + ( q ) + 1 ) → Index ( p + 1 ) × Index ( q  ) ) = insertLeftStepFun ν j from rfl, insertLeftStepFun ] at *;
     split_ifs <;> simp_all +decide [ Fin.succAbove ];
     · grind;
     · split_ifs <;> norm_num [ Fin.lt_iff_val_lt_val ] at * <;> omega;
@@ -2064,9 +2064,9 @@ lemma insertLeftStep_isLeftType {p q : ℕ}
 /-- Right insertion produces a non-left-type vertex: the step at (or just before)
 the inserted vertex is a right step, not a left step. -/
 lemma insertRightStep_not_isLeftType {p q : ℕ}
-    (ν : Shuffle (p + 1) q) (k : Fin (q + 2)) :
+    (ν : Shuffle (p) q) (k : Fin (q + 2)) :
     ¬isLeftStep (insertRightStep ν k)
-      ⟨min (insertRightIndex ν k).val ((p + 1) + (q + 1) - 1), by omega⟩ := by
+      ⟨min (insertRightIndex ν k).val ((p) + (q + 1) - 1), by omega⟩ := by
   intro h_left_step
   generalize_proofs at *;
   unfold isLeftStep at h_left_step;
@@ -2074,36 +2074,36 @@ lemma insertRightStep_not_isLeftType {p q : ℕ}
   unfold insertRightStepFun at h_left_step; simp +decide [ *, Fin.ext_iff ] at h_left_step ⊢;
   split_ifs at h_left_step <;> try linarith [ Fin.is_lt ( ν.insertRightIndex k ) ] ;
   any_goals omega;
-  · have := ν.1.monotone ( show ⟨ Min.min ( ν.insertRightIndex k : ℕ ) ( p + 1 + q ), by omega ⟩ ≤ ⟨ p + 1 + q, by omega ⟩ from Nat.min_le_right _ _ ) ; simp_all +decide [ Fin.le_iff_val_le_val ] ;
-    have h_last : ν.1 ⟨p + 1 + q, by omega⟩ = (Fin.last (p + 1), Fin.last q) := by
+  · have := ν.1.monotone ( show ⟨ Min.min ( ν.insertRightIndex k : ℕ ) ( p + q ), by omega ⟩ ≤ ⟨ p + q, by omega ⟩ from Nat.min_le_right _ _ ) ; simp_all +decide [ Fin.le_iff_val_le_val ] ;
+    have h_last : ν.1 ⟨p + q, by omega⟩ = (Fin.last (p), Fin.last q) := by
       exact Shuffle.apply_last ν
     generalize_proofs at *; simp_all +decide [ Fin.le_iff_val_le_val ] ;
-    simp_all +decide [ Fin.le_def, min_eq_right ( by linarith : p + 1 + q ≤ ( ν.insertRightIndex k : ℕ ) ) ];
+    simp_all +decide [ Fin.le_def, min_eq_right ( by linarith : p + q ≤ ( ν.insertRightIndex k : ℕ ) ) ];
     exact h_left_step.not_ge ( Nat.le_of_lt_succ <| by simp +arith +decide [ *, Fin.is_lt ] );
-  · cases min_cases ( ν.insertRightIndex k : ℕ ) ( p + 1 + q ) <;> simp_all +decide [ Fin.lt_iff_val_lt_val ];
+  · cases min_cases ( ν.insertRightIndex k : ℕ ) ( p + q ) <;> simp_all +decide [ Fin.lt_iff_val_lt_val ];
     have := insertRightIndex_iff ν k ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ ; simp_all +decide [ Fin.ext_iff ] ;
     have := coordSum_eq ν ⟨ ( ν.insertRightIndex k : ℕ ), by omega ⟩ ; simp_all +decide [ Fin.ext_iff ] ; omega;
 
 
 /-- Extract the two facts from `isDiagonalVertex`: `0 < r` and `r < (p+1)+(q+1)`. -/
-private lemma isDiagonalVertex_bounds {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
-    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r) :
-    0 < r.val ∧ r.val < (p + 1) + (q + 1) := by
+private lemma isDiagonalVertex_bounds {p q : ℕ} {μ : Shuffle (p ) (q)}
+    {r : Index (p + (q))} (hr : isDiagonalVertex μ r) :
+    0 < r.val ∧ r.val < (p) + (q) := by
   unfold isDiagonalVertex at hr
   split_ifs at hr with h₁ h₂ <;> exact ⟨‹_›, ‹_›⟩
 
 /-- At a diagonal vertex with a left step at `r-1`, the shuffle step from
 `r-1` to `r` increments fst, giving `μ(r).1 ≥ 1`. -/
-private lemma diagonal_left_fst_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
-    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r)
+private lemma diagonal_left_fst_pos {p q : ℕ} {μ : Shuffle (p) (q)}
+    {r : Index (p + (q))} (hr : isDiagonalVertex μ r)
     (hL : isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
     0 < (μ.1 r).1.val := by
   have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
   have hstep := shuffle_step μ ⟨r.val - 1, by omega⟩
-  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).castSucc =
-      (⟨r.val - 1, by omega⟩ : Index ((p + 1) + (q + 1))) :=
+  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p) + (q))).castSucc =
+      (⟨r.val - 1, by omega⟩ : Index ((p) + (q))) :=
     Fin.ext (by simp [Fin.castSucc])
-  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).succ = r :=
+  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p) + (q))).succ = r :=
     Fin.ext (by simp [Fin.succ]; omega)
   rw [hcs, hsu] at hstep
   unfold isLeftStep at hL; rw [hcs, hsu] at hL
@@ -2113,16 +2113,16 @@ private lemma diagonal_left_fst_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
 
 /-- At a diagonal vertex with a right step at `r-1`, the shuffle step from
 `r-1` to `r` increments snd, giving `μ(r).2 ≥ 1`. -/
-private lemma diagonal_right_snd_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
-    {r : Index (p + 1 + (q + 1))} (hr : isDiagonalVertex μ r)
+private lemma diagonal_right_snd_pos {p q : ℕ} {μ : Shuffle (p) (q)}
+    {r : Index (p + (q))} (hr : isDiagonalVertex μ r)
     (hR : ¬isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
     0 < (μ.1 r).2.val := by
   have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
   have hstep := shuffle_step μ ⟨r.val - 1, by omega⟩
-  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).castSucc =
-      (⟨r.val - 1, by omega⟩ : Index ((p + 1) + (q + 1))) :=
+  have hcs : (⟨r.val - 1, by omega⟩ : Fin ((p) + (q))).castSucc =
+      (⟨r.val - 1, by omega⟩ : Index ((p) + (q))) :=
     Fin.ext (by simp [Fin.castSucc])
-  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p + 1) + (q + 1))).succ = r :=
+  have hsu : (⟨r.val - 1, by omega⟩ : Fin ((p) + (q))).succ = r :=
     Fin.ext (by simp [Fin.succ]; omega)
   rw [hcs, hsu] at hstep
   unfold isLeftStep at hR; rw [hcs, hsu] at hR
@@ -2134,9 +2134,9 @@ private lemma diagonal_right_snd_pos {p q : ℕ} {μ : Shuffle (p + 1) (q + 1)}
 except at vertex `r`, where the step type is swapped.
 - LR diagonal (left then right): `μ(r)` becomes `(μ(r).1 - 1, μ(r).2 + 1)`
 - RL diagonal (right then left): `μ(r)` becomes `(μ(r).1 + 1, μ(r).2 - 1)` -/
-private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
-    Index ((p + 1) + (q + 1)) → Index (p + 1) × Index (q + 1) :=
+private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p ) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r) :
+    Index ((p ) + (q )) → Index (p) × Index (q) :=
   fun i =>
     if i = r then
       have ⟨h₁, h₂⟩ := isDiagonalVertex_bounds hr
@@ -2147,16 +2147,16 @@ private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
         have hfst_pos := diagonal_left_fst_pos hr hL
         -- snd < q+1 because step r is right (snd increments at r),
         -- so μ(r+1).2 > μ(r).2 and μ(r+1).2 ≤ q+1
-        have hsnd_lt : (μ.1 r).2.val < q + 1 := by
+        have hsnd_lt : (μ.1 r).2.val < q := by
           -- Step r is right (not left) in LR diagonal, so snd increments at r
           unfold isDiagonalVertex at hr; simp [h₁, h₂] at hr
           have hnotL : ¬isLeftStep μ ⟨r.val, h₂⟩ := by tauto
           have hstep := shuffle_step μ ⟨r.val, h₂⟩
-          have hcs : (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).castSucc = r :=
+          have hcs : (⟨r.val, h₂⟩ : Fin ((p) + (q))).castSucc = r :=
             Fin.ext (by simp [Fin.castSucc])
           rw [hcs] at hstep
           unfold isLeftStep at hnotL; rw [hcs] at hnotL
-          have hsucc_snd := (μ.1 (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).succ).2.isLt
+          have hsucc_snd := (μ.1 (⟨r.val, h₂⟩ : Fin ((p) + (q))).succ).2.isLt
           rcases hstep with ⟨h1, _⟩ | ⟨_, h2⟩
           · exfalso; exact hnotL (by omega)
           · omega
@@ -2168,16 +2168,16 @@ private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
         have hsnd_pos := diagonal_right_snd_pos hr (by exact hL)
         -- fst < p+1 because step r is left (fst increments at r),
         -- so μ(r+1).1 > μ(r).1 and μ(r+1).1 ≤ p+1
-        have hfst_lt : (μ.1 r).1.val < p + 1 := by
+        have hfst_lt : (μ.1 r).1.val < p := by
           -- Step r is left in RL diagonal, so fst increments at r
           unfold isDiagonalVertex at hr; simp [h₁, h₂] at hr
           have hisL : isLeftStep μ ⟨r.val, h₂⟩ := by tauto
           have hstep := shuffle_step μ ⟨r.val, h₂⟩
-          have hcs : (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).castSucc = r :=
+          have hcs : (⟨r.val, h₂⟩ : Fin ((p) + (q))).castSucc = r :=
             Fin.ext (by simp [Fin.castSucc])
           rw [hcs] at hstep
           unfold isLeftStep at hisL; rw [hcs] at hisL
-          have hsucc_fst := (μ.1 (⟨r.val, h₂⟩ : Fin ((p + 1) + (q + 1))).succ).1.isLt
+          have hsucc_fst := (μ.1 (⟨r.val, h₂⟩ : Fin ((p) + (q))).succ).1.isLt
           rcases hstep with ⟨h1, _⟩ | ⟨h1, _⟩
           · omega
           · exfalso; exact absurd (by omega : (μ.1 r).1.val < _) (by omega)
@@ -2189,16 +2189,17 @@ private def swapDiagonalSteps_fun {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
 /-- `swapDiagonalSteps_fun` preserves the coordinate sum: fst + snd = i for all i.
 At `i ≠ r` this is `coordSum_eq μ`. At `i = r` the ±1 adjustments cancel. -/
 private lemma swapDiagonalSteps_fun_coordSum {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
-    (hr : isDiagonalVertex μ r) (i : Index ((p + 1) + (q + 1))) :
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
+    (hr : isDiagonalVertex μ r) (i : Index ((p) + (q))) :
     (swapDiagonalSteps_fun μ r hr i).1.val +
       (swapDiagonalSteps_fun μ r hr i).2.val = i.val := by
   unfold HomologyLean.SingularHomology.Shuffle.swapDiagonalSteps_fun;
   split_ifs <;> simp_all +decide [ coordSum_eq ];
   rename_i hrcn;
   -- By definition of `swapDiagonalSteps_fun`, we know that the sum of the components is preserved.
+
   by_cases hL : μ.isLeftStep ⟨r.val - 1, by
-    grind⟩
+    have := isDiagonalVertex_bounds hr; omega⟩
   all_goals generalize_proofs at *;
   · simp_all +decide [ Nat.sub_add_cancel, Nat.add_sub_of_le, Nat.le_of_lt_succ ];
     rename_i h₁ h₂ h₃ h₄ h₅ h₆;
@@ -2218,7 +2219,7 @@ noncomputable section AristotleLemmas
 open HomologyLean.SingularHomology
 
 private lemma swapDiagonalSteps_fun_local_bounds {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     μ.1 ⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ ≤ swapDiagonalSteps_fun μ r hr r ∧
     swapDiagonalSteps_fun μ r hr r ≤ μ.1 ⟨r.val + 1, by have := isDiagonalVertex_bounds hr; omega⟩ := by
@@ -2337,7 +2338,7 @@ private lemma swapDiagonalSteps_fun_local_bounds {p q : ℕ}
 end AristotleLemmas
 
 private lemma swapDiagonalSteps_fun_monotone {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     Monotone (swapDiagonalSteps_fun μ r hr) := by
   -- Let's unfold the definition of `swapDiagonalSteps_fun`.
@@ -2360,7 +2361,7 @@ private lemma swapDiagonalSteps_fun_monotone {p q : ℕ}
 /-- `swapDiagonalSteps_fun` is injective.  Follows from monotonicity +
 coordinate-sum preservation (same argument as for `insertLeftStep`). -/
 private lemma swapDiagonalSteps_fun_injective {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     Function.Injective (swapDiagonalSteps_fun μ r hr) := by
   intros i j hij; have := swapDiagonalSteps_fun_coordSum μ r hr i; have := swapDiagonalSteps_fun_coordSum μ r hr j; aesop;
@@ -2371,9 +2372,9 @@ private lemma swapDiagonalSteps_fun_injective {p q : ℕ}
 corner with RL or vice versa).  This produces a new shuffle `μ'` such that:
 - `μ' ∘ δ_r = μ ∘ δ_r` (same underlying map after vertex removal)
 - `μ'.sign = -μ.sign` (opposite sign, from the inversion count change) -/
-def swapDiagonalSteps {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
-    Shuffle (p + 1) (q + 1) :=
+def swapDiagonalSteps {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r) :
+    Shuffle (p) (q) :=
   ⟨⟨swapDiagonalSteps_fun μ r hr, swapDiagonalSteps_fun_monotone μ r hr⟩,
    swapDiagonalSteps_fun_injective μ r hr⟩
 
@@ -2385,9 +2386,9 @@ For any index `i` different from the diagonal vertex `r`, the shuffle map `swapD
 -/
 open HomologyLean.SingularHomology
 
-lemma swapDiagonalSteps_apply_ne {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r)
-    (i : Index (p + 1 + (q + 1))) (hi : i ≠ r) :
+lemma swapDiagonalSteps_apply_ne {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r)
+    (i : Index (p + (q))) (hi : i ≠ r) :
     (swapDiagonalSteps μ r hr).1 i = μ.1 i := by
       -- Since $i \neq r$, the else part of the definition of `swapDiagonalSteps_fun` applies.
       simp [swapDiagonalSteps, hi];
@@ -2398,15 +2399,15 @@ If the step entering the diagonal vertex `r` is a Left step, then `swapDiagonalS
 -/
 open HomologyLean.SingularHomology
 
-lemma swapDiagonalSteps_apply_r_of_left {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r)
+lemma swapDiagonalSteps_apply_r_of_left {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r)
     (hL : isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
     (swapDiagonalSteps μ r hr).1 r =
       (⟨(μ.1 r).1.val - 1, by
         exact Nat.lt_succ_of_le ( Nat.sub_le_of_le_add <| by linarith [ Fin.is_lt ( μ.1 r |>.1 ) ] )⟩, ⟨(μ.1 r).2.val + 1, by
-        -- Since the second component of `μ r` is in `Fin (q + 1)`, its value is between 0 and q.
-        have h_snd_range : (μ.1 r).2.val < q + 1 := by
-          have h_snd_lt : (μ.1 r).2.val < q + 1 := by
+        -- Since the second component of `μ r` is in `Fin (q)`, its value is between 0 and q.
+        have h_snd_range : (μ.1 r).2.val < q := by
+          have h_snd_lt : (μ.1 r).2.val < q := by
             have h_not_left : ¬isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
               unfold isDiagonalVertex at hr; simp [hL] at hr; tauto;
             have h_step := shuffle_step μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩
@@ -2422,8 +2423,8 @@ If the step entering the diagonal vertex `r` is a Right step (not Left), then `s
 -/
 open HomologyLean.SingularHomology
 
-lemma swapDiagonalSteps_apply_r_of_right {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r)
+lemma swapDiagonalSteps_apply_r_of_right {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r)
     (hR : ¬ isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩) :
     (swapDiagonalSteps μ r hr).1 r =
       (⟨(μ.1 r).1.val + 1, by
@@ -2455,8 +2456,8 @@ Proof sketch:
 -/
 open HomologyLean.SingularHomology
 
-lemma swapDiagonalSteps_flip_prev {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
+lemma swapDiagonalSteps_flip_prev {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r) :
     isLeftStep (swapDiagonalSteps μ r hr) ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩ ↔
     ¬ isLeftStep μ ⟨r.val - 1, by have := (isDiagonalVertex_bounds hr).2; omega⟩ := by
       unfold isLeftStep
@@ -2476,7 +2477,7 @@ lemma swapDiagonalSteps_flip_prev {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
               skip;
           · exact hL;
       · rcases r with ⟨ _ | r, hr ⟩ <;> simp_all +decide [ Nat.succ_eq_add_one ];
-        · unfold isDiagonalVertex at hr; simp_all +decide [ Nat.succ_eq_add_one ] ;
+        · unfold isDiagonalVertex at hr;
           grind +ring;
         · -- Since `hL` states that `isLeftStep μ ⟨r, by omega⟩` is false, we have `(μ.1 ⟨r, by omega⟩).1 = (μ.1 ⟨r + 1, by omega⟩).1`.
           have h_eq : (μ.1 ⟨r, by omega⟩).1 = (μ.1 ⟨r + 1, by omega⟩).1 := by
@@ -2512,8 +2513,8 @@ Proof sketch:
 -/
 open HomologyLean.SingularHomology
 
-lemma swapDiagonalSteps_flip_curr {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
-    (r : Index (p + 1 + (q + 1))) (hr : isDiagonalVertex μ r) :
+lemma swapDiagonalSteps_flip_curr {p q : ℕ} (μ : Shuffle (p) (q))
+    (r : Index (p + (q))) (hr : isDiagonalVertex μ r) :
     isLeftStep (swapDiagonalSteps μ r hr) ⟨r.val, by have := (isDiagonalVertex_bounds hr).2; omega⟩ ↔
     ¬ isLeftStep μ ⟨r.val, by have := (isDiagonalVertex_bounds hr).2; omega⟩ := by
       unfold HomologyLean.SingularHomology.Shuffle.isLeftStep
@@ -2539,13 +2540,13 @@ lemma swapDiagonalSteps_flip_curr {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
         exact congr_arg Fin.val ( swapDiagonalSteps_apply_ne μ r hr ⟨ r.val + 1, by omega ⟩ ( by simp +decide [ Fin.ext_iff ] ) |> congr_arg Prod.fst ) |> Eq.trans <| rfl
         skip);
       · simp_all +decide [ Fin.castSucc, Fin.succ ];
-        rw [ show ( μ.swapDiagonalSteps r hr : HomologyLean.SingularHomology.Index ( p + 1 + ( q + 1 ) ) →o HomologyLean.SingularHomology.Index ( p + 1 ) × HomologyLean.SingularHomology.Index ( q + 1 ) ) r = ( ⟨ ( μ.1 r ).1.val + 1, by
+        rw [ show ( μ.swapDiagonalSteps r hr : HomologyLean.SingularHomology.Index ( p + ( q ) ) →o HomologyLean.SingularHomology.Index ( p ) × HomologyLean.SingularHomology.Index ( q ) ) r = ( ⟨ ( μ.1 r ).1.val + 1, by
               unfold HomologyLean.SingularHomology.Shuffle.isDiagonalVertex at hr; simp_all +decide [ Fin.castSucc, Fin.succ ] ;
               have := μ.1 r |>.1.isLt; have := μ.1 r |>.2.isLt; simp_all +arith +decide [ HomologyLean.SingularHomology.Shuffle.isLeftStep ] ;
               grind ⟩, ⟨ ( μ.1 r ).2.val - 1, by
               exact Nat.lt_succ_of_le ( Nat.sub_le_of_le_add <| by linarith [ Fin.is_lt ( μ.1 r |>.2 ) ] ) ⟩ ) from ?_ ]
         all_goals generalize_proofs at *;
-        · rw [ show ( μ.swapDiagonalSteps r hr : HomologyLean.SingularHomology.Index ( p + 1 + ( q + 1 ) ) →o HomologyLean.SingularHomology.Index ( p + 1 ) × HomologyLean.SingularHomology.Index ( q + 1 ) ) ⟨ r.val + 1, by linarith ⟩ = μ.1 ⟨ r.val + 1, by linarith ⟩ from ?_ ];
+        · rw [ show ( μ.swapDiagonalSteps r hr : HomologyLean.SingularHomology.Index ( p + ( q ) ) →o HomologyLean.SingularHomology.Index ( p ) × HomologyLean.SingularHomology.Index ( q ) ) ⟨ r.val + 1, by linarith ⟩ = μ.1 ⟨ r.val + 1, by linarith ⟩ from ?_ ];
           · rw [ Fin.lt_iff_val_lt_val, Fin.le_iff_val_le_val ] ; simp +arith +decide [ * ];
             constructor <;> intro <;> norm_cast at * <;> simp_all +decide [ Nat.succ_le_iff ];
             · unfold isDiagonalVertex at hr; simp_all +decide [ Nat.succ_le_iff ] ;
@@ -2558,7 +2559,7 @@ lemma swapDiagonalSteps_flip_curr {p q : ℕ} (μ : Shuffle (p + 1) (q + 1))
 end AristotleLemmas
 
 lemma swapDiagonalSteps_vertex {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     isDiagonalVertex (swapDiagonalSteps μ r hr) r := by
   unfold isDiagonalVertex at *; simp_all +decide [ isLeftStep ] ;
@@ -2579,8 +2580,8 @@ The `swapDiagonalSteps` map agrees with the original shuffle at all indices othe
 open HomologyLean.SingularHomology
 
 lemma swapDiagonalSteps_apply_ne_r {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
-    (hr : isDiagonalVertex μ r) (i : Index (p + 1 + (q + 1))) (h : i ≠ r) :
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
+    (hr : isDiagonalVertex μ r) (i : Index (p + (q))) (h : i ≠ r) :
     (swapDiagonalSteps μ r hr).1 i = μ.1 i := by
       unfold HomologyLean.SingularHomology.Shuffle.swapDiagonalSteps;
       unfold HomologyLean.SingularHomology.Shuffle.swapDiagonalSteps_fun; aesop;
@@ -2591,9 +2592,9 @@ The value of the swapped shuffle at the diagonal vertex `r` is given by decremen
 open HomologyLean.SingularHomology
 
 lemma swapDiagonalSteps_val_r {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r)
-    (rm1 : Fin ((p + 1) + (q + 1)))
+    (rm1 : Fin ((p) + (q)))
     (h_rm1 : rm1.val = r.val - 1) :
     (swapDiagonalSteps μ r hr).1 r =
       if h : isLeftStep μ rm1 then
@@ -2641,14 +2642,15 @@ The `swapDiagonalSteps` involution toggles the type (Left/Right) of the step imm
 open HomologyLean.SingularHomology
 
 lemma swapDiagonalSteps_isLeftStep_toggle {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
-    let rm1 : Fin ((p + 1) + (q + 1)) := ⟨r.val - 1, by
+    let rm1 : Fin ((p) + (q)) := ⟨r.val - 1, by
       unfold isDiagonalVertex at hr
       split_ifs at hr
       omega⟩
     isLeftStep (swapDiagonalSteps μ r hr) rm1 ↔ ¬ isLeftStep μ rm1 := by
-      have hswap := swapDiagonalSteps_val_r μ r hr ⟨r.val - 1, by omega⟩ rfl
+      have hrlt: r.val - 1 < p + q := by have := isDiagonalVertex_bounds hr; omega
+      have hswap := swapDiagonalSteps_val_r μ r hr ⟨r.val - 1, by exact hrlt⟩ rfl
       generalize_proofs at *;
       split_ifs at hswap <;> simp_all +decide [ Shuffle.isLeftStep ];
       · convert iff_of_false ?_ ?_ using 1
@@ -2674,7 +2676,7 @@ lemma swapDiagonalSteps_isLeftStep_toggle {p q : ℕ}
 end AristotleLemmas
 
 lemma swapDiagonalSteps_involutive {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     swapDiagonalSteps (swapDiagonalSteps μ r hr) r
       (swapDiagonalSteps_vertex μ r hr) = μ := by
@@ -2682,9 +2684,9 @@ lemma swapDiagonalSteps_involutive {p q : ℕ}
   use fun x => x.1 = μ.1;
   · use μ; aesop;
   · -- By definition of swapDiagonalSteps, we know that applying it twice returns the original shuffle.
-    have h_swap : ∀ i : Index ((p + 1) + (q + 1)), (swapDiagonalSteps (swapDiagonalSteps μ r hr) r (swapDiagonalSteps_vertex μ r hr)).1 i = μ.1 i := by
+    have h_swap : ∀ i : Index ((p) + (q)), (swapDiagonalSteps (swapDiagonalSteps μ r hr) r (swapDiagonalSteps_vertex μ r hr)).1 i = μ.1 i := by
       intro i; by_cases hi : i = r <;> simp +decide [ hi, swapDiagonalSteps_apply_ne_r ] ;
-      let rm1 : Fin ((p + 1) + (q + 1)) := ⟨r.val - 1, by
+      let rm1 : Fin ((p) + (q)) := ⟨r.val - 1, by
         have := isDiagonalVertex_bounds hr
         omega⟩
       have h₁ := swapDiagonalSteps_val_r μ r hr rm1 rfl
@@ -2712,8 +2714,8 @@ lemma swapDiagonalSteps_involutive {p q : ℕ}
 /-- The swap preserves the underlying OrderHom when composed with any OrderHom
 that avoids the diagonal vertex. -/
 lemma swapDiagonalSteps_same_map {p q n : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
-    (hr : isDiagonalVertex μ r) (φ : Fin n →o Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
+    (hr : isDiagonalVertex μ r) (φ : Fin n →o Index (p + (q)))
     (hφ : ∀ k, φ k ≠ r) :
     (swapDiagonalSteps μ r hr).1.comp φ = μ.1.comp φ := by
   have h_swap_fun : ∀ i : Fin n, swapDiagonalSteps_fun μ r hr (φ i) = μ.1 (φ i) := by
@@ -2736,14 +2738,14 @@ For the two affected summands, set `y := (μ.1 ⟨r-1⟩).2.val`.  In the LR cas
 In the RL case (step `r-1` is Right): the four terms are `0, y, y+1, 0`,
 also summing to `2y+1`.  Hence the total is even + odd = odd. -/
 private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     Odd ((swapDiagonalSteps μ r hr).invCount + μ.invCount) := by
   rw [Shuffle.invCount_eq_sum_mul_diff, Shuffle.invCount_eq_sum_mul_diff,
     ← Finset.sum_add_distrib]
-  let rm1 : Fin ((p + 1) + (q + 1)) := ⟨r.val - 1, by
+  let rm1 : Fin ((p) + (q)) := ⟨r.val - 1, by
     have := isDiagonalVertex_bounds hr; omega⟩
-  let r' : Fin ((p + 1) + (q + 1)) := ⟨r.val, by
+  let r' : Fin ((p) + (q)) := ⟨r.val, by
     have := isDiagonalVertex_bounds hr; omega⟩
   have hne : rm1 ≠ r' := by
     simp only [rm1, r', ne_eq, Fin.mk.injEq]
@@ -2784,10 +2786,10 @@ private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
     have hstep_rm1 := shuffle_step μ ⟨r.val - 1, by
       have := isDiagonalVertex_bounds hr; omega⟩
     have hcs_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).castSucc = rm1.castSucc := by
+        Fin ((p) + (q))).castSucc = rm1.castSucc := by
       ext; simp [rm1, Fin.val_castSucc]
     have hsucc_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).succ = r := by
+        Fin ((p) + (q))).succ = r := by
       ext; simp [Fin.val_succ]; have := isDiagonalVertex_bounds hr; omega
     rw [hcs_rm1, hsucc_rm1] at hstep_rm1
     have hfst : (μ.1 rm1.castSucc).1.val + 1 = (μ.1 r).1.val := by
@@ -2802,9 +2804,9 @@ private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
     have hstep_r := shuffle_step μ ⟨r.val, by
       have := isDiagonalVertex_bounds hr; omega⟩
     have hcs_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).castSucc = r := Fin.ext (by simp)
+        Fin ((p) + (q))).castSucc = r := Fin.ext (by simp)
     have hsucc_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).succ = r'.succ := Fin.ext (by simp [r', Fin.val_succ])
+        Fin ((p) + (q))).succ = r'.succ := Fin.ext (by simp [r', Fin.val_succ])
     rw [hcs_r, hsucc_r] at hstep_r
     have hnotL_r : ¬isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
       unfold isDiagonalVertex at hr
@@ -2833,10 +2835,10 @@ private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
     have hstep_rm1 := shuffle_step μ ⟨r.val - 1, by
       have := isDiagonalVertex_bounds hr; omega⟩
     have hcs_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).castSucc = rm1.castSucc := by
+        Fin ((p) + (q))).castSucc = rm1.castSucc := by
       ext; simp [rm1]
     have hsucc_rm1 : (⟨r.val - 1, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).succ = r := by
+        Fin ((p) + (q))).succ = r := by
       ext; simp; have := isDiagonalVertex_bounds hr; omega
     rw [hcs_rm1, hsucc_rm1] at hstep_rm1
     have hfst : (μ.1 rm1.castSucc).1.val = (μ.1 r).1.val := by
@@ -2852,9 +2854,9 @@ private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
     have hstep_r := shuffle_step μ ⟨r.val, by
       have := isDiagonalVertex_bounds hr; omega⟩
     have hcs_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).castSucc = r := Fin.ext (by simp)
+        Fin ((p) + (q))).castSucc = r := Fin.ext (by simp)
     have hsucc_r : (⟨r.val, by have := isDiagonalVertex_bounds hr; omega⟩ :
-        Fin ((p + 1) + (q + 1))).succ = r'.succ := Fin.ext (by simp [r'])
+        Fin ((p) + (q))).succ = r'.succ := Fin.ext (by simp [r'])
     rw [hcs_r, hsucc_r] at hstep_r
     have hisL_r : isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
       unfold isDiagonalVertex at hr
@@ -2880,7 +2882,7 @@ Derives from `swapDiagonalSteps_invCount_sum_odd`: since the invCount sum is
 odd, `(-1)^invCount' * (-1)^invCount = -1`, and multiplying both sides by
 `(-1)^invCount` (which squares to 1) gives `(-1)^invCount' = -(-1)^invCount`. -/
 lemma swapDiagonalSteps_neg_sign {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     (swapDiagonalSteps μ r hr).sign  =
     -(μ.sign) := by
@@ -2901,7 +2903,7 @@ lemma swapDiagonalSteps_neg_sign {p q : ℕ}
 /-- The swap involution is never the identity: swapping two steps of different
 type always produces a distinct shuffle. -/
 lemma swapDiagonalSteps_ne {p q : ℕ}
-    (μ : Shuffle (p + 1) (q + 1)) (r : Index (p + 1 + (q + 1)))
+    (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
     swapDiagonalSteps μ r hr ≠ μ := by
   apply mt (congrArg Shuffle.sign)
