@@ -333,6 +333,7 @@ private lemma sndHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
     exact fun heq => absurd (Fin.ext heq)
       (Fin.succAbove_ne r ⟨i, by simp only [SimplexCategory.len_mk] at hi; omega⟩)))
 
+omit [HasFiniteCoproducts C] in
 /-- **Leibniz rule for the shuffle map.**
 
 The shuffle map component `ezComponent(p, q)`, composed with the alternating
@@ -457,7 +458,8 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         have hsnd := sndHom_swapDiagonalSteps_comp_δ x.1 x.2 hj.symm hr
         have hfst := fstHom_swapDiagonalSteps_comp_δ x.1 x.2 hj.symm hr
         -- Lift equalities to op: (δ ≫ eqToHom ≫ f(swap)).op = (δ ≫ eqToHom ≫ f(μ)).op
-        -- then expand with op_comp to get f(swap).op ≫ eqToHom.op ≫ δ.op = f(μ).op ≫ eqToHom.op ≫ δ.op
+        -- then expand with op_comp to get
+        -- f(swap).op ≫ eqToHom.op ≫ δ.op = f(μ).op ≫ eqToHom.op ≫ δ.op
         have hsnd_op := congrArg Quiver.Hom.op hsnd
         have hfst_op := congrArg Quiver.Hom.op hfst
         simp only [op_comp] at hsnd_op hfst_op
@@ -493,7 +495,6 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
     · -- Step 10: Left faces — match with vertical differential
       rcases p with _ | p'
       · -- p = 0: LHS is 0, RHS sum is empty (no left steps in Shuffle 0 q).
-        simp only [Nat.zero_eq]
         symm
         apply Finset.sum_eq_zero
         intro μ _
@@ -507,7 +508,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         simp only [isLeftType, Shuffle.isLeftStep] at hlt
         exact absurd hlt (by omega)
       · -- p = p' + 1: bijection via insertLeftStep
-        simp only [Nat.succ_eq_add_one]
+        simp only []
         rw [← Fintype.sum_prod_type']
         rw [Finset.sum_sigma']
         -- set_option maxHeartbeats 400000 in
@@ -591,11 +592,10 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
               (congrArg SimplexCategory.mk (show p' + q = j from by omega))
             rw [NatTrans.congr _ hpq', NatTrans.congr _ hpq']
             simp only [eqToHom_map, eqToHom_trans, eqToHom_trans_assoc, Category.assoc,
-              eqToHom_refl, Category.id_comp, Category.comp_id]
+              eqToHom_refl, Category.id_comp]
     · -- Step 11: Right faces — match with horizontal differential
       rcases q with _ | q'
       · -- q = 0: LHS is 0, RHS sum is empty (no right-type vertices in Shuffle p 0).
-        simp only [Nat.zero_eq]
         symm
         apply Finset.sum_eq_zero
         intro μ _
@@ -617,7 +617,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         simp only [Fin.val_succ, Fin.val_castSucc] at hcs1 hcs2
         omega
       · -- q = q' + 1: bijection via insertRightStep
-        simp only [Nat.succ_eq_add_one]
+        simp only []
         rw [← Fintype.sum_prod_type']
         rw [Finset.sum_sigma']
         apply Finset.sum_nbij
@@ -674,7 +674,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
               apply hnotleft
               have hleft := Shuffle.insertLeftStep_isLeftType ν j
               subst hμ_eq
-              show isLeftType (Shuffle.insertLeftStep ν j) r
+              change isLeftType (Shuffle.insertLeftStep ν j) r
               simp only [isLeftType]
               convert hleft using 2
               congr 1; simp only [Fin.val_cast] at hr_eq; omega
@@ -706,8 +706,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             have hpq' := congrArg Opposite.op
               (congrArg SimplexCategory.mk (show p + q' = j from by omega))
             rw [NatTrans.congr _ hpq']
-            simp only [eqToHom_map, eqToHom_trans, eqToHom_trans_assoc, Category.assoc,
-              eqToHom_refl, Category.id_comp, Category.comp_id]
+            simp only [eqToHom_map, eqToHom_trans, Category.assoc]
 
 
 /-- The Eilenberg-Zilber (shuffle) chain map `F₁(X) ⟶ F₂(X)`.
@@ -734,7 +733,7 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
       HomologicalComplex₂.ι_totalDesc_assoc, Category.assoc,
       eqToHom_refl, Category.id_comp]
     rw [HomologicalComplex₂.total_d]
-    simp only [Preadditive.comp_add, Preadditive.add_comp, Category.assoc,
+    simp only [Preadditive.comp_add, Preadditive.add_comp,
       HomologicalComplex₂.ι_D₁_assoc, HomologicalComplex₂.ι_D₂_assoc,
       Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X]
     rw [ezComponent_boundary X p q j h]
@@ -755,9 +754,9 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
         simp only [show ComplexShape.ε₁ (ComplexShape.down ℕ) (ComplexShape.down ℕ)
           (ComplexShape.down ℕ) (p + 1, q) = 1 from rfl, one_smul, Category.assoc,
           Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X]
-        simp only [HomologicalComplex₂.ι_totalDesc, ComplexShape.π_def]
-        simp only [← Preadditive.sum_comp, ← Preadditive.zsmul_comp, Category.assoc]
-        congr 1; congr 1
+        simp only [HomologicalComplex₂.ι_totalDesc]
+        simp only [← Preadditive.sum_comp, ← Preadditive.zsmul_comp]
+        congr 1
         simp only [doubleComplex, Functor.mapHomologicalComplex_obj_d,
           alternatingFaceMapComplex_obj_d]
         simp only [AlternatingFaceMapComplex.objD, SimplicialObject.δ,
@@ -777,12 +776,13 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
           p (show (ComplexShape.down ℕ).Rel (q + 1) q from by simp [ComplexShape.down_Rel])
           j (by simp [ComplexShape.π_def]; rw [ComplexShape.down_Rel] at h; omega)]
         simp only [show ComplexShape.ε₂ (ComplexShape.down ℕ) (ComplexShape.down ℕ)
-          (ComplexShape.down ℕ) (p, q + 1) = (-1 : ℤˣ) ^ p from rfl, Category.assoc,
+          (ComplexShape.down ℕ) (p, q + 1) = (-1 : ℤˣ) ^ p from rfl,
           Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X]
         simp only [Units.smul_def, Preadditive.zsmul_comp, Category.assoc]
         simp only [← Preadditive.sum_comp, ← Preadditive.zsmul_comp]
-        congr 1; congr 1
-        · simp only [
+        congr 1
+        · congr 1
+          simp only [
             alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD, SimplicialObject.δ]
         · simp only [HomologicalComplex₂.ι_totalDesc]
 
