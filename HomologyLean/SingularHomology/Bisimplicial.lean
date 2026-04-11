@@ -80,6 +80,37 @@ def ι_front (p q : ℕ) : (⦋p⦌ : SimplexCategory) ⟶ ⦋p + q⦌ :=
 def ι_back (p q : ℕ) : (⦋q⦌ : SimplexCategory) ⟶ ⦋p + q⦌ :=
   SimplexCategory.mkHom ⟨fun j => ⟨p + j.1, by omega⟩, fun _ _ h => Nat.add_le_add_left h _⟩
 
+/-- `ι_front(p, q) ≫ δ k = δ k ≫ ι_front(p+1, q)` when `k ≤ p`, i.e., the face map
+acts within the front range. Here `δ k` on the left is `[p+q] → [p+q+1]` and
+`δ k` on the right is `[p] → [p+1]`. -/
+lemma ι_front_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
+    (hk : (k : ℕ) ≤ p) :
+    ι_front p q ≫ SimplexCategory.δ k =
+      SimplexCategory.δ ⟨k, by omega⟩ ≫ ι_front (p + 1) q ≫
+        eqToHom (by ring_nf) := sorry
+
+/-- `ι_front(p, q) ≫ δ k = ι_front(p, q+1)` when `k > p`, i.e., the face map
+acts beyond the front range — all front vertices stay below the skipped index. -/
+lemma ι_front_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
+    (hk : p < (k : ℕ)) :
+    ι_front p q ≫ SimplexCategory.δ k =
+      ι_front p (q + 1) ≫ eqToHom (by ring_nf) := sorry
+
+/-- `ι_back(p, q) ≫ δ k = ι_back(p+1, q)` when `k ≤ p`, i.e., the face map
+acts before the back range — all back vertices shift by one. -/
+lemma ι_back_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
+    (hk : (k : ℕ) ≤ p) :
+    ι_back p q ≫ SimplexCategory.δ k =
+      ι_back (p + 1) q ≫ eqToHom (by ring_nf) := sorry
+
+/-- `ι_back(p, q) ≫ δ k = δ (k - p) ≫ ι_back(p, q+1)` when `k > p`, i.e., the face
+map acts within the back range. Here `δ (k-p)` is the face map on `[q]`. -/
+lemma ι_back_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
+    (hk : p < (k : ℕ)) :
+    ι_back p q ≫ SimplexCategory.δ k =
+      SimplexCategory.δ ⟨k - (p + 1), by omega⟩ ≫ ι_back p (q + 1) ≫
+        eqToHom (by ring_nf) := sorry
+
 /-! ### Alexander-Whitney map
 
 The AW map `F₂(X) ⟶ F₁(X)` sends the diagonal chain complex to the total complex.
@@ -104,14 +135,73 @@ noncomputable def awComponent (X : BisimplicialObject C) (p q : ℕ) :
   (X.map (ι_front p q).op).app (Opposite.op ⦋p + q⦌) ≫
     (X.obj (Opposite.op ⦋p⦌)).map (ι_back p q).op
 
+/-- Composing a diagonal face map `δ_k` with `eqToHom ≫ awComponent(p, q)` at degree `n+1`.
+
+This is the key identity for proving `alexanderWhitney.comm'`: the diagonal face map
+composed with a cast and AW component decomposes based on whether `k ≤ p` (face on front)
+or `k > p` (face on back). -/
+private lemma diag_δ_comp_eqToHom_awComponent (X : BisimplicialObject C)
+    (n p q : ℕ) (hpq : p + q = n) (k : Fin (n + 2)) :
+    (X.map (SimplexCategory.δ k).op).app (Opposite.op ⦋n + 1⦌) ≫
+      (X.obj (Opposite.op ⦋n⦌)).map (SimplexCategory.δ k).op ≫
+        eqToHom (by subst hpq; rfl) ≫ awComponent X p q =
+    if hk : (k : ℕ) ≤ p then
+      eqToHom (by subst hpq; simp only [show p + 1 + q = p + q + 1 by omega]) ≫
+        awComponent X (p + 1) q ≫
+          (X.map (SimplexCategory.δ ⟨k, by omega⟩).op).app (Opposite.op ⦋q⦌)
+    else
+      eqToHom (by subst hpq; simp only [show p + (q + 1) = p + q + 1 by omega]) ≫
+        awComponent X p (q + 1) ≫
+          (X.obj (Opposite.op ⦋p⦌)).map
+            (SimplexCategory.δ ⟨k - (p + 1), by omega⟩).op := sorry
+
 /-- The Alexander-Whitney chain map `F₂(X) ⟶ F₁(X)`.
 
 At degree `n`, maps `X_{n,n}` into `⨁_{p+q=n} X_{p,q}` by copairing the
 `awComponent` maps with the coproduct inclusions `ιTotal`. -/
 noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     F₂.obj X ⟶ F₁.obj X where
-  f := sorry
-  comm' := sorry
+  f n := by
+    change (X.obj (Opposite.op ⦋n⦌)).obj (Opposite.op ⦋n⦌) ⟶ _
+    exact ∑ p : Fin (n + 1),
+      eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) ≫
+        awComponent X p (n - p) ≫
+          HomologicalComplex₂.ιTotal (doubleComplex X) (ComplexShape.down ℕ) p (n - p) n (by
+            simp only [ComplexShape.π_def, Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)])
+  comm' := by
+    intro i j h
+    simp only [id]
+    rw [ComplexShape.down_Rel] at h; subst h
+    -- Both sides are maps X_{j+1, j+1} → total.X(j).
+    -- Strategy: expand both sides into double sums over face indices and AW-component
+    -- indices, apply diag_δ_comp_eqToHom_awComponent to rewrite the RHS, then match.
+    -- Step 1: Expand LHS using total.d = D₁ + D₂, then ι_D₁/ι_D₂.
+    simp only [Preadditive.sum_comp, Category.assoc]
+    change ∑ x : Fin (j + 2), _ ≫ _ ≫ _ ≫
+      (HomologicalComplex₂.total (doubleComplex X) (ComplexShape.down ℕ)).d (j + 1) j = _
+    rw [HomologicalComplex₂.total_d]
+    simp only [Preadditive.comp_add, Finset.sum_add_distrib, Category.assoc,
+      HomologicalComplex₂.ι_D₁, HomologicalComplex₂.ι_D₂]
+    -- Step 2: Expand RHS: d_diag = ∑_k (-1)^k δ_k, distribute through the sum.
+    simp only [Preadditive.comp_sum, Preadditive.sum_comp, Category.assoc]
+    simp only [F₂, Functor.comp_obj, diag_obj_obj, alternatingFaceMapComplex_obj_d,
+      AlternatingFaceMapComplex.objD, SimplicialObject.δ, diag_obj_map]
+    simp only [Preadditive.sum_comp, Preadditive.comp_sum,
+      Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc]
+    -- Step 3: On the RHS, rewrite δ_k ≫ eqToHom ≫ awComp using the key lemma.
+    -- The eqToHom proof terms block simp_rw, so we use congr + exact.
+    conv_rhs =>
+      enter [2, x, 2, x_1, 2]
+      rw [reassoc_of% diag_δ_comp_eqToHom_awComponent X j (↑x) (j - ↑x)
+        (Nat.add_sub_cancel' (Nat.lt_succ_iff.mp x.isLt)) x_1]
+    -- Step 4: Distribute smul and ≫ through the if/else, then split into two sums.
+    simp only [smul_dite, dite_comp]
+    simp_rw [Finset.sum_dite]
+    -- Both sides are now sums with + inside, but LHS is over Fin(j+2) and RHS over Fin(j+1).
+    -- The d₁ and d₂ terms vanish at the boundary indices (x=0 for d₁, x=j+1 for d₂),
+    -- making the index sets effectively the same.
+    -- This is a complex sum-reindexing argument — extract as a separate lemma.
+    sorry
 
 /-! ### Eilenberg-Zilber / shuffle map
 

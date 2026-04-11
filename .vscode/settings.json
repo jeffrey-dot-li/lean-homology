@@ -1,5 +1,6 @@
 {
   "lean4.envPathExtensions": [
     "./.devenv/profile/bin"
-  ]
+  ],
+  "explorer.excludeGitIgnore": true
 }
