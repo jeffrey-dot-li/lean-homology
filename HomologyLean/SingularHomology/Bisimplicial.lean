@@ -1174,15 +1174,140 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
             alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD, SimplicialObject.δ]
         · simp only [HomologicalComplex₂.ι_totalDesc]
 
+/-! ### Eilenberg–Mac Lane homotopy
+
+The homotopy `H : F₂(X) ⟶ F₂(X)` of degree `+1` witnessing `∇AW ≃ 𝟙` (Franz, eq. (3.6)
+`∇AW = 1 + d(H)`). At diagonal degree `n` we transcribe Eilenberg–Mac Lane's explicit
+formula (Franz eq. (3.3)):
+
+`H(x, y) = ∑_{0 ≤ p+q < n} ∑_{(α,β) ⊢ (p+1,q)} (-1)^{m+1+(α,β)}
+              · (s_{β+m} s_{m-1} ∂ⁿ_{n-q+1} x,  s_{α+m} ∂^{n-q-1}_m y)`
+
+with `m = n - p - q`. In the bisimplicial setting the "`x`" part is the first (horizontal)
+simplicial variable and the "`y`" part the second (vertical) one, so each summand is a
+horizontal `SimplexCategory` operator on `X.map _` composed with a vertical one on
+`(X.obj _).map _`, exactly as in `ezComponent`/`awComponent`.
+
+The two `SimplexCategory` operators are factored out below; their explicit construction
+(iterated cofaces/codegeneracies indexed by the shuffle, with the `+m` shifts) is the
+combinatorial content still to be filled. -/
+
+/-- Horizontal (`x`/first-variable) `SimplexCategory` operator of the EM homotopy:
+`s_{β+m} s_{m-1} ∂ⁿ_{n-q+1}` from Franz (3.3), as a map `⦋n+1⦌ ⟶ ⦋n⦌`, where `m = n - p - q`
+and `(α,β)` is the `(p+1,q)`-shuffle `μ`.
+
+The operator raises a degree-`n` simplex to degree `n+1`, so the corresponding
+`SimplexCategory` morphism factors as `A ≫ B ≫ F` with `F = ∂ⁿ_{n-q+1}` the front inclusion
+`⦋n-q⦌ ⟶ ⦋n⦌`, `B = σ_{m-1}` the codegeneracy `⦋n-q+1⦌ ⟶ ⦋n-q⦌`, and `A = s_{β+m}` the
+codegeneracy `⦋n+1⦌ ⟶ ⦋n-q+1⦌` that is the identity on the bottom `m` vertices and the
+shuffle's first-coordinate codegeneracy (shifted by `m`) on top. Using `F v = v`,
+`σ_{m-1}`, and `μ.1 0 = (0,0)` this composite collapses to the closed form below. -/
+def emFstHom (n p q : ℕ) (μ : Shuffle (p + 1) q) :
+    (⦋n + 1⦌ : SimplexCategory) ⟶ ⦋n⦌ :=
+  SimplexCategory.mkHom
+    { toFun := fun j =>
+        ⟨min (if (j : ℕ) < n - p - q then (j : ℕ)
+              else n - p - q - 1 +
+                ((μ.1 ⟨(j : ℕ) - (n - p - q), by have hj := j.isLt; omega⟩).1 : ℕ)) n,
+          by omega⟩
+      monotone' := by
+        intro a b hab
+        have hab' : (a : ℕ) ≤ (b : ℕ) := hab
+        simp only [Fin.mk_le_mk]
+        split_ifs with ha hb hb
+        · omega
+        · omega
+        · omega
+        · have hmono : ((μ.1 ⟨(a : ℕ) - (n - p - q), by have := a.isLt; omega⟩).1 : ℕ) ≤
+              ((μ.1 ⟨(b : ℕ) - (n - p - q), by have := b.isLt; omega⟩).1 : ℕ) :=
+            (μ.1.monotone (show (⟨(a : ℕ) - (n - p - q), by have := a.isLt; omega⟩ :
+                Index ((p + 1) + q)) ≤ ⟨(b : ℕ) - (n - p - q), by have := b.isLt; omega⟩ from by
+              simp only [Fin.mk_le_mk]; omega)).1
+          omega }
+
+/-- Vertical (`y`/second-variable) `SimplexCategory` operator of the EM homotopy:
+`s_{α+m} ∂^{n-q-1}_m` from Franz (3.3), as a map `⦋n+1⦌ ⟶ ⦋n⦌`, where `m = n - p - q`
+and `(α,β)` is the `(p+1,q)`-shuffle `μ`.
+
+The operator raises a degree-`n` simplex to degree `n+1`, so the corresponding
+`SimplexCategory` morphism factors as `A ≫ F` with `A = s_{α+m}` the codegeneracy
+`⦋n+1⦌ ⟶ ⦋n-p⦌` (identity on the bottom `m` vertices, the shuffle's second-coordinate
+codegeneracy shifted by `m` on top) and `F = ∂^{n-q-1}_m` the coface `⦋n-p⦌ ⟶ ⦋n⦌` omitting
+the middle block `{m,…,n-q-1}` (so `F v = v` for `v < m` and `F v = v + p` otherwise). Using
+`μ.1 0 = (0,0)` this composite collapses to the closed form below. -/
+def emSndHom (n p q : ℕ) (μ : Shuffle (p + 1) q) :
+    (⦋n + 1⦌ : SimplexCategory) ⟶ ⦋n⦌ :=
+  SimplexCategory.mkHom
+    { toFun := fun j =>
+        ⟨min (if (j : ℕ) < n - p - q then (j : ℕ)
+              else n - p - q + p +
+                ((μ.1 ⟨(j : ℕ) - (n - p - q), by have hj := j.isLt; omega⟩).2 : ℕ)) n,
+          by omega⟩
+      monotone' := by
+        intro a b hab
+        have hab' : (a : ℕ) ≤ (b : ℕ) := hab
+        simp only [Fin.mk_le_mk]
+        split_ifs with ha hb hb
+        · omega
+        · omega
+        · omega
+        · have hmono : ((μ.1 ⟨(a : ℕ) - (n - p - q), by have := a.isLt; omega⟩).2 : ℕ) ≤
+              ((μ.1 ⟨(b : ℕ) - (n - p - q), by have := b.isLt; omega⟩).2 : ℕ) :=
+            (μ.1.monotone (show (⟨(a : ℕ) - (n - p - q), by have := a.isLt; omega⟩ :
+                Index ((p + 1) + q)) ≤ ⟨(b : ℕ) - (n - p - q), by have := b.isLt; omega⟩ from by
+              simp only [Fin.mk_le_mk]; omega)).2
+          omega }
+
+/-- The Eilenberg–Mac Lane homotopy operator `H` on the diagonal complex `F₂(X)`, in
+degree `n` (raising degree by one). Signed double sum over `(p, q)` with `p + q < n` and
+over `(p+1, q)`-shuffles, per Franz (3.3). The sign is `(-1)^{m+1} · sign(μ)` with
+`m = n - p - q`; we index the outer sum by `d = p + q ∈ {0,…,n-1}` and `p ∈ {0,…,d}`. -/
+noncomputable def emHomotopy (X : BisimplicialObject C) (n : ℕ) :
+    (F₂.obj X).X n ⟶ (F₂.obj X).X (n + 1) :=
+  ∑ d ∈ Finset.range n, ∑ p ∈ Finset.range (d + 1), ∑ μ : Shuffle (p + 1) (d - p),
+    ((-1 : ℤ) ^ (n - d + 1) * μ.sign) •
+      ((X.obj (Opposite.op ⦋n⦌)).map (emSndHom n p (d - p) μ).op ≫
+        (X.map (emFstHom n p (d - p) μ).op).app (Opposite.op ⦋n + 1⦌))
+
+/-- `H₀ = 0` (Franz (3.4)): the degree-`0` part of the EM homotopy vanishes, since the
+outer sum ranges over `d ∈ Finset.range 0 = ∅`. -/
+lemma emHomotopy_zero (X : BisimplicialObject C) : emHomotopy X 0 = 0 := by
+  simp [emHomotopy]
+
+/-- The EM homotopy `H` packaged as a degree-`+1` `Homotopy.hom` family on `F₂(X)`: it is
+`emHomotopy X i` (transported along `j = i + 1`) on the single nonzero entry `j = i + 1`,
+and `0` elsewhere, matching the `ComplexShape.down ℕ` grading. -/
+noncomputable def emHomotopyHom (X : BisimplicialObject C) (i j : ℕ) :
+    (F₂.obj X).X i ⟶ (F₂.obj X).X j :=
+  if h : j = i + 1 then emHomotopy X i ≫ eqToHom (by rw [h]) else 0
+
+lemma emHomotopyHom_zero (X : BisimplicialObject C) (i j : ℕ)
+    (hij : ¬ (ComplexShape.down ℕ).Rel j i) : emHomotopyHom X i j = 0 :=
+  dif_neg fun h => hij (by rw [ComplexShape.down_Rel]; omega)
+
+/-- `∇AW = 1 + d(H)` (Franz (3.6)): per diagonal degree `n`, the composite
+`alexanderWhitney ≫ shuffleMap` equals the identity plus the homotopy boundary `d ∘ H + H ∘ d`
+of the Eilenberg–Mac Lane homotopy `H = emHomotopyHom`, written in the `dNext`/`prevD` form
+expected by `Homotopy.comm`. -/
+lemma awShuffle_eq_id_add_dH (X : BisimplicialObject C) (n : ℕ) :
+    (alexanderWhitney X ≫ shuffleMap X).f n =
+      dNext n (emHomotopyHom X) + prevD n (emHomotopyHom X) +
+        (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f n :=
+  sorry
+
 /-! ### Homotopy equivalence -/
 
 /-- `AW ∘ EZ` is chain homotopic to `𝟙` on `F₁(X)`. -/
 noncomputable def homotopyShuffleAWId (X : BisimplicialObject C) :
     Homotopy (shuffleMap X ≫ alexanderWhitney X) (𝟙 (F₁.obj X)) := sorry
 
-/-- `EZ ∘ AW` is chain homotopic to `𝟙` on `F₂(X)`. -/
+/-- `EZ ∘ AW` is chain homotopic to `𝟙` on `F₂(X)`, via the Eilenberg–Mac Lane homotopy
+`H = emHomotopyHom`; the homotopy relation is Franz (3.6) `∇AW = 1 + d(H)`. -/
 noncomputable def homotopyAWShuffleId (X : BisimplicialObject C) :
-    Homotopy (alexanderWhitney X ≫ shuffleMap X) (𝟙 (F₂.obj X)) := sorry
+    Homotopy (alexanderWhitney X ≫ shuffleMap X) (𝟙 (F₂.obj X)) where
+  hom := emHomotopyHom X
+  zero := emHomotopyHom_zero X
+  comm := awShuffle_eq_id_add_dH X
 
 /-- **Eilenberg-Zilber theorem for bisimplicial objects.**
 
