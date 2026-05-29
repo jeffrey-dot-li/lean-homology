@@ -288,6 +288,59 @@ private lemma awComponent_top_face_eq_bottom_face (X : BisimplicialObject C) (p 
       (eqToHom (by congr 1; omega)).op]
   simp only [Category.assoc, eqToHom_op, eqToHom_map, eqToHom_trans_assoc]
 
+private lemma sum_bij_front {α : Type*} [AddCommMonoid α] {j : ℕ} (x : Fin (j + 1))
+    {f : Fin (↑x + 1) → α}
+    {g :
+      {y : Fin (j + 2) // y ∈ Finset.univ.filter (fun y : Fin (j + 2) => (↑y : ℕ) ≤ ↑x)} → α}
+    (hfg : ∀ i : Fin (↑x + 1),
+      f i =
+        g ⟨(⟨↑i, by omega⟩ : Fin (j + 2)), by
+          simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+          omega⟩) :
+    ∑ i : Fin (↑x + 1), f i = ∑ y, g y := by
+  refine Finset.sum_bij'
+    (fun (i : Fin (↑x + 1)) _ => ⟨(⟨↑i, by omega⟩ : Fin (j + 2)), by
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+      omega⟩)
+    (fun y _ => (⟨↑(↑y : Fin (j + 2)), by
+      have := (Finset.mem_filter.mp y.2).2
+      omega⟩ : Fin (↑x + 1)))
+    ?_ ?_ ?_ ?_ ?_
+  · intros; exact Finset.mem_univ _
+  · intros; exact Finset.mem_univ _
+  · intros; rfl
+  · intros; rfl
+  · intros; simpa using hfg _
+
+private lemma sum_bij_back {α : Type*} [AddCommMonoid α] {j : ℕ} (x : Fin (j + 1))
+    {f : Fin (j - ↑x + 1) → α}
+    {g :
+      {y : Fin (j + 2) // y ∈ Finset.univ.filter (fun y : Fin (j + 2) => ¬ (↑y : ℕ) ≤ ↑x)} → α}
+    (hfg : ∀ i : Fin (j - ↑x + 1),
+      f i =
+        g ⟨(⟨↑x + 1 + ↑i, by omega⟩ : Fin (j + 2)), by
+          simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+          omega⟩) :
+    ∑ i : Fin (j - ↑x + 1), f i = ∑ y, g y := by
+  refine Finset.sum_bij'
+    (fun (i : Fin (j - ↑x + 1)) _ => ⟨(⟨↑x + 1 + ↑i, by omega⟩ : Fin (j + 2)), by
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+      omega⟩)
+    (fun y _ => (⟨↑(↑y : Fin (j + 2)) - (↑x + 1), by
+      have h1 := (Finset.mem_filter.mp y.2).2
+      have h2 := (↑y : Fin (j + 2)).isLt
+      omega⟩ : Fin (j - ↑x + 1)))
+    ?_ ?_ ?_ ?_ ?_
+  · intros; exact Finset.mem_univ _
+  · intros; exact Finset.mem_univ _
+  · intros; apply Fin.ext; simp
+  · intro y hy
+    apply Subtype.ext; apply Fin.ext
+    have hgt := (Finset.mem_filter.mp y.2).2
+    simp at hgt ⊢
+    omega
+  · intros; simpa using hfg _
+
 /-- The Alexander-Whitney chain map `F₂(X) ⟶ F₁(X)`.
 
 At degree `n`, maps `X_{n,n}` into `⨁_{p+q=n} X_{p,q}` by copairing the
@@ -305,111 +358,44 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     intro i j h
     simp only [id]
     rw [ComplexShape.down_Rel] at h; subst h
-    -- Both sides are maps X_{j+1, j+1} → total.X(j).
-    -- Strategy: expand both sides into double sums over face indices and AW-component
-    -- indices, apply diag_δ_comp_eqToHom_awComponent to rewrite the RHS, then match.
-    -- Step 1: Expand LHS using total.d = D₁ + D₂, then ι_D₁/ι_D₂.
+    -- Expand the total differential on the left.
     simp only [Preadditive.sum_comp, Category.assoc]
     change ∑ x : Fin (j + 2), _ ≫ _ ≫ _ ≫
       (HomologicalComplex₂.total (doubleComplex X) (ComplexShape.down ℕ)).d (j + 1) j = _
     rw [HomologicalComplex₂.total_d]
-    simp only [Preadditive.comp_add, Finset.sum_add_distrib, Category.assoc,
+    simp only [Preadditive.comp_add, Finset.sum_add_distrib,
       HomologicalComplex₂.ι_D₁, HomologicalComplex₂.ι_D₂]
-    -- Step 2: Expand RHS: d_diag = ∑_k (-1)^k δ_k, distribute through the sum.
-    simp only [Preadditive.comp_sum, Preadditive.sum_comp, Category.assoc]
+    -- Expand the diagonal differential on the right.
+    simp only [Preadditive.comp_sum]
     simp only [F₂, Functor.comp_obj, diag_obj_obj, alternatingFaceMapComplex_obj_d,
       AlternatingFaceMapComplex.objD, SimplicialObject.δ, diag_obj_map]
-    simp only [Preadditive.sum_comp, Preadditive.comp_sum,
-      Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc]
-    -- Step 3: On the RHS, rewrite δ_k ≫ eqToHom ≫ awComp using the key lemma.
-    -- The eqToHom proof terms block simp_rw, so we use congr + exact.
+    simp only [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
+    -- Rewrite each diagonal face through `awComponent`; `conv` avoids matching issues
+    -- from the `eqToHom` witnesses.
     conv_rhs =>
       enter [2, x, 2, x_1, 2]
       rw [reassoc_of% diag_δ_comp_eqToHom_awComponent X j (↑x) (j - ↑x)
         (Nat.add_sub_cancel' (Nat.lt_succ_iff.mp x.isLt)) x_1]
-    -- Step 4: Distribute smul and ≫ through the if/else, then split into two sums.
     simp only [smul_dite, dite_comp]
     simp_rw [Finset.sum_dite]
-    -- Both sides are now sums with + inside, but LHS is over Fin(j+2) and RHS over Fin(j+1).
-    -- The d₁ and d₂ terms vanish at the boundary indices (x=0 for d₁, x=j+1 for d₂),
-    -- making the index sets effectively the same.
-    -- Step 5: Distribute the RHS sum over its `+`, so the goal becomes A + B = C + D
-    -- with A,C the d₁/face-on-front pieces and B,D the d₂/face-on-back pieces.
-    -- Then reduce to two independent equalities A = C and B = D.
     rw [Finset.sum_add_distrib]
-    -- NOTE: The split below (`A + B = C + D` via `congr_arg₂`) is **almost correct** but
-    -- not quite — there's a cardinality mismatch.  After fixing the off-by-one in
-    -- `diag_δ_comp_eqToHom_awComponent` (back-branch face is `δ ⟨k - p, _⟩`, not
-    -- `δ ⟨k - (p+1), _⟩`), the RHS front-branch has `p + 1` faces (`k ∈ {0,…,p}`) and
-    -- back-branch has `q + 1` faces (`k - p ∈ {1,…,q+1}`).  But LHS `d₁` has `p + 2`
-    -- faces (`k ∈ {0,…,p+1}`) and LHS `d₂` has `q + 2` faces (`k ∈ {0,…,q+1}`).
-    -- So there are 2 extras per outer index `i`: the `d₁` top-face (`k = p + 1`) and
-    -- the `d₂` bottom-face (`k = 0`), which must cancel between themselves (opposite
-    -- signs) via simplicial naturality before any per-branch matching can work.
-    -- The strategy below therefore needs to be reworked to handle that cross-cancellation
-    -- first; the per-summand `d₁` expansion code below is still useful and kept here
-    -- for reference.
-    -- refine congr_arg₂ (· + ·) ?_ ?_
-    -- · -- A = C: LHS d₁ sum = RHS face-on-front (`k ≤ p`) sum, via reindex x ↦ x+1
-    --   -- (the x = 0 LHS summand is zero since `d₁` vanishes at p = 0).
-    --   conv_lhs => rw [Fin.sum_univ_succ]
-    --   rw [HomologicalComplex₂.d₁_eq_zero _ _ _ _ _ (by simp), comp_zero, comp_zero, zero_add]
-    --   refine Finset.sum_congr rfl (fun i _ => ?_)
-    --   -- Expand `d₁`: the sign `ε₁ = 1` for the homogeneous `.down ℕ` total complex,
-    --   -- so `d₁ = (K.d (i+1) i).f q ≫ ιTotal`. Then unfold the outer differential of
-    --   -- `X.doubleComplex` as the alternating face sum `∑ k, (-1)^k • X.δ k` acting
-    --   -- in the first simplicial direction.
-    --   have hε1 : ((ComplexShape.down ℕ).ε₁ (.down ℕ) (.down ℕ)
-    --       (↑i.succ, j + 1 - ↑i.succ) : ℤˣ) = 1 := rfl
-    --   rw [HomologicalComplex₂.d₁_eq _ _
-    --         (show (ComplexShape.down ℕ).Rel (↑i.succ) ↑i by simp) _ _ (by simp; omega),
-    --       hε1, one_smul, Functor.mapHomologicalComplex_obj_d, alternatingFaceMapComplex_map_f]
-    --   -- `alternatingFaceMapComplex_obj_d` matches the pattern `_.d (n+1) n`, so massage
-    --   -- `_.d ↑i.succ ↑i` into `_.d (↑i + 1) ↑i` first to enable the rewrite.
-    --   conv_lhs =>
-    --     rw [show (((alternatingFaceMapComplex (SimplicialObject C)).obj X).d (↑i.succ : ℕ) ↑i)
-    --           = ((alternatingFaceMapComplex (SimplicialObject C)).obj X).d (↑i + 1) ↑i
-    --         from by simp [Fin.val_succ]]
-    --   rw [alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD,
-    --       NatTrans.app_sum]
-    --   conv_lhs => enter [2, 2, 1, 2, k]; rw [NatTrans.app_zsmul]
-    --   simp only [Preadditive.sum_comp, Preadditive.comp_sum,
-    --     Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc]
-    --   congr 1
-    --   sorry
-    -- · -- B = D: LHS d₂ sum = RHS face-on-back (`k > p`) sum
-    --   -- (the x = j+1 LHS summand is zero since `d₂` vanishes at q = 0).
-    --   sorry
-    -- Step 6: Peel `x = 0` off the d₁ sum so we can kill it via `d₁_eq_zero` next.
+    -- A direct branchwise split leaves one extra top `d₁` face and one extra bottom
+    -- `d₂` face on the left. Peel those boundary terms first.
     conv_lhs => rw [Fin.sum_univ_succ]
-    -- Step 7: Kill the `x = 0` d₁ summand: `d₁ X (0) ... = 0` since `.down ℕ` has no
-    -- predecessor of 0, so `≫ d₁` becomes `≫ 0 = 0` and the leading `0 +` disappears.
     rw [HomologicalComplex₂.d₁_eq_zero _ _ _ _ _ (by simp), comp_zero, comp_zero, zero_add]
-    -- Step 8: Peel `x = j+1` (last) off the d₂ sum; use `enter [2]` to target the
-    -- second summand of LHS so we don't re-peel the d₁ sum.
     conv_lhs => enter [2]; rw [Fin.sum_univ_castSucc]
-    -- Step 9: Kill the `x = j+1` d₂ summand: `d₂ X _ 0 _ = 0` since second coord = 0
-    -- has no predecessor in `.down ℕ`. After `comp_zero, comp_zero`, the trailing
-    -- `+ 0` disappears via `add_zero`.
     rw [HomologicalComplex₂.d₂_eq_zero _ _ _ _ _ (by simp), comp_zero, comp_zero, add_zero]
-    -- Step 10: Expand each d₁ summand: `d₁ K (i.succ) (j+1-i.succ) j = ε₁ • (K.d ...).f ... ≫ ιTotal`.
-    -- `Rel ↑i.succ ↑i` holds in `.down ℕ` (`simp`); the π-coherence `↑i + (j+1-↑i.succ) = j`
-    -- is closed by `omega`.
+    -- Expand `d₁` and `d₂` into alternating face sums.
     conv_lhs =>
       enter [1, 2, i]
       rw [HomologicalComplex₂.d₁_eq _ _
             (show (ComplexShape.down ℕ).Rel (↑i.succ) ↑i by simp) _ _ (by simp; omega)]
-    -- Step 11: Expand each d₂ summand: `d₂ K (i.castSucc) (j+1-i.castSucc) j = ε₂ • (K.X _).d ... ≫ ιTotal`.
-    -- `Rel (j+1-↑i.castSucc) (j-↑i.castSucc)` requires `↑i.castSucc ≤ j` (true since
-    -- `i : Fin (j+1)`); both proofs by `simp; omega`.
     conv_lhs =>
       enter [2, 2, i]
       rw [HomologicalComplex₂.d₂_eq _ _ _
             (show (ComplexShape.down ℕ).Rel (j + 1 - ↑i.castSucc) (j - ↑i.castSucc) by
               simp; omega) _ (by simp; omega)]
-    -- Step 12: Simplify the ε signs for the homogeneous `.down ℕ` shape:
-    --   `ε₁ (.down ℕ) (.down ℕ) (.down ℕ) (_, _) = 1` (definitionally from `TotalComplexShape c c c`);
-    --   `ε₂ (.down ℕ) (.down ℕ) (.down ℕ) (p, _) = (-1)^p` (definitionally via `ε_down_ℕ`).
+    -- Normalize the total-complex signs `ε₁ = 1` and `ε₂ = (-1)^p`.
     simp_rw [show ∀ p q : ℕ,
               ((ComplexShape.down ℕ).ε₁ (.down ℕ) (.down ℕ) (p, q) : ℤˣ) = 1
               from fun _ _ => rfl,
@@ -417,11 +403,8 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
              show ∀ p q : ℕ,
               ((ComplexShape.down ℕ).ε₂ (.down ℕ) (.down ℕ) (p, q) : ℤˣ) = (-1 : ℤˣ)^p
               from fun _ _ => rfl]
-    -- Step 13a: Normalise `↑x.castSucc → ↑x` so the d₂ sum's outer index appears as plain `↑x`.
-    simp only [Fin.coe_castSucc]
-    -- Step 13b: Rewrite the d₂ inner `.d (j+1-↑x) (j-↑x)` into the definitionally well-formed
-    -- `eqToHom ⋯ ≫ .d ((j-↑x)+1) (j-↑x)` so the next step can apply
-    -- `alternatingFaceMapComplex_obj_d` (which expects indices in `(n+1, n)` form).
+    simp only [Fin.val_castSucc]
+    -- Rewrite the d₂ index into `(n+1, n)` form before expanding the differential.
     conv_lhs =>
       enter [2, 2, x]
       rw [(HomologicalComplex.eqToHom_comp_d _
@@ -429,118 +412,66 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
               simp [ComplexShape.down_Rel]; omega)
             (show (ComplexShape.down ℕ).Rel ((j - ↑x) + 1) (j - ↑x) by
               simp [ComplexShape.down_Rel])).symm]
-    -- Step 14: Expand the d₂ inner differential into the alternating face sum
-    -- `∑ k, (-1)^k • X _⦋↑x⦌.map (δ k).op` — matching the shape of the RHS d₂ sum.
     conv_lhs =>
       enter [2, 2, x]
       simp only [Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X,
         alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD, SimplicialObject.δ]
-    -- Step 15a: Structural unfolding of the d₁ outer differential. `Fin.val_succ` normalises
-    -- `↑x.succ → ↑x + 1` so `alternatingFaceMapComplex_obj_d` can match the `(n+1, n)` pattern;
-    -- `alternatingFaceMapComplex_map_f` extracts the `.f q` component to `η.app (op ⦋q⦌)`.
-    -- `.app` is left outside the resulting sum and is distributed in step 15b.
+    -- For the d₁ branch, expose the `.f` component before distributing `.app` over the sum.
     conv_lhs =>
       enter [1, 2, x]
       simp only [Fin.val_succ, doubleComplex, Functor.mapHomologicalComplex_obj_d,
         alternatingFaceMapComplex_map_f, alternatingFaceMapComplex_obj_d,
         AlternatingFaceMapComplex.objD, SimplicialObject.δ]
-    -- Step 15b: Distribute `.app (op ⦋_⦌)` over the d₁ sum: first pull it inside the sum via
-    -- `NatTrans.app_sum`, then push through each smul via `NatTrans.app_zsmul` inside a
-    -- `Finset.sum_congr` (mirroring the existing pattern at the EZ-side AW comm proof).
     conv_lhs =>
       enter [1, 2, x]
       rw [NatTrans.app_sum, Finset.sum_congr rfl (fun x _ => NatTrans.app_zsmul _ _ _)]
-    -- Step 16: Distribute the outer compositions and smul over the inner sums on the LHS,
-    -- so each branch becomes `∑ x, ∑ x_1, scalar • (composition)` — matching the RHS shape.
-    -- `Units.smul_def` converts the d₂ outer `(-1)^↑x : ℤˣ` smul (from `ε₂`) into a `ℤ` smul
-    -- so `Preadditive.comp_zsmul`/`zsmul_comp` can fire on it. `Finset.smul_sum` pulls the
-    -- resulting outer smul into the inner d₂ sum, and `smul_smul` combines the two scalars.
+    -- Distribute compositions and scalars so both sides are double sums of compositions.
     simp only [Units.smul_def, Preadditive.comp_sum, Preadditive.sum_comp,
       Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc,
       Finset.smul_sum, smul_smul]
-    -- Step 17: Peel the extra inner-sum terms so cardinalities match the RHS:
-    --   • LHS d₁ inner sum is over `Fin (↑x + 2)` but RHS front is over `Fin (↑x + 1)`; peel the
-    --     last term (top face `x_1 = ↑x + 1`) via `Fin.sum_univ_castSucc`.
-    --   • LHS d₂ inner sum is over `Fin (j - ↑x + 2)` but RHS back is over `Fin (j - ↑x + 1)`;
-    --     peel the first term (bottom face `x_1 = 0`) via `Fin.sum_univ_succ`.
-    -- The peeled terms (top-d₁ and bottom-d₂) are the simplicial-naturality pair that should
-    -- cancel each other via the AW front-back identity (next step).
+    -- Peel the remaining boundary faces so the interior index ranges match the RHS.
     conv_lhs =>
       enter [1, 2, x]
       rw [Fin.sum_univ_castSucc]
     conv_lhs =>
       enter [2, 2, x]
       rw [Fin.sum_univ_succ]
-    -- Step 18: Split each LHS outer sum `∑ x, (remaining + extra) = (∑ x, remaining) + (∑ x, extra)`
-    -- so we get four separate outer sums on LHS: `remaining_d₁ + top_d₁_extra + bottom_d₂_extra
-    -- + remaining_d₂`. The two extras will then cancel via the AW front-back identity, and the
-    -- two remaining sums will match the RHS front and back branches after reindexing.
     simp only [Finset.sum_add_distrib]
-    -- Step 19: Bind the 4 LHS sums and 2 RHS sums to local names via `name_parts`, sidestepping
-    -- the typeclass-stuck issue that prevented a polymorphic `rw` from rearranging. With names
-    -- A,B,C,D,E,F in scope (concrete-typed via `let`), `abel` can rearrange the LHS to pair the
-    -- cancelling extras (B,C) together.
-    name_parts ?A + ?B + (?C + ?D) = ?E + ?F
-    rw [show A + B + (C + D) = (A + D) + (B + C) from by abel]
-    -- Step 20: Decompose into three sub-claims:
-    --   • hAE : A = E       -- remaining_d₁ = RHS_front (reindex Fin(↑x+1) → {k ≤ ↑x})
-    --   • hDF : D = F       -- remaining_d₂ = RHS_back  (reindex Fin(j-↑x+1) → {k > ↑x})
-    --   • hBC : B + C = 0   -- AW front-back identity (simplicial naturality cancels signs)
-    -- Then close by rewriting and absorbing the zero.
-    have hAE : A = E := by
+    -- Name the four LHS branches and the two RHS branches, then regroup so the two
+    -- boundary terms sit together.
+    name_parts ?A0 + ?B0 + (?C0 + ?D0) = ?E0 + ?F0
+    rw [show A0 + B0 + (C0 + D0) = (A0 + D0) + (B0 + C0) from by abel]
+    -- Match the interior sums by reindexing, then cancel the two boundary terms.
+    have hAE : A0 = E0 := by
       refine Finset.sum_congr rfl (fun x _ => ?_)
-      refine Finset.sum_bij'
-        (fun (i : Fin (↑x + 1)) _ => ⟨(⟨↑i, by omega⟩ : Fin (j + 2)), by
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and]; omega⟩)
-        (fun y _ => (⟨↑(↑y : Fin (j + 2)), by
-          have := (Finset.mem_filter.mp y.2).2; omega⟩ : Fin (↑x + 1)))
-        ?h1 ?h2 ?h3 ?h4 ?h5
-      case h1 => intros; exact Finset.mem_univ _
-      case h2 => intros; exact Finset.mem_univ _
-      case h3 => intros; rfl
-      case h4 => intros; rfl
-      case h5 =>
-        intros a _
-        have k : j + 1 - (↑x + 1) = j - ↑x := by omega
-        generalize_proofs at *
-        generalize j + 1 - (↑x + 1) = q at *
-        subst k
-        rfl
-    have hDF : D = F := by
+      refine sum_bij_front (x := x) ?_
+      intro a
+      have k : j + 1 - (↑x + 1) = j - ↑x := by omega
+      generalize_proofs at *
+      generalize j + 1 - (↑x + 1) = q at *
+      subst k
+      rfl
+    have hDF : D0 = F0 := by
       refine Finset.sum_congr rfl (fun x _ => ?_)
-      refine Finset.sum_bij'
-        (fun (i : Fin (j - ↑x + 1)) _ => ⟨(⟨↑x + 1 + ↑i, by omega⟩ : Fin (j + 2)), by
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and]; omega⟩)
-        (fun y _ => (⟨↑(↑y : Fin (j + 2)) - (↑x + 1), by
-          have h1 := (Finset.mem_filter.mp y.2).2
-          have h2 := (↑y : Fin (j + 2)).isLt
-          omega⟩ : Fin (j - ↑x + 1)))
-        ?h1 ?h2 ?h3 ?h4 ?h5
-      case h1 => intros; exact Finset.mem_univ _
-      case h2 => intros; exact Finset.mem_univ _
-      case h3 => intros; apply Fin.ext; simp
-      case h4 =>
-        intro y hy
-        apply Subtype.ext; apply Fin.ext
-        have hgt := (Finset.mem_filter.mp y.2).2
-        simp at hgt ⊢
+      refine sum_bij_back
+        (α := ((alternatingFaceMapComplex C).obj (diag.obj X)).X (j + 1) ⟶
+          (HomologicalComplex₂.total X.doubleComplex (ComplexShape.down ℕ)).X j)
+        (x := x) ?_
+      intro a
+      have k : j + 1 - ↑x = j - ↑x + 1 := by omega
+      generalize_proofs at *
+      generalize j + 1 - ↑x = q at *
+      subst k
+      simp only [eqToHom_refl, Category.id_comp]
+      congr 1
+      · push_cast
+        rw [Fin.val_succ, pow_add]
+        ring
+      · congr
+        apply Fin.ext
+        simp
         omega
-      case h5 =>
-        intros a _
-        have k : j + 1 - ↑x = j - ↑x + 1 := by omega
-        generalize_proofs at *
-        generalize j + 1 - ↑x = q at *
-        subst k
-        simp only [eqToHom_refl, Category.id_comp]
-        congr 1
-        · push_cast
-          rw [Fin.val_succ, pow_add]
-          ring
-        · congr
-          apply Fin.ext
-          simp
-          omega
-    have hBC : B + C = 0 := by
+    have hBC : B0 + C0 = 0 := by
       rw [← Finset.sum_add_distrib]
       apply Finset.sum_eq_zero
       intro x _
@@ -552,7 +483,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       name_parts ?s1 • ?MA + ?s2 • ?MB = 0
       suffices hAB : MA = MB by
         have hscalar : s1 = -s2 := by
-          show ((-1 : ℤ) ^ ((Fin.last ((x.val : ℕ) + 1)).val : ℕ)) = -↑((-1 : ℤˣ) ^ x.val)
+          change ((-1 : ℤ) ^ ((Fin.last ((x.val : ℕ) + 1)).val : ℕ)) = -↑((-1 : ℤˣ) ^ x.val)
           rw [Fin.val_last, pow_succ, Units.val_pow_eq_pow_val]
           push_cast
           ring
