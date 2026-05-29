@@ -90,21 +90,43 @@ lemma ι_front_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
     (hk : (k : ℕ) ≤ p) :
     ι_front p q ≫ SimplexCategory.δ k =
       SimplexCategory.δ ⟨k, by omega⟩ ≫ ι_front (p + 1) q ≫
-        eqToHom (by ring_nf) := sorry
+        eqToHom (by ring_nf) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+  split_ifs <;> simp_all
 
 /-- `ι_front(p, q) ≫ δ k = ι_front(p, q+1)` when `k > p`, i.e., the face map
 acts beyond the front range — all front vertices stay below the skipped index. -/
 lemma ι_front_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
     (hk : p < (k : ℕ)) :
     ι_front p q ≫ SimplexCategory.δ k =
-      ι_front p (q + 1) ≫ eqToHom (by ring_nf) := sorry
+      ι_front p (q + 1) ≫ eqToHom (by ring_nf) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+  split_ifs <;> simp_all
+  omega
 
 /-- `ι_back(p, q) ≫ δ k = ι_back(p+1, q)` when `k ≤ p`, i.e., the face map
 acts before the back range — all back vertices shift by one. -/
 lemma ι_back_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
     (hk : (k : ℕ) ≤ p) :
     ι_back p q ≫ SimplexCategory.δ k =
-      ι_back (p + 1) q ≫ eqToHom (by ring_nf) := sorry
+      ι_back (p + 1) q ≫ eqToHom (by ring_nf) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+  split_ifs <;> simp_all <;> omega
 
 /-- `ι_back(p, q) ≫ δ k = δ (k - p) ≫ ι_back(p, q+1)` when `k > p`, i.e., the face
 map acts within the back range. Here `δ (k-p)` is the face map on `[q]`. -/
@@ -112,7 +134,40 @@ lemma ι_back_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
     (hk : p < (k : ℕ)) :
     ι_back p q ≫ SimplexCategory.δ k =
       SimplexCategory.δ ⟨k - p, by omega⟩ ≫ ι_back p (q + 1) ≫
-        eqToHom (by ring_nf) := sorry
+        eqToHom (by ring_nf) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+  split_ifs <;> simp_all <;> omega
+
+/-- The top face of `[p+1]` followed by the front inclusion is the front inclusion
+`[p] ⟶ [p+(q+1)]`, up to the arithmetic reassociation of the target. -/
+private lemma δ_last_comp_ι_front (p q : ℕ) :
+    SimplexCategory.δ (Fin.last (p + 1)) ≫ ι_front (p + 1) q =
+      ι_front p (q + 1) ≫ eqToHom (by congr 1; omega) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_last, Fin.val_castSucc]
+  split_ifs
+  simp_all
+
+/-- The bottom face of `[q+1]` followed by the back inclusion shifts the back block
+from offset `p` to offset `p+1`, up to the arithmetic reassociation of the target. -/
+private lemma δ_zero_comp_ι_back (p q : ℕ) :
+    SimplexCategory.δ 0 ≫ ι_back p (q + 1) =
+      ι_back (p + 1) q ≫ eqToHom (by congr 1; omega) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi
+  dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  omega
 
 /-! ### Alexander-Whitney map
 
@@ -138,6 +193,7 @@ noncomputable def awComponent (X : BisimplicialObject C) (p q : ℕ) :
   (X.map (ι_front p q).op).app (Opposite.op ⦋p + q⦌) ≫
     (X.obj (Opposite.op ⦋p⦌)).map (ι_back p q).op
 
+omit [Preadditive C] [HasFiniteCoproducts C] in
 /-- Composing a diagonal face map `δ_k` with `eqToHom ≫ awComponent(p, q)` at degree `n+1`.
 
 This is the key identity for proving `alexanderWhitney.comm'`: the diagonal face map
@@ -156,22 +212,81 @@ private lemma diag_δ_comp_eqToHom_awComponent (X : BisimplicialObject C)
       eqToHom (by subst hpq; simp only [show p + (q + 1) = p + q + 1 by omega]) ≫
         awComponent X p (q + 1) ≫
           (X.obj (Opposite.op ⦋p⦌)).map
-            (SimplexCategory.δ ⟨k - p, by omega⟩).op := sorry
+            (SimplexCategory.δ ⟨k - p, by omega⟩).op := by
+  subst hpq
+  unfold awComponent
+  split_ifs with hk
+  · simp only [Category.assoc]
+    simp only [eqToHom_refl, Category.id_comp]
+    slice_lhs 2 3 =>
+      rw [(X.map (ι_front p q).op).naturality (SimplexCategory.δ k).op]
+    simp only [Category.assoc]
+    slice_lhs 1 2 => rw [← NatTrans.comp_app, ← Functor.map_comp]
+    rw [← op_comp, ι_front_comp_δ_of_le p q k hk]
+    simp only [op_comp, Functor.map_comp, NatTrans.comp_app, Category.assoc]
+    slice_lhs 4 5 => rw [← Functor.map_comp, ← op_comp, ι_back_comp_δ_of_le p q k hk]
+    simp only [op_comp, Functor.map_comp, eqToHom_op, eqToHom_map, eqToHom_app]
+    generalize_proofs at *
+    -- Apply θ = X.map (δ k).op naturality on the RHS w.r.t. the back-face ι_back, turning
+    -- `X_⦋p+1⦌.map ι_back ≫ θ.app ⦋q⦌` into `θ.app ⦋p+1+q⦌ ≫ X_⦋p⦌.map ι_back`.
+    slice_rhs 3 4 =>
+      rw [(X.map (SimplexCategory.δ ⟨↑k, by omega⟩).op).naturality (ι_back (p + 1) q).op]
+    -- Fuse the two vertical maps `η.app d ≫ θ.app d` into a single
+    -- `(X.map (ι_front.op ≫ δ.op)).app d` on both sides, leaving one natural transformation.
+    slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp]
+    slice_rhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp]
+    simp only [Category.assoc]
+    -- Slide the leftover eqToHom (horizontal degree p+q+1 → p+1+q) across the fused map via
+    -- its naturality for the cast morphism, lining both sides up at degree p+1+q. The goal has
+    -- a bare `eqToHom`; first re-express it as `X_⦋p⦌.map (eqToHom _)` so naturality matches.
+    slice_lhs 2 3 =>
+      rw [← eqToHom_map (X _⦋p⦌) (show (Opposite.op ⦋p + q + 1⦌ : SimplexCategoryᵒᵖ) =
+            Opposite.op ⦋p + 1 + q⦌ from by rw [show p + q + 1 = p + 1 + q from by omega])]
+      rw [← (X.map ((ι_front (p + 1) q).op ≫ (SimplexCategory.δ ⟨↑k, by omega⟩).op)).naturality
+        (eqToHom (show (Opposite.op ⦋p + q + 1⦌ : SimplexCategoryᵒᵖ) = Opposite.op ⦋p + 1 + q⦌ from
+          by rw [show p + q + 1 = p + 1 + q from by omega]))]
+    simp only [eqToHom_map, eqToHom_trans_assoc, Category.assoc]
+  · simp only [Category.assoc]
+    simp only [eqToHom_refl, Category.id_comp]
+    slice_lhs 2 3 =>
+      rw [(X.map (ι_front p q).op).naturality (SimplexCategory.δ k).op]
+    simp only [Category.assoc]
+    slice_lhs 1 2 => rw [← NatTrans.comp_app, ← Functor.map_comp]
+    rw [← op_comp, ι_front_comp_δ_of_gt p q k (by omega)]
+    simp only [op_comp, Functor.map_comp, NatTrans.comp_app, Category.assoc]
+    slice_lhs 3 4 => rw [← Functor.map_comp, ← op_comp, ι_back_comp_δ_of_gt p q k (by omega)]
+    simp only [op_comp, Functor.map_comp, eqToHom_op, eqToHom_map, eqToHom_app, Category.assoc]
+    -- The two eqToHom casts collapse (`p+q+1` and `p+(q+1)` are defeq), leaving identical
+    -- composites whose only difference is the defeq index `⦋p+q+1⦌` vs `⦋p+(q+1)⦌`.
+    simp only [eqToHom_refl, Category.id_comp]
+    rfl
 
-/-- AW front-back identity: composing `awComponent (p+1) (j-p)` with the *top face* `δ (last)`
-(d₁ branch, peeled top face from the front-half) equals composing `awComponent p (j+1-p)` with
-the *bottom face* `δ 0` (d₂ branch, peeled bottom face from the back-half), both bridged
-through the appropriate `eqToHom` casts. This is the key cancellation in `alexanderWhitney.comm'`. -/
-private lemma aw_top_front_eq_bottom_back (X : BisimplicialObject C)
-    (j p : ℕ) (hp : p ≤ j)
-    (h₁ : ((alternatingFaceMapComplex C).obj (diag.obj X)).X (j + 1) =
-      X _⦋p + 1 + (j - p)⦌ _⦋p + 1 + (j - p)⦌)
-    (h₂ : diag.obj X _⦋j + 1⦌ = X _⦋p + (j + 1 - p)⦌ _⦋p + (j + 1 - p)⦌)
-    (h₃ : X _⦋p⦌ _⦋j + 1 - p⦌ = X _⦋p⦌ _⦋j - p + 1⦌) :
-    (eqToHom h₁ ≫ awComponent X (p + 1) (j - p)) ≫
-        (X.map (SimplexCategory.δ (Fin.last (p + 1))).op).app (Opposite.op ⦋j - p⦌) =
-      ((eqToHom h₂ ≫ awComponent X p (j + 1 - p)) ≫ eqToHom h₃) ≫
-        (X _⦋p⦌).map (SimplexCategory.δ 0).op := sorry
+omit [Preadditive C] [HasFiniteCoproducts C] in
+/-- Core AW front-back identity with canonical arithmetic casts: the top face of
+`awComponent (p+1, q)` agrees with the bottom face of `awComponent (p, q+1)`.
+This is the simplicial identity underlying the cross-term cancellation in
+`alexanderWhitney.comm'`; the wrapper below only adapts arbitrary `eqToHom`
+witnesses from the total-complex expression. -/
+private lemma awComponent_top_face_eq_bottom_face (X : BisimplicialObject C) (p q : ℕ) :
+    awComponent X (p + 1) q ≫
+        (X.map (SimplexCategory.δ (Fin.last (p + 1))).op).app (Opposite.op ⦋q⦌) =
+      eqToHom (by simp only [show p + 1 + q = p + (q + 1) by omega]) ≫
+        awComponent X p (q + 1) ≫
+        (X _⦋p⦌).map (SimplexCategory.δ 0).op := by
+  unfold awComponent
+  simp only [Category.assoc]
+  rw [(X.map (SimplexCategory.δ (Fin.last (p + 1))).op).naturality
+    (ι_back (p + 1) q).op]
+  simp only [← Functor.map_comp]
+  slice_lhs 1 2 => rw [← NatTrans.comp_app, ← Functor.map_comp]
+  rw [← op_comp, δ_last_comp_ι_front]
+  rw [← op_comp, δ_zero_comp_ι_back]
+  simp only [op_comp, Functor.map_comp, NatTrans.comp_app, Category.assoc]
+  slice_lhs 1 1 => rw [eqToHom_op, eqToHom_map, eqToHom_app]
+  slice_rhs 2 3 =>
+    rw [← (X.map (ι_front p (q + 1)).op).naturality
+      (eqToHom (by congr 1; omega)).op]
+  simp only [Category.assoc, eqToHom_op, eqToHom_map, eqToHom_trans_assoc]
 
 /-- The Alexander-Whitney chain map `F₂(X) ⟶ F₁(X)`.
 
@@ -445,9 +560,16 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       simp only [MA, MB]
       simp only [← Category.assoc]
       congr 1
-      exact aw_top_front_eq_bottom_back X j ↑x (by omega) _ _ _
+      simp only [Category.assoc]
+      rw [awComponent_top_face_eq_bottom_face]
+      generalize hq : j + 1 - ↑x = q at *
+      have hq' : j - ↑x + 1 = q := by omega
+      subst hq'
+      simp only [eqToHom_trans_assoc]
+      congr 1
+      simp only [eqToHom_refl, Category.id_comp]
     rw [hAE, hDF, hBC, add_zero]
-
+#print axioms alexanderWhitney
 /-! ### Eilenberg-Zilber / shuffle map
 
 The EZ map `F₁(X) ⟶ F₂(X)` sends the total complex to the diagonal chain complex.

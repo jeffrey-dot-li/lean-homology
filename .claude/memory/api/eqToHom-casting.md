@@ -151,6 +151,32 @@ private lemma myLemma_comp_δ {p q : ℕ} (ν : ...) (j : ...) (i : Fin (p + q +
 
 **When to use this**: Whenever a proof needs to connect a `SimplexCategory` morphism composition (`δ ≫ eqToHom`) with a `Fin`-level operation (`succAbove`, `cast`), and there's already a combinatorial lemma stated in `Fin` terms.
 
+## Principle 6b: Face/inclusion commutation lemmas — full recipe + two-stage closer
+
+**Use case**: Proving `ι ≫ δ k = (δ k' ≫) ι' ≫ eqToHom _` identities, where `ι`/`ι'` are custom monotone inclusions (`ι_front`, `ι_back` in `Bisimplicial.lean`) and `δ` is a coface. These are pure `SimplexCategory` morphism equalities — descend to `Fin` (Principle 6). All four `ι_front/ι_back_comp_δ_of_le/_gt` were proved with the **identical** template:
+
+```lean
+lemma ι_front_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2)) (hk : (k : ℕ) ≤ p) :
+    ι_front p q ≫ SimplexCategory.δ k =
+      SimplexCategory.δ ⟨k, by omega⟩ ≫ ι_front (p + 1) q ≫ eqToHom (by ring_nf) := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
+  simp only [SimplexCategory.len_mk] at hi          -- expose `hi : i < p + 1` for omega
+  dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+  split_ifs <;> simp_all
+  omega                                             -- only needed for `_gt`/`_back` arith cases
+```
+
+Only differences across the four: `dsimp [ι_front, ...]` ↔ `dsimp [ι_back, ...]`, and whether the trailing `omega` is needed.
+
+**The two-stage closer `split_ifs <;> simp_all` then `omega` is the key insight.** Neither tactic alone works:
+- `omega` **alone fails**: after `split_ifs`, the equality goals are `↑⟨i,_⟩.castSucc = ↑⟨i,hi⟩.castSucc` (same val, differing only by proof term). `omega` treats `.castSucc`/`.succ` as **opaque atoms** and can't see they're equal. `simp_all` reduces them via `Fin.val_castSucc`/`Fin.val_succ` and closes by congruence.
+- `simp_all` **alone fails**: the `_gt` and `_back` branches produce pure arithmetic contradictions (e.g. `hk : p < k`, `hi : i < p+1`, `h : k ≤ i` ⊢ `False`, i.e. `k ≤ i ≤ p < k`). `simp_all` can't discharge these; `omega` does.
+
+So run `split_ifs <;> simp_all` first (kills the `Fin`-congruence goals), then `omega` on its own line for the leftover arithmetic. Putting `omega` on a separate line (rather than `<;> omega`) avoids the `unnecessarySeqFocus` linter when only one goal remains.
+
 ## Principle 7: Proving the `eqToHom` proof term
 
 When writing `eqToHom (by ...)`, the proof obligation is typically `F.obj X = F.obj Y` where `X` and `Y` differ by a `Nat` equation. For `SimplexCategory.mk`:
@@ -201,6 +227,47 @@ exact eqToHom_map _ _                          -- functoriality closes it
 **When to use this**: Whenever you `dsimp` a `F.map(...)` to access something inside (e.g., a product lift component), and the remaining goal is an equality in the expanded concrete form. The re-fold lets you escape back to functor-level reasoning.
 
 **Companion pattern — bridge lemma for the non-eqToHom side**: The concrete morphism you re-folded into `F.map(f)` may itself need a bridge lemma showing `f = eqToHom(...)` in the source category `C`. For example, `snd_comp_default_shuffle_eq_eqToHom` proves the snd projection of the default `(0,n)`-shuffle is `eqToHom` in `SimplexCategory`. These are proved by `ext + omega` / `dsimp` at the `Fin` level (Principle 6).
+
+## Principle 10: Slide an `eqToHom` across a `NatTrans.app` at the "wrong" index
+
+**Problem**: You want to apply naturality of a natural transformation `α : F ⟶ G`, but `α.app` is evaluated at index `d₁` while a propositionally-equal index `d₂` is needed (e.g. `p+q+1` vs `p+1+q`), and an `eqToHom` sits wedged between `α.app d₁` and the next morphism:
+
+```
+α.app d₁ ≫ eqToHom h ≫ ...        -- naturality (which expects `α.app d₂`) won't fire
+```
+
+There is **no** off-the-shelf lemma `α.app _ ≫ eqToHom _ = eqToHom _ ≫ α.app _` (loogle finds nothing).
+
+**Recipe** (used in `diag_δ_comp_eqToHom_awComponent`, `Bisimplicial.lean`):
+
+1. **Fuse adjacent verticals first.** If you have two stacked transformations `η.app d ≫ θ.app d` (same `d`), collapse them into one transformation before fighting the cast:
+   ```lean
+   slice_lhs i j => rw [← NatTrans.comp_app, ← Functor.map_comp]
+   -- η.app d ≫ θ.app d  ↦  (X.map (f ≫ g)).app d   (η = X.map f, θ = X.map g)
+   ```
+   Now only a *single* nat-trans `M := X.map (f ≫ g)` remains — one naturality square instead of two.
+
+2. **Re-express the bare `eqToHom` as `G.map (eqToHom _)`.** After earlier `simp`s, the cast is usually a bare `eqToHom pf` (and `pf` is often inaccessible — `pf✝` — after `generalize_proofs`, so you can't name it). `rw [← eqToHom_map G h]` matches it anyway, because `rw` matches `eqToHom` up to its irrelevant proof term:
+   ```lean
+   slice_lhs i j =>
+     rw [← eqToHom_map (X _⦋p⦌) (show (Opposite.op ⦋p+q+1⦌ : SimplexCategoryᵒᵖ) =
+           Opposite.op ⦋p+1+q⦌ from by rw [show p + q + 1 = p + 1 + q from by omega])]
+   ```
+
+3. **Apply `M`'s naturality for the cast morphism.** Now `M.app d₁ ≫ G.map (eqToHom h)` is exactly the RHS of `M.naturality (eqToHom h)`, so `rw [← M.naturality (eqToHom h)]` slides it to `F.map (eqToHom h) ≫ M.app d₂`:
+   ```lean
+     rw [← (X.map (f ≫ g)).naturality
+       (eqToHom (show (Opposite.op ⦋p+q+1⦌ : SimplexCategoryᵒᵖ) = Opposite.op ⦋p+1+q⦌ from
+         by rw [show p + q + 1 = p + 1 + q from by omega]))]
+   ```
+
+4. **Collapse residual casts**: `simp only [eqToHom_map, eqToHom_trans, eqToHom_trans_assoc, Category.assoc]`. The leading `eqToHom ≫ F.map (eqToHom _)` fuses to one `eqToHom` and matches the other side by proof irrelevance.
+
+**Gotchas (each cost a real iteration):**
+- **Direction of the cast matters.** The morphism for naturality must have *domain* equal to the index `α.app` is currently at. Get it backwards and the pattern lands at the wrong `.app` index ("did not find pattern, target has `.app ⦋p+q+1⦌`"). Flip the `show ... = ...`.
+- **`rw` won't match a bare `eqToHom` against `G.map (eqToHom _).op`** — you *must* do step 2 first to get the cast into `G.map (...)` form. (The model lemma `awComponent_top_face_eq_bottom_face` only got away without step 2 because its goal still had the cast in `X.map (...).op` form, not yet reduced to a bare `eqToHom`.)
+- **Prove `Opposite.op ⦋a⦌ = Opposite.op ⦋b⦌` with `by rw [show a = b from by omega]`**, not `by congr 1; omega`. `congr 1` on the `op`/`mk` layers leaves a goal `omega` can't see (it reported a bogus counterexample involving unrelated vars), whereas rewriting the `Nat` makes both sides syntactically identical.
+- **Verify in the real file, not just `lean_multi_attempt`.** Line-based `lean_multi_attempt` gave **false positives** here (reported `goals: []` for sequences that failed on real elaboration). Always confirm with `lean_diagnostic_messages` after editing.
 
 ## Pitfall: `SimplexCategory.len` is opaque to `omega`
 
