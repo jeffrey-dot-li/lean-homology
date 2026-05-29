@@ -11,6 +11,10 @@
     elan
   ];
 
+  enterShell = ''
+    alias codex="${config.devenv.root}/scripts/codex-lean.sh"
+  '';
+
   git-hooks.hooks = {
     # shellcheck.enable = true;
     # ruff.enable = true;
