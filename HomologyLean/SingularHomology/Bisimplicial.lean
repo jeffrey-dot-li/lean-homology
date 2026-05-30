@@ -1285,6 +1285,31 @@ lemma emHomotopyHom_zero (X : BisimplicialObject C) (i j : ℕ)
     (hij : ¬ (ComplexShape.down ℕ).Rel j i) : emHomotopyHom X i j = 0 :=
   dif_neg fun h => hij (by rw [ComplexShape.down_Rel]; omega)
 
+/-- Base case `n = 0` of `∇AW = 1 + d(H)`: on `X_{0,0}` only the `p = q = 0` shuffle
+contributes and the front/back faces are identities, so `∇AW` is already the identity. -/
+private lemma awShuffle_f_zero (X : BisimplicialObject C) :
+    (alexanderWhitney X ≫ shuffleMap X).f 0 =
+      (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f 0 := by
+  rw [HomologicalComplex.comp_f]
+  simp [alexanderWhitney, shuffleMap]
+  simp only [awComponent, ezComponent, ι_front, ι_back, shuffleFstHom, shuffleSndHom]
+  have hid : ∀ (f : (⦋0⦌ : SimplexCategory) ⟶ ⦋0⦌), f = 𝟙 _ :=
+    fun f => Subsingleton.elim _ _
+  simp [hid, Shuffle.sign, Shuffle.invCount]
+
+/-- `dNext` of the EM homotopy vanishes in degree `0`: there is no differential out of
+degree `0` in `ComplexShape.down ℕ`. -/
+private lemma dNext_emHomotopyHom_zero (X : BisimplicialObject C) :
+    dNext 0 (emHomotopyHom X) = 0 := by
+  exact dNext_eq_zero _ 0 (by simp)
+
+/-- `prevD` of the EM homotopy vanishes in degree `0`: it factors through `H₀ = 0`
+(`emHomotopy_zero`). -/
+private lemma prevD_emHomotopyHom_zero (X : BisimplicialObject C) :
+    prevD 0 (emHomotopyHom X) = 0 := by
+  rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel 1 0 by simp)]
+  simp [emHomotopyHom, emHomotopy_zero]
+
 /-- `∇AW = 1 + d(H)` (Franz (3.6)): per diagonal degree `n`, the composite
 `alexanderWhitney ≫ shuffleMap` equals the identity plus the homotopy boundary `d ∘ H + H ∘ d`
 of the Eilenberg–Mac Lane homotopy `H = emHomotopyHom`, written in the `dNext`/`prevD` form
@@ -1292,8 +1317,11 @@ expected by `Homotopy.comm`. -/
 lemma awShuffle_eq_id_add_dH (X : BisimplicialObject C) (n : ℕ) :
     (alexanderWhitney X ≫ shuffleMap X).f n =
       dNext n (emHomotopyHom X) + prevD n (emHomotopyHom X) +
-        (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f n :=
-  sorry
+        (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f n := by
+  rcases n with _ | n
+  · rw [dNext_emHomotopyHom_zero, prevD_emHomotopyHom_zero, zero_add, zero_add]
+    exact awShuffle_f_zero X
+  · sorry
 
 /-! ### Homotopy equivalence -/
 
