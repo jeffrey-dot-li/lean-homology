@@ -2,29 +2,183 @@
 
 ## Goal
 
-Fill the two `sorry`s that complete `eilenbergZilber : HomotopyEquiv (F₁.obj X) (F₂.obj X)`
-in `Bisimplicial.lean`:
+Produce `eilenbergZilber : HomotopyEquiv (F₁.obj X) (F₂.obj X)` in `Bisimplicial.lean` (ideally
+natural in `X`), as a Mathlib-PR-quality Eilenberg–Zilber theorem for bisimplicial objects. Here
+`F₁` is the **total complex** of the double complex and `F₂` is `alternatingFaceMapComplex ∘ diag`;
+**both are unnormalized.**
+
+**Strategy (see ★ CURRENT APPROACH):** the maps need *not* be the literal unnormalized
+`shuffleMap`/`alexanderWhitney`. Prove the EZ contraction on the **normalized** complexes (where
+the literature, EM Thm 2.1a, applies and one direction is strict), then **transport** to the
+unnormalized `F₁`/`F₂` along the Dold–Kan homotopy equivalences. This replaces the earlier attempt
+to fill `homotopyShuffleAWId`/`homotopyAWShuffleId` by an *exact unnormalized* `∇AW = 1 + dH`
+(Route B, below) — which the literature never does and EM's Thm 2.1 framing suggests is false
+off the normalized complex.
+
+## References
+
+**Primary: Eilenberg–Mac Lane, *On the groups H(Π,n), II* (1954), Chapter I.** This is the
+source of the Eilenberg–Zilber theorem (Thm 2.1 / 2.1a) and the explicit homotopy.
+
+> ⚠️ **Read `pdfs/mcl2_sections_1_2.md`, NOT `pdfs/mcl2.pdf`.** The PDF is an image-only scan
+> with **no text layer** — text extraction returns only blank page markers, so it is useless to
+> the agent. Chapters 1–2 (the EZ theorem, Thm 2.1/2.1a, and the derived-operator machinery)
+> have been transcribed to the markdown file `pdfs/mcl2_sections_1_2.md`; use that. (If you must
+> see a figure/page, render a page to PNG with `uv run --with pymupdf` and read the image.)
+
+Key EM facts (see `mcl2_sections_1_2.md`):
+- **Theorem 2.1** (unnormalized `K × L ⇄ K ⊗ L`): `f, ∇` form a *chain equivalence* — both
+  composites are merely chain-homotopic to the identity. No explicit homotopy.
+- **Theorem 2.1a** (normalized `K ×_N L ⇄ K_N ⊗ L_N`): *explicitly* there is a homotopy `Φ` with
+  `f∇ = i` (**strict**) and `∂Φ + Φ∂ = ∇f − i`; plus `Φ∇ = 0`, `fΦ = 0` (modulo norms).
+- The proof of 2.1 is obtained **from** 2.1a via the normalization theorem I.4.1 — i.e. EM
+  themselves prove it normalized, then transport. This is exactly our approach below.
+
+**Secondary: Matthias Franz, *Szczarba's twisting cochain and the Eilenberg–Zilber maps***
+(`pdfs/Franz_EilenbergZilberMap.pdf` — text-readable). Restates the contraction identities (3.6)
+`AW∇ = 1, ∇AW = 1 + d(H), H∇ = 0, AW H = 0, HH = 0` and gives the **explicit** (Rubio–Morace)
+homotopy formula (3.3) and the EM recursion (3.4). Franz's `C(X)` is the **normalized** complex,
+and (3.6) is *cited* from EM [4, Thm 2.1a] — Franz does not reprove it.
+
+## ★ CURRENT APPROACH (chosen): prove EZ on normalized, transport to unnormalized
+
+This **supersedes Route B** (the direct unnormalized construction below, kept for history).
+Confirmed against EM directly (`mcl2_sections_1_2.md`, Thm 2.1/2.1a): the explicit homotopy is a
+**normalized** statement, and even EM get the unnormalized equivalence by proving it normalized
+and transporting. We do the same. We do **not** need the equivalence maps to be the literal
+unnormalized `shuffleMap`/`alexanderWhitney`; an abstract `HomotopyEquiv` (eventually natural in
+`X`) is acceptable for the Mathlib PR.
+
+### Architecture (three pieces, composed by `HomotopyEquiv.trans`/`.symm`)
 
 ```
-homotopyShuffleAWId : Homotopy (shuffleMap X ≫ alexanderWhitney X) (𝟙 (F₁.obj X))
-homotopyAWShuffleId : Homotopy (alexanderWhitney X ≫ shuffleMap X) (𝟙 (F₂.obj X))
+eilenbergZilber := bridge₁.symm.trans (eilenbergZilberNormalized.trans bridge₂)
+   F₁  ≃[bridge₁]  N₁  ≃[EZ_norm]  N₂  ≃[bridge₂]  F₂
 ```
 
-Here `F₁` is the **total complex** of the double complex and `F₂` is
-`alternatingFaceMapComplex ∘ diag`. **Both are unnormalized.**
+- **`N₂ = diag ⋙ normalizedMooreComplex C`** — normalized diagonal.
+- **`N₁ = normalizedMooreComplex _ ⋙ (normalizedMooreComplex C).mapHomologicalComplex _ ⋙ totalFunctor`**
+  — bi-normalized total complex (normalize both simplicial directions, then total).
 
-## Reference
+**Ingredient 0 — `eilenbergZilberNormalized : HomotopyEquiv (N₁ X) (N₂ X)`** (the literature part,
+EM Thm 2.1a). Asymmetric and that asymmetry is the whole point of going normalized:
+  - `homotopyHomInvId` = `∇ ≫ AW = 𝟙 N₁` **strictly** (`Homotopy.ofEq`); the degenerate
+    cross-term `∂₁x ⊗ s₀y` that blocks this unnormalized is zero modulo norms. **Cheap.**
+  - `homotopyInvHomId` = `AW ≫ ∇ ≃ 𝟙 N₂` via the explicit EM homotopy `Φ`. **The real work**
+    (EM induction with derived operators, or verify Rubio–Morace `Φ`); now *sourced* and the
+    "modulo norms" steps are literally `0` on normalized chains.
 
-Matthias Franz, *Szczarba's twisting cochain and the Eilenberg–Zilber maps*
-(`pdfs/Franz_EilenbergZilberMap.pdf`), **Section 3** (pp. 3–5). The relevant content is
-the contraction identities, eq. (3.6):
+**Ingredient 2 — `bridge₂ : HomotopyEquiv N₂ (F₂.obj X)`** — **FREE from Mathlib:**
+`AlgebraicTopology.DoldKan.homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex` at
+`Y := diag X` (`.lake/.../DoldKan/HomotopyEquivalence.lean:78`).
 
+**Ingredient 1 — `bridge₁ : HomotopyEquiv N₁ (F₁.obj X)`** — **the main new plumbing** (not in
+Mathlib). Lift the levelwise Dold–Kan equivalence through the total complex using
+`HomologicalComplex.mapBifunctorMapHomotopy₁/₂` (`.lake/.../Algebra/Homology/BifunctorHomotopy.lean:175,185`):
+a homotopy in one direction of a double complex lifts to the total complex. Sub-tasks:
+  (a) relate our `totalFunctor ∘ mapHomologicalComplex` form of `F₁`/`N₁` to the `mapBifunctor`
+      framework that `mapBifunctorMapHomotopy` is phrased in (iso, or re-derive for `totalFunctor`);
+  (b) apply the inner-direction normalization equivalence (lift via `…₂`) and the outer (via `…₁`);
+  (c) compose to `N₁ ≃ F₁`.
+
+### Caveats / open decisions
+
+- **General bisimplicial vs. external product.** EM/Franz state everything for `X × Y` (two
+  simplicial sets); our `F₁`/`F₂` are for one **arbitrary** bisimplicial object `X`. EM is the
+  special case `X_{p,q} = K_p × L_q`. The shuffle/AW *formulas* generalize (they touch the two
+  directions independently); the contraction *proof* must be the general-bisimplicial one
+  (or acyclic models — existence-only, fine for a `HomotopyEquiv`, but no Mathlib acyclic-models).
+- **Typeclass bump:** the normalized side requires **`[Abelian C]`** (for `normalizedMooreComplex`
+  and the Mathlib bridge). This is isolated in `BisimplicialNormalized.lean`; `Bisimplicial.lean`
+  stays general `[Preadditive C] [HasFiniteCoproducts C]`.
+- **Naturality:** target the *cleaner* form (natural `hom`/`inv`, or a natural iso in
+  `HomotopyCategory`); each of the three pieces is natural, and `.trans`/`.symm` preserve it.
+  Exact naturality data deferred until the pieces exist.
+- **`normalizedMooreComplex` additivity** is currently a `sorry`'d instance (Mathlib has none;
+  `cat_disch` can't push `map_add` through the subobject factorization). Fill or find a lemma.
+
+### File layout (three files)
+
+- **`Bisimplicial.lean`** — unnormalized constructions only; general
+  `[Preadditive C] [HasFiniteCoproducts C]`. Contains `F₁`, `F₂`, `shuffleMap`,
+  `alexanderWhitney`, the (historical/Route B) `emHomotopy` apparatus, and the target
+  `eilenbergZilber : HomotopyEquiv (F₁.obj X) (F₂.obj X)`.
+- **`BisimplicialNormalizedDefs.lean`** (new, **defs layer**) — everything requiring `[Abelian C]`
+  that is a *definition*: the `Abelian (SimplicialObject C)` and `normalizedMooreComplex.Additive`
+  instances, `N₁`/`N₂`, and the normalized maps `normalizedShuffleMap`/`normalizedAlexanderWhitney`.
+  Imports `Bisimplicial`.
+- **`BisimplicialNormalized.lean`** (**proofs layer**) — imports `…Defs`; holds the contraction
+  lemmas (`normalizedShuffle_alexanderWhitney`, `homotopyNormalizedAlexanderWhitneyShuffle`) and the
+  assembled `eilenbergZilberNormalized`. The `bridge₁`/`bridge₂`/transport assembly into the
+  unnormalized `eilenbergZilber` will live here too (or in a further file).
+
+### Map strategy: option 3 (`PInfty`)
+
+The normalized maps are **not** written as explicit combinatorial formulas on the Moore subobjects
+(awkward — subobjects, not levelwise), nor proved by an explicit unnormalized contraction (no
+literature support). Instead they **transport the unnormalized `shuffleMap`/`alexanderWhitney`
+through Dold–Kan normalization** (Moore inclusion/retraction, i.e. the idempotent `PInfty` on the
+alternating-face-map complex). This keeps maps levelwise-concrete *and* makes degenerate cross-terms
+vanish in the contraction proofs (`PInfty` kills degeneracies) — exactly the "modulo norms = 0" step
+in EM Thm 2.1a. So the unnormalized `shuffleMap`/`AW` are reused as stepping stones; only the
+unnormalized *homotopy* (Route B) is dropped.
+
+### Current drafted scaffold (both files compile; all `sorry`'d)
+
+`BisimplicialNormalizedDefs.lean` (defs layer):
+```lean
+noncomputable instance : Abelian (SimplicialObject C) := …                 -- ✅ (functorCategoryAbelian)
+instance : (normalizedMooreComplex C).Additive where map_add := by sorry   -- ❌ sorry (additivity)
+
+abbrev N₁ : BisimplicialObject C ⥤ ChainComplex C ℕ := …                   -- ✅ bi-normalized total
+abbrev N₂ : BisimplicialObject C ⥤ ChainComplex C ℕ := diag ⋙ normalizedMooreComplex C  -- ✅
+
+-- Dold–Kan inclusion/retraction chain maps (the chain-map halves of bridge₁/bridge₂):
+def mooreInclusion : normalizedMooreComplex C ⟶ alternatingFaceMapComplex C := …  -- ✅ (nat trans)
+def mooreRetraction : alternatingFaceMapComplex C ⟶ normalizedMooreComplex C := … -- ✅ (PInfty nat trans)
+def inclusionN₁ (X) : N₁.obj X ⟶ F₁.obj X := totalFunctor.map (incl⊗incl)   -- ✅ (both directions)
+def retractionN₁ (X) : F₁.obj X ⟶ N₁.obj X := totalFunctor.map (PInfty⊗PInfty) -- ✅
+def inclusionN₂ (X) : N₂.obj X ⟶ F₂.obj X := inclusionOfMooreComplexMap (diag X)  -- ✅
+def retractionN₂ (X) : F₂.obj X ⟶ N₂.obj X := PInftyToNormalizedMooreComplex (diag X) -- ✅
+
+-- option 3: conjugate the unnormalized maps (no longer `sorry`):
+def normalizedShuffleMap (X) := inclusionN₁ X ≫ shuffleMap X ≫ retractionN₂ X       -- ✅ ∇
+def normalizedAlexanderWhitney (X) := inclusionN₂ X ≫ alexanderWhitney X ≫ retractionN₁ X -- ✅ AW
 ```
-AW ∇ = 1,    ∇ AW = 1 + d(H),    H ∇ = 0,    AW H = 0,    H H = 0.
+
+`BisimplicialNormalized.lean` (proofs layer; imports `…Defs`):
+```lean
+lemma normalizedShuffle_alexanderWhitney (X) : ∇ ≫ AW = 𝟙 (N₁.obj X) := sorry  -- ❌ EM 2.1a (strict)
+def homotopyNormalizedAlexanderWhitneyShuffle (X) :                          -- ❌ EM 2.1a (homotopy Φ)
+    Homotopy (AW ≫ ∇) (𝟙 (N₂.obj X)) := sorry
+def eilenbergZilberNormalized (X) : HomotopyEquiv (N₁.obj X) (N₂.obj X) where -- ✅ assembled
+  hom := normalizedShuffleMap X; inv := normalizedAlexanderWhitney X
+  homotopyHomInvId := Homotopy.ofEq (normalizedShuffle_alexanderWhitney X)
+  homotopyInvHomId := homotopyNormalizedAlexanderWhitneyShuffle X
+-- TODO: bridge₁, bridge₂, and the transport assembly into the unnormalized `eilenbergZilber`.
 ```
 
-with `AW` = Alexander–Whitney (3.1), `∇` = shuffle map (3.2), `H` = Eilenberg–Mac Lane
-homotopy (explicit (3.3), recursive (3.4)), and `F = ∇AW` (3.5).
+### Milestones (current approach)
+
+1. ✅ Split into three files: `BisimplicialNormalizedDefs.lean` (`[Abelian C]` defs — instances,
+   `N₁`/`N₂`, normalized maps) and `BisimplicialNormalized.lean` (proofs — contraction lemmas +
+   `eilenbergZilberNormalized`, imports `…Defs`); both import-chain from `Bisimplicial`
+   (DONE — all three files compile; `Bisimplicial.lean` stays general
+   `[Preadditive C] [HasFiniteCoproducts C]`).
+2. ✅ Define the normalized maps (option 3): `mooreInclusion`/`mooreRetraction` nat-transs, the
+   four inclusion/retraction chain maps `inclusionN₁`/`retractionN₁` (via `totalFunctor.map`) and
+   `inclusionN₂`/`retractionN₂` (diagonal), then `normalizedShuffleMap`/`normalizedAlexanderWhitney`
+   by conjugation (DONE — sorry-free; only the additivity instance + the two contraction proofs
+   remain `sorry`).
+3. Discharge `normalizedMooreComplex` additivity `sorry`.
+4. `bridge₂` (one-liner via Mathlib). NB its chain-map halves are already `inclusionN₂`/`retractionN₂`.
+5. `eilenbergZilberNormalized`: `normalizedShuffle_alexanderWhitney` (strict, cheaper) then the
+   explicit `Φ` homotopy (the hard, sourced part — EM 2.1a on the general bisimplicial object).
+6. `bridge₁` (total-complex Dold–Kan via `mapBifunctorMapHomotopy₁/₂`; chain-map halves are already
+   `inclusionN₁`/`retractionN₁`, so only the homotopy data remains).
+7. Assemble `eilenbergZilber` by transport; then add naturality.
+
+---
 
 ## CRITICAL CORRECTION: the original plan was unsound
 
@@ -65,7 +219,16 @@ The cross term `d₁ x ⊗ s₀ y` is the `(r,s) = (0,1) ≠ (1,0)` component. I
 `Homotopy f g` encodes `f - g = d ∘ h + h ∘ d`, so `∇AW = 1 + d(H)` is exactly a
 `Homotopy (AW ≫ ∇) (𝟙)` with homotopy operator `H`.
 
-## Chosen approach: Route B (build the Eilenberg–Mac Lane homotopy)
+## ~~Route B (build the Eilenberg–Mac Lane homotopy directly on unnormalized)~~ — SUPERSEDED
+
+> **SUPERSEDED by the CURRENT APPROACH above.** Kept for history and because some pieces
+> (`emHomotopy`/`emFstHom`/`emSndHom`, the `awShuffle_f_*` plumbing) may still be reusable for the
+> *normalized* `Φ`. Route B attempts the **exact** identity `∇AW = 1 + dH` on the **unnormalized**
+> `F₂` — which the literature never does (see survey below), and which EM's Thm 2.1 framing
+> suggests holds only modulo norms. Do **not** invest further here without first exhausting the
+> normalized+transport route.
+
+### (historical) Route B detail
 
 ### Out of scope — the 1–2–3 relations (Franz §5, eqs. (5.3)/(5.4))
 
@@ -136,26 +299,111 @@ reindexing bookkeeping — the same style as the existing chain-map (`comm'`) pr
 
 **Milestones (do in order):**
 
-1. **Base case `n = 0`.** `prevD 0 = emHomotopy X 0 ≫ d = 0` (by `emHomotopy_zero`) and
-   `dNext 0 = 0` (no differential out of degree 0), so the goal collapses to
-   `(∇AW).f 0 = 𝟙`. At `n=0` only the `p=q=0` shuffle exists and the faces are trivial.
-   Small, self-contained; locks down the `total.hom_ext` / `awComponent` / `ezComponent`
-   unfolding plumbing at degree 0.
+1. **✅ DONE — Base case `n = 0`.** The proof splits `awShuffle_eq_id_add_dH` on `rcases n`.
+   For `n = 0`: `prevD 0 = 0` (`prevD_emHomotopyHom_zero`, via `emHomotopy_zero`) and
+   `dNext 0 = 0` (`dNext_emHomotopyHom_zero`, `dNext_eq_zero` — no differential out of degree
+   0), so the goal collapses to `(∇AW).f 0 = 𝟙` (`awShuffle_f_zero`). The base case proof:
+   ```lean
+   rw [HomologicalComplex.comp_f]
+   simp [alexanderWhitney, shuffleMap]               -- ↝ awComponent 0 0 ≫ ezComponent 0 0 = 𝟙
+   simp only [awComponent, ezComponent, ι_front, ι_back, shuffleFstHom, shuffleSndHom]
+   have hid : ∀ (f : (⦋0⦌ : SimplexCategory) ⟶ ⦋0⦌), f = 𝟙 _ := fun f => Subsingleton.elim _ _
+   simp [hid, Shuffle.sign, Shuffle.invCount]
+   ```
+   Key tricks: `⦋0⦌` is terminal so `Subsingleton (⦋0⦌ ⟶ ⦋0⦌)` collapses every face/degeneracy
+   to `𝟙`; the unique `Shuffle 0 0` has `sign = 1` computed directly from the empty `invCount`
+   sum (dodging a `default`-instance mismatch with `sign_default_zero_right`).
 
-2. **Operator-composition sub-lemmas (the reusable combinatorial core).** How `emFstHom` /
-   `emSndHom` compose with `SimplexCategory.δ` / `σ`, and with the diagonal face map
-   `(diag X).δ k = (X.map δₖ) ≫ (X.obj _).map δₖ`. Mirror the `*_comp_δ` lemmas already
-   proven for `shuffleFstHom` / `ι_front`, in the `ext ⟨i,hi⟩; dsimp; split_ifs; omega` style.
-   These express `dH + Hd` and `∇AW` in a common normal form.
+### The `n + 1` case (remaining `sorry`)
 
-3. **Full degree-`n` identity.** Expand LHS `∇AW.f n` and RHS `dNext + prevD` as signed sums
-   over shuffles/faces/degeneracies, reindex, and cancel pairwise to leave the identity term
-   (à la `universalSimplexCrossProduct_boundary`). This is the bulk of the work.
+**Goal, made concrete.**  `(AW ≫ ∇).f (n+1) = dNext (n+1) + prevD (n+1) + 𝟙_{n+1}` where:
+- `dNext (n+1)` (`dNext_nat`): `d_{n+1,n} ≫ emHomotopyHom X n (n+1)` = `d ≫ H_n`  (`Hd` term).
+- `prevD (n+1)` (`prevD_eq` at `Rel (n+2) (n+1)`): `emHomotopy X (n+1) ≫ d_{n+2,n+1}` =
+  `H_{n+1} ≫ d`  (`dH` term).
+- LHS (`comp_f` + `total.hom_ext`/`ι_totalDesc`, like `awShuffle_f_zero` at general degree):
+  `∑_{p+q=n+1} awComponent(p,q) ≫ ezComponent(p,q)` = EM's `F = ∇AW` at degree `n+1`.
 
-**Rejected alternative (Route A):** induct via the recursion (3.4) `Hₙ = -H'ₙ₋₁ + F'ₙ₋₁ s₀`.
-Faithful to EM/Franz but requires formalizing the **derived operator** `f ↦ f'` and its laws
-(Franz (2.4), Lemma 2.1) — heavy machinery not in Mathlib, and proving our explicit (3.3)
-satisfies (3.4) may be as hard as Route B itself.
+**Key structural reduction.** Every term on both sides is a `ℤ`-linear combination of
+*operator words* `(X.map a.op).app _ ≫ (X.obj _).map b.op` — a pair `(a, b)` of `SimplexCategory`
+maps (horizontal, vertical). Since `X` is arbitrary/abstract, the identity holds iff the two
+formal `ℤ`-combinations of **pairs of monotone maps** coincide coefficient-by-coefficient (over
+`Hom(⦋n+1⦌,⦋p⦌) × Hom(⦋n+1⦌,⦋q⦌)`). So `n+1` reduces to a finite combinatorial identity in the
+two-variable simplicial-operator algebra — exactly EM's computation, where the `(-1)^{m+1}` sign
+(Franz footnote 2) makes it balance.
+
+2. **Concretize both sides.** ✅ **partially done.**
+   - LHS done: `awShuffle_f_eq_sum` proves
+     `(AW ≫ ∇).f m = ∑ p:Fin(m+1), eqToHom ≫ awComponent p (m-p) ≫ ezComponent p (m-p) ≫ eqToHom`.
+     Proof is short: `rw [HomologicalComplex.comp_f]; simp only [alexanderWhitney, shuffleMap,
+     id_eq, Preadditive.sum_comp, Category.assoc, HomologicalComplex₂.ι_totalDesc]` (the `id_eq`
+     strips the structure-projection wrapper so the sum distributes and `ι_totalDesc` collapses
+     each `ιTotal ≫ totalDesc` to its component).
+   - `n+1` goal now reads (after `rw [awShuffle_f_eq_sum, dNext_nat, prevD_eq …]`):
+     `∑ p, … awComponent p (n+1-p) ≫ ezComponent p (n+1-p) … = d_{n+1,n} ≫ H_n + H_{n+1} ≫ d_{n+2,n+1} + 𝟙`.
+   - Still TODO: expand the two differentials `d` on `F₂ = alternatingFaceMapComplex(diag X)` into
+     alternating sums of diagonal faces `(diag X).δ k = (X.map δₖ.op).app ≫ (X.obj _).map δₖ.op`,
+     and expand `emHomotopy` in components, so the RHS operator words become explicit.
+
+3. **Operator-composition sub-lemmas (the reusable combinatorial core).** How `emFstHom` /
+   `emSndHom` compose with a **boundary face `δ_k`** (and with `SimplexCategory.σ`), i.e. how
+   `H`'s operator word recombines when the differential's faces are appended. Mirror the
+   `*_comp_δ` lemmas already proven for `shuffleFstHom` / `ι_front`, in the
+   `ext ⟨i,hi⟩; dsimp; split_ifs; omega` style. Also `awComponent ≫ ezComponent` rewritten in
+   the same shuffle-indexed normal form. Outcome: `F_{n+1}`, `H_n d`, `d H_{n+1}` all land in a
+   common normal form. **Self-contained and reusable — do these first as `sorry`'d statements.**
+
+4. **Combinatorial cancellation.** Reindex the sums (over shuffles × face index), pair terms, and
+   cancel everything except the identity term (à la `universalSimplexCrossProduct_boundary`).
+   This is the EM/Rubio argument and the bulk of the work; the `m+1` sign exponent is essential.
+
+**Honest assessment / fallback.** Step 4 is the crux of the whole theorem, and Franz/EM only
+obtain it via the recursion (3.4), not the explicit formula. Treat Milestone 3 as a *probe*: it
+is needed regardless and reveals how bad the bookkeeping is. If step 4 balloons, switch to
+Route A or AMT (see literature survey below).
+
+### Literature survey: is Route B (direct, unnormalized) sourced anywhere?
+
+**Finding: no.** A direct combinatorial verification of `∇AW = 1 + dH` from the closed-form (3.3)
+on *unnormalized* chains does not appear in the literature. Every treatment routes around that
+cancellation in one of four ways:
+
+1. **Acyclic models** (existence only, no explicit `H`): May *Simplicial Objects* Cor. 29.10;
+   Dold VI.12; JHU note `math.jhu.edu/~jmb/note/eilzil.pdf`; nLab *EZAW deformation retraction*.
+2. **Recursive `H` + induction with derived operators** (the EM original): Eilenberg–Mac Lane
+   1954, Thm 2.1a — what Franz cites. = our Route A.
+3. **Explicit formula reduced to the recursion:** Sergeraert, *EZ via discrete vector fields*
+   (`www-fourier.univ-grenoble-alpes.fr/~sergerar/Papers/EZ-submitted.pdf`) writes the
+   Rubio–Morace closed form and *proves it satisfies EM's recursion* (its point 5), i.e.
+   explicit ⇒ recursive ⇒ EM. Even the explicit-formula authors bounce back to (2).
+4. **Algebraic Morse theory / discrete vector fields:** builds the whole contraction `(f,g,h)`
+   from a matching; the identities `fg=1`, `1−gf=dh+hd`, `hh=0` follow from general AMT lemmas,
+   *not* from manipulating the shuffle sum (Sergeraert; Sköldberg; Kozlov).
+
+The explicit-`H` shuffle-form sources all work **normalized** and drop degenerate summands, citing
+EM for the contraction identities rather than reproving `dH+Hd`:
+- González-Díaz & Real, `arXiv:math/0110308` (also `maths.ed.ac.uk/~v1ranick/papers/real1.pdf`):
+  notable reusable idea — put every face/degeneracy composite in the **canonical form**
+  `s_{jₜ}…s_{j₁} ∂_{i₁}…∂_{iₛ}`, then kill leading-degeneracy summands. That canonical-form
+  normalization is exactly the bookkeeping Route B needs.
+- James-map paper (Hess–Parent–Scott–Tonks, HHA 9(2)): reproduces EM's *recursive* `ϕ`.
+- MathOverflow #323966 → Muro points to GD–Real p. 7 (normalized).
+
+**Why nobody does it directly:** on unnormalized chains the cancellation does *not* fully
+collapse — the surviving degenerate terms are precisely what `dH+Hd` accounts for, which is why
+the `(-1)^{m+1}` sign is delicate (Franz fn. 2). So Route B is genuinely un-precedented; we would
+be doing a computation the literature deliberately avoids.
+
+**Revised recommendation.** Prefer a *precedented* route:
+- **Route A (recursion ⇒ induction, à la Sergeraert pt. 5).** Formalize a derived operator
+  `f ↦ f'` + its laws (Franz (2.4), Lemma 2.1), prove our explicit (3.3) satisfies (3.4), then
+  the short induction `dH + Hd = F − 1` using `dF = Fd` (free). Sergeraert gives the explicit ⇒
+  recursive argument to follow.
+- **AMT reconstruction.** Replace `emHomotopy` by the homotopy coming from an Eilenberg–Zilber
+  discrete vector field; get all of (3.6) from general algebraic-Morse-theory lemmas. Cleanest in
+  principle but means abandoning the current explicit `emHomotopy` and building an AMT layer.
+
+Route B remains viable as a *probe* (Milestone 3 lemmas are reusable regardless), but if it
+stalls, Route A is the documented fallback.
 
 ### Phase 2 — `homotopyShuffleAWId` (subtle; defer)
 
@@ -172,7 +420,11 @@ satisfies (3.4) may be as hard as Route B itself.
 
 **Plan: do Phase 1 first, keep Phase 2 as `sorry`, then pursue (2a).**
 
-## Current scaffold state (compiling)
+## (historical) Route B scaffold state — unnormalized, SUPERSEDED
+
+> For the live scaffold see **"Current drafted scaffold"** under the CURRENT APPROACH section
+> above. The block below is the unnormalized Route B attempt, retained for reuse of the explicit
+> `emHomotopy` pieces in the normalized `Φ`.
 
 ```lean
 -- Phase 1 — operators DONE, identity is the remaining sorry
@@ -183,9 +435,17 @@ lemma emHomotopy_zero (X) : emHomotopy X 0 = 0 := …               -- ✅ H₀ 
 def emHomotopyHom (X) (i j) : (F₂.obj X).X i ⟶ (F₂.obj X).X j := … -- ✅ Homotopy.hom family
 lemma emHomotopyHom_zero (X) … : emHomotopyHom X i j = 0 := …     -- ✅ Homotopy.zero
 
-lemma awShuffle_eq_id_add_dH (X) (n) :                            -- ❌ sorry (Route B, main work)
+-- base-case + LHS-concretization plumbing
+lemma awShuffle_f_zero (X) : (AW ≫ ∇).f 0 = (𝟙 …).f 0 := …       -- ✅ n=0 base case
+lemma dNext_emHomotopyHom_zero (X) : dNext 0 (emHomotopyHom X) = 0 := …  -- ✅
+lemma prevD_emHomotopyHom_zero (X) : prevD 0 (emHomotopyHom X) = 0 := …  -- ✅
+lemma awShuffle_f_eq_sum (X) (m) :                               -- ✅ LHS = ∑ awComp ≫ ezComp
+    (AW ≫ ∇).f m = ∑ p:Fin(m+1), eqToHom ≫ awComponent p (m-p) ≫ ezComponent p (m-p) ≫ eqToHom := …
+
+lemma awShuffle_eq_id_add_dH (X) (n) :                            -- ⚠️ n=0 ✅, n+1 ❌ sorry (main work)
     (alexanderWhitney X ≫ shuffleMap X).f n
-      = dNext n (emHomotopyHom X) + prevD n (emHomotopyHom X) + (𝟙 (F₂.obj X)).f n := sorry
+      = dNext n (emHomotopyHom X) + prevD n (emHomotopyHom X) + (𝟙 (F₂.obj X)).f n :=
+  -- rcases n: base case closed via awShuffle_f_zero; n+1 reduced via awShuffle_f_eq_sum/dNext_nat/prevD_eq then sorry
 
 def homotopyAWShuffleId (X) : Homotopy (alexanderWhitney X ≫ shuffleMap X) (𝟙 (F₂.obj X)) := -- ✅ packaged
   { hom := emHomotopyHom X, zero := emHomotopyHom_zero X, comm := awShuffle_eq_id_add_dH X }
@@ -206,19 +466,40 @@ def homotopyShuffleAWId (X) : Homotopy (shuffleMap X ≫ alexanderWhitney X) (�
 - For Phase 2 (2a): Mathlib `AlgebraicTopology.DoldKan`, `NormalizedMooreComplex`, and the
   chain homotopy equivalence between normalized and unnormalized complexes.
 
-## Difficulty estimate
+## Difficulty estimate (CURRENT APPROACH)
 
 | Item | Difficulty | Notes |
 |------|-----------|-------|
-| Phase 1: define `emHomotopy` (+`emFstHom`/`emSndHom`) | Medium | ✅ done — direct (3.3) transcription |
-| Phase 1: `awShuffle_eq_id_add_dH` — base case `n=0` | Medium | start here; locks down plumbing |
-| Phase 1: `awShuffle_eq_id_add_dH` — `emFst/SndHom ≫ δ` lemmas | Medium–Hard | reusable combinatorial core |
-| Phase 1: `awShuffle_eq_id_add_dH` — full degree-`n` | **Hard** | main identity, the bulk of the work |
-| Phase 1: package `Homotopy` | Easy | ✅ done — `homotopyAWShuffleId` assembled |
-| Phase 2 (2a normalize+transport) | Medium–Hard | depends on Mathlib Dold–Kan ergonomics |
+| Switch to `[Abelian C]` + `Abelian (SimplicialObject C)` + `N₁`/`N₂` skeleton | Easy | ✅ done — compiles |
+| `normalizedMooreComplex` additivity instance | Easy–Medium | `sorry` now; subobject-factorization `map_add` |
+| `bridge₂` (normalized ≃ unnormalized diagonal) | Easy | one-liner via Mathlib |
+| `eilenbergZilberNormalized`: `∇ ≫ AW = 𝟙` strict | Medium | shuffle-pairing, valid on normalized |
+| `eilenbergZilberNormalized`: `AW ≫ ∇ ≃ 𝟙` via `Φ` | **Hard** | EM 2.1a; explicit homotopy on general bisimplicial obj |
+| `bridge₁` (total-complex Dold–Kan) | **Hard** | new plumbing; `mapBifunctorMapHomotopy₁/₂` is the tool |
+| Transport assembly `eilenbergZilber` | Easy | `bridge₁.symm.trans (… .trans bridge₂)` |
+| Naturality of the equivalence | Medium | layer on after pieces exist |
+
+## Supporting lemmas / API (CURRENT APPROACH)
+
+- `AlgebraicTopology.DoldKan.homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex`
+  (`.lake/.../DoldKan/HomotopyEquivalence.lean:78`) — gives `bridge₂` directly.
+- `HomologicalComplex.mapBifunctorMapHomotopy₁` / `…₂`
+  (`.lake/.../Algebra/Homology/BifunctorHomotopy.lean:175,185`) — lift a homotopy in one
+  direction of a double complex to the total complex; the core of `bridge₁`.
+- `HomotopyEquiv.trans` / `.symm` (`.lake/.../Algebra/Homology/Homotopy.lean:702,710`) — compose.
+- `Homotopy.ofEq` — wrap the strict `∇ ≫ AW = 𝟙` direction.
+- `CategoryTheory.Abelian.functorCategoryAbelian` — `Abelian (SimplicialObject C)`.
 
 ## Files involved
 
-- `HomologyLean/SingularHomology/Bisimplicial.lean` — all definitions and the two homotopies.
-- `HomologyLean/SingularHomology/Shuffle.lean` — shuffle/sign lemmas, if Phase 1 needs more.
-- (Phase 2) Mathlib `AlgebraicTopology.DoldKan.*`.
+- `HomologyLean/SingularHomology/Bisimplicial.lean` — **unnormalized only**, general
+  `[Preadditive C] [HasFiniteCoproducts C]`: `F₁`/`F₂`, `shuffleMap`/`alexanderWhitney`, the
+  target `eilenbergZilber`, and the (historical) `emHomotopy` apparatus.
+- `HomologyLean/SingularHomology/BisimplicialNormalized.lean` — **normalized**, `[Abelian C]`:
+  `N₁`/`N₂`, normalized maps + homotopies, `eilenbergZilberNormalized`, and (to add) `bridge₁`,
+  `bridge₂`, the transport assembly. Imports `Bisimplicial` + `CategoryTheory.Abelian.FunctorCategory`
+  + `AlgebraicTopology.MooreComplex` (and later the DoldKan/Bifunctor homotopy files).
+- `HomologyLean/SingularHomology/Shuffle.lean` — shuffle/sign lemmas (reused for the normalized `Φ`).
+- Mathlib `AlgebraicTopology.DoldKan.*`, `Algebra.Homology.BifunctorHomotopy`,
+  `CategoryTheory.Abelian.FunctorCategory`.
+- `pdfs/mcl2_sections_1_2.md` — EM Ch. 1–2 transcription (**use this, not `mcl2.pdf`**).

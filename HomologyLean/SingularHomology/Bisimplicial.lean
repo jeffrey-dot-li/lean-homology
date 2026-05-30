@@ -1310,6 +1310,21 @@ private lemma prevD_emHomotopyHom_zero (X : BisimplicialObject C) :
   rw [prevD_eq _ (show (ComplexShape.down ℕ).Rel 1 0 by simp)]
   simp [emHomotopyHom, emHomotopy_zero]
 
+/-- `∇AW` in components (Franz's `F = ∇AW`): at diagonal degree `m`, the composite
+`alexanderWhitney ≫ shuffleMap` is the sum over `p + q = m` of `awComponent p q ≫ ezComponent p q`
+(front/back faces followed by the shuffle degeneracies), transported onto `X_{m,m}`. This is the
+LHS concretization for the `n+1` case; the `ιTotal ≫ totalDesc` plumbing collapses each summand
+to its `(p, m-p)` component. -/
+private lemma awShuffle_f_eq_sum (X : BisimplicialObject C) (m : ℕ) :
+    (alexanderWhitney X ≫ shuffleMap X).f m =
+      ∑ p : Fin (m + 1),
+        eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) ≫
+          awComponent X p (m - p) ≫ ezComponent X p (m - p) ≫
+            eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) := by
+  rw [HomologicalComplex.comp_f]
+  simp only [alexanderWhitney, shuffleMap, id_eq, Preadditive.sum_comp, Category.assoc,
+    HomologicalComplex₂.ι_totalDesc]
+
 /-- `∇AW = 1 + d(H)` (Franz (3.6)): per diagonal degree `n`, the composite
 `alexanderWhitney ≫ shuffleMap` equals the identity plus the homotopy boundary `d ∘ H + H ∘ d`
 of the Eilenberg–Mac Lane homotopy `H = emHomotopyHom`, written in the `dNext`/`prevD` form
@@ -1321,7 +1336,9 @@ lemma awShuffle_eq_id_add_dH (X : BisimplicialObject C) (n : ℕ) :
   rcases n with _ | n
   · rw [dNext_emHomotopyHom_zero, prevD_emHomotopyHom_zero, zero_add, zero_add]
     exact awShuffle_f_zero X
-  · sorry
+  · rw [awShuffle_f_eq_sum, dNext_nat,
+      prevD_eq _ (show (ComplexShape.down ℕ).Rel (n + 2) (n + 1) by simp)]
+    sorry
 
 /-! ### Homotopy equivalence -/
 
@@ -1352,3 +1369,16 @@ noncomputable def eilenbergZilber (X : BisimplicialObject C) :
 end BisimplicialObject
 
 end CategoryTheory
+
+--
+-- noncomputable abbrev F₁ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
+--   alternatingFaceMapComplex _  ⋙
+--     (alternatingFaceMapComplex C).mapHomologicalComplex _ ⋙
+--       HomologicalComplex₂.totalFunctor _ _ _ _
+
+-- abbrev F₂ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
+--   diag ⋙ alternatingFaceMapComplex C
+
+-- -- `hom`, `inv`, `homotopyHomInvId`, and `homotopyInvHomId` must also be natural in `X`
+-- def eilenbergZilber (X : BisimplicialObject C) :
+--     HomotopyEquiv (F₁.obj X) (F₂.obj X) := sorry
