@@ -46,9 +46,9 @@ variable {C : Type*} [Category* C] [Abelian C]
 noncomputable instance : Abelian (SimplicialObject C) :=
   CategoryTheory.Abelian.functorCategoryAbelian
 
--- TODO: `normalizedMooreComplex` is additive (the Moore differentials are induced by additive
--- face maps), but Mathlib has no instance and `cat_disch` can't discharge `map_add` through the
--- subobject factorization. Proved by `sorry` for now.
+-- Mathlib does not currently provide this `Additive` instance for `normalizedMooreComplex`.
+-- Degreewise, `map_add` follows by cancelling the target subobject inclusion and reducing to
+-- additivity of the simplicial morphism components.
 instance : (normalizedMooreComplex C).Additive where
   map_add := by
     intro X Y f g
