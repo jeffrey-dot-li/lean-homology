@@ -178,6 +178,40 @@ def eilenbergZilberNormalized (X) : HomotopyEquiv (N₁.obj X) (N₂.obj X) wher
    `inclusionN₁`/`retractionN₁`, so only the homotopy data remains).
 7. Assemble `eilenbergZilber` by transport; then add naturality.
 
+### Proof skeleton: `normalizedShuffle_alexanderWhitney` (`∇ ≫ AW = 𝟙 N₁`, EM `f∇ = i`)
+
+The **strict, cheap** half of EM Thm 2.1a (eq. (2.3) `f∇ = i`). Unfold the conjugated maps and
+reduce via the Dold–Kan round-trip identities (all `≫` right-associated):
+
+```
+∇_N ≫ AW_N
+ = inclN₁ ≫ shuffle ≫ (retN₂ ≫ inclN₂) ≫ AW ≫ retN₁     -- unfold defs + assoc
+ = inclN₁ ≫ shuffle ≫ AW ≫ retN₁     -- (B): retN₂≫inclN₂ = PInfty (Mathlib), dropped — ∇ preserves norms
+ = inclN₁ ≫ retN₁                     -- (A): shuffle ≫ AW ≫ retN₁ = retN₁   (EM f∇=i mod norms)
+ = 𝟙 N₁                               -- (glue): split-mono id, lifted through totalFunctor
+```
+
+**Content lemmas (the only real work):**
+- **(A)** `shuffleMap X ≫ alexanderWhitney X ≫ retractionN₁ X = retractionN₁ X`. EM `f∇ = i` mod
+  norms (`mcl2_sections_1_2.md:128–133`): unnormalized `shuffle ≫ AW = 𝟙 + D` with `D` landing in
+  the degenerate subcomplex, and `retractionN₁` (Moore retraction in both directions) kills `D`.
+  Combinatorial core = the shuffle-pairing `ezComponent p q ≫ awComponent r s` (diagonal `(r,s)=(p,q)`
+  → id; off-diagonal → factors through a degeneracy `σ`). This is the **reverted**
+  `ezComponent_comp_awComponent_ne` lemma, now **correct** because off-diagonal terms only need to
+  vanish *after* `≫ retractionN₁`, not on the nose (where they are nonzero — see the counterexample).
+- **(B)** `inclusionN₁ X ≫ shuffleMap X ≫ retractionN₂ X ≫ inclusionN₂ X = inclusionN₁ X ≫ shuffleMap X`.
+  Folds (G1) `retN₂ ≫ inclN₂ = PInfty` (Mathlib `PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap`)
+  and ∇-preserves-normalization (EM Lemma I.5.3, `mcl2_sections_1_2.md:91`): once on the normalized
+  total, `∇` lands in the normalized diagonal, so the diagonal `PInfty` round-trip is a no-op.
+  Tagged `@[reassoc]` so it rewrites under the trailing `AW ≫ retN₁`.
+
+**Cheap glue:** `inclusionN₁ X ≫ retractionN₁ X = 𝟙 (N₁.obj X)` — total-complex lift of the Mathlib
+split-mono identity `(splitMonoInclusionOfMooreComplexMap _).id` (`Normalized.lean:102`) via
+functoriality of `totalFunctor` + `NatTrans.mapHomologicalComplex`. Reused by `bridge₁`.
+
+Build order: sorry (A)/(B)/glue, confirm the top-level rewrite chain closes, then fill (B) (PInfty
+algebra), the glue (total-complex functoriality), and finally (A)'s shuffle-pairing (the real grind).
+
 ---
 
 ## CRITICAL CORRECTION: the original plan was unsound
