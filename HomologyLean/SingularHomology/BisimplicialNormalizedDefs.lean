@@ -50,7 +50,21 @@ noncomputable instance : Abelian (SimplicialObject C) :=
 -- face maps), but Mathlib has no instance and `cat_disch` can't discharge `map_add` through the
 -- subobject factorization. Proved by `sorry` for now.
 instance : (normalizedMooreComplex C).Additive where
-  map_add := by sorry
+  map_add := by
+    intro X Y f g
+    ext n
+    cases n with
+    | zero =>
+        dsimp [normalizedMooreComplex, NormalizedMooreComplex.map]
+        apply (cancel_mono ((⊤ : Subobject (Y.obj (Opposite.op ⦋0⦌))).arrow)).1
+        rw [Preadditive.add_comp, Subobject.factorThru_arrow, Subobject.factorThru_arrow,
+          Subobject.factorThru_arrow, NatTrans.app_add, Preadditive.comp_add]
+    | succ n =>
+        dsimp [normalizedMooreComplex, NormalizedMooreComplex.map]
+        apply (cancel_mono
+          ((Finset.univ.inf fun k : Fin (n + 1) => kernelSubobject (Y.δ k.succ)).arrow)).1
+        rw [Preadditive.add_comp, Subobject.factorThru_arrow, Subobject.factorThru_arrow,
+          Subobject.factorThru_arrow, NatTrans.app_add, Preadditive.comp_add]
 
 /-- The **bi-normalized total complex**: normalize both simplicial directions (via the
 normalized Moore complex), then take the total complex. The normalized analogue of `F₁`. -/
