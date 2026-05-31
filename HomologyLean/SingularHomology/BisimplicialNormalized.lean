@@ -129,7 +129,37 @@ private lemma biInclusion_comp_outer_map_op_eq_zero (X : BisimplicialObject C) {
             (NatTrans.mapHomologicalComplex mooreInclusion (ComplexShape.down ℕ)).app
               ((alternatingFaceMapComplex (SimplicialObject C)).obj X)).f p).f q) ≫
         (X.map h.op).app (Opposite.op ⦋q⦌) = 0 := by
-  sorry
+  dsimp [mooreInclusion]
+  simp only [Category.assoc, inclusionOfMooreComplexMap_f]
+  match p with
+  | 0 =>
+    haveI : Subsingleton (Fin ((⦋0⦌ : SimplexCategory).len + 1)) := by
+      rw [SimplexCategory.len_mk]
+      exact (inferInstance : Subsingleton (Fin 1))
+    exact absurd (fun y => ⟨0, Subsingleton.elim _ _⟩) hns
+  | p + 1 =>
+    obtain ⟨i, h', hhi⟩ := SimplexCategory.eq_comp_δ_of_not_surjective h hns
+    have hi : i ≠ 0 := by
+      obtain ⟨k0, hk0⟩ := h0
+      rintro rfl
+      rw [hhi] at hk0
+      simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+        SimplexCategory.δ, SimplexCategory.Hom.toOrderHom_mk, Fin.succAboveOrderEmb_apply,
+        Fin.succAbove_zero] at hk0
+      exact Fin.succ_ne_zero _ hk0
+    have hcond : (p : ℕ) + 2 ≤ (i : ℕ) + (p + 1) := by
+      have := Fin.pos_of_ne_zero hi
+      omega
+    rw [Subobject.factorThru_arrow_assoc, Category.assoc]
+    have hvanish :
+        (NormalizedMooreComplex.objX X (p + 1)).arrow.app (Opposite.op ⦋q⦌) ≫
+            (X.map (SimplexCategory.δ i).op).app (Opposite.op ⦋q⦌) = 0 := by
+      simpa [SimplicialObject.δ, inclusionOfMooreComplexMap_f] using
+        congrArg (fun f => f.app (Opposite.op ⦋q⦌))
+          ((HigherFacesVanish.inclusionOfMooreComplexMap (X := X) p).comp_δ_eq_zero i hi hcond)
+    rw [hhi, op_comp, X.map_comp, NatTrans.comp_app]
+    slice_lhs 2 3 => rw [hvanish]
+    simp only [zero_comp, comp_zero]
 
 /-- **(B-core)** Higher faces vanish on the shuffle of a bi-normalized chain: every diagonal
 face `δⱼ₊₁` (`j : Fin (n+1)`, i.e. all faces except `δ₀`) annihilates

@@ -272,6 +272,88 @@ one p-step, one q-step?):
 3. Non-diagonal part → factor through `δ_v` (`v ≥ 1`) via `insert…Step_face`, kill with the
    `inclusionOfMooreComplexMap`/`mooreInclusion` kernel property.
 
+**STATUS (B): assembled, sorry-free internally.** `higherFacesVanish_inclusionN₁_shuffleMap`
+compiles; it now rests on two drafted helpers — `nondiag_sndHom_or_fstHom_comp_δ_not_surjective`
+(combinatorial disjunction, `:86`) and `biInclusion_comp_outer_map_op_eq_zero` (outer glue, `:132`).
+The diagonal case (swap involution) and both non-diagonal sub-cases (RR inner-glue, LL outer-glue via
+naturality swap + `convert … using 2`) are done.
+
+### Proof of (A): `shuffleMap ≫ alexanderWhitney ≫ retractionN₁ = retractionN₁`
+
+`(A)` is **EM `f∇ = i` modulo norms** — the strict half of EM Thm 2.1a, but conjugated so the
+unnormalized cross-terms die under `≫ retractionN₁` rather than on the nose (the counterexample
+below shows they are nonzero unnormalized). Directions: `shuffleMap : F₁ → F₂`,
+`alexanderWhitney : F₂ → F₁`, `retractionN₁ : F₁ → N₁`; the goal is an equality of maps `F₁ → N₁`.
+
+**Reduction (mechanical, mirrors `inclusionN₁_shuffleMap_diag_normalize` + `alexanderWhitney.comm'`):**
+1. `ext n`; both sides are maps `(F₁.obj X).X n → (N₁.obj X).X n`. Apply
+   `HomologicalComplex₂.total.hom_ext` on the **source** total complex ⇒ precompose with each
+   coproduct inclusion `ιTotal_{r,s}` (`r + s = n`).
+2. `ιTotal_{r,s} ≫ shuffleMap.f n = ezComponent X r s ≫ eqToHom _` (def via `totalDesc`,
+   `HomologicalComplex₂.ι_totalDesc`).
+3. `≫ alexanderWhitney.f n = ∑_{p : Fin (n+1)} eqToHom _ ≫ awComponent X p (n-p) ≫ ιTotal_{p,n-p}`
+   (def of `alexanderWhitney`). Absorbing the index-transport `eqToHom`s gives
+   `∑_p (ezComponent X r s ≫ awComponent X p (n-p)) ≫ ιTotal_{p,n-p}`.
+4. `≫ retractionN₁.f n`. Since `retractionN₁ = totalFunctor.map (bi-PInfty)`, we have
+   `ιTotal_{p,q} ≫ retractionN₁.f n = r_{p,q} ≫ ιTotal^{N₁}_{p,q}`, where the **bidegree-`(p,q)`
+   retraction component** `r_{p,q}` is the inner Moore retraction on `X⟦p⟧` at degree `q` composed
+   with the outer `PInftyToNormalizedMooreComplex X` component (extract via `totalFunctor_map` /
+   `ιTotal_map`, `NatTrans.mapHomologicalComplex_app_f`, `Functor.mapHomologicalComplex` field
+   accessors — the dual of the `Aₚq`/`Bₚq` unfolding used in (B)).
+   The RHS `retractionN₁.f n` precomposed with `ιTotal_{r,s}` is just `r_{r,s} ≫ ιTotal^{N₁}_{r,s}`.
+5. Coproduct inclusions `ιTotal^{N₁}_{p,q}` are jointly mono-independent ⇒ match summand-by-summand
+   in `p`. The goal splits into:
+   - **diagonal** `p = r`: `ezComponent X r s ≫ awComponent X r s ≫ r_{r,s} = r_{r,s}`;
+   - **off-diagonal** `p ≠ r`: `ezComponent X r s ≫ awComponent X p (n-p) ≫ r_{p,n-p} = 0`.
+
+**Combinatorial core (the real grind — two lemmas, DUAL to (B)).** Where (B) killed *cofaces* `δ_v`
+(`v ≥ 1`) with the Moore *inclusion* (kernel-of-faces), (A) kills *degeneracies* `σ_i` with the
+Moore *retraction* `PInfty` (which annihilates the degenerate/image-of-`σ` subobject):
+
+- **(A-offdiag)** `p ≠ r`: the pairing `awComponent X p (n-p) ∘ ezComponent X r s` factors through a
+  **degeneracy** in one of the two directions. Geometrically: AW takes the front-`p`-face
+  (`ι_front`) ⊗ back-`(n-p)`-face (`ι_back`); for every `(r,s)`-shuffle `μ`, when the split point
+  `p ≠ r` the chosen front/back faces of `μ` repeat a vertex, so `ι_front/ι_back ∘ shuffleFst/SndHom μ`
+  is **non-injective** ⇒ factors as `σ_i ∘ (…)` (`SimplexCategory.eq_σ_comp_of_not_injective`, dual
+  of the `eq_comp_δ_of_not_surjective` used in (B)). Contravariantly the directional `X.map`/
+  `X⟦p⟧.map` then *ends* (just before `r_{p,q}`) with a degeneracy `s_i`; the matching leg of the
+  bi-PInfty retraction kills it (`PInfty`/`PInftyToNormalizedMooreComplex` annihilates degeneracies).
+  ⇒ extract a **dual glue lemma**: `Y.map g.op ≫ (PInftyToNormalizedMooreComplex Y).f q = 0` for `g`
+  non-injective (image-repeats) — and its outer/bi-graded analogue — mirroring
+  `inclusionOfMooreComplexMap_comp_map_op_eq_zero` / `biInclusion_comp_outer_map_op_eq_zero` but on
+  the **retraction** side. (Matches the counterexample: the `(r,s)=(0,1)≠(1,0)` term `d₁x ⊗ s₀y` is
+  degenerate via `s₀`.)
+- **(A-diag)** `p = r`: `ezComponent X r s ≫ awComponent X r s = 𝟙_{X⟦r⟧⟦s⟧} + D_deg`, with `D_deg`
+  a sum of degenerate terms. The `𝟙` comes from the **trivial shuffle** (its front-`r`/back-`s` faces
+  recover the identity); every other shuffle contributes a degenerate cross-term. Then
+  `(𝟙 + D_deg) ≫ r_{r,s} = r_{r,s} + (D_deg ≫ r_{r,s}) = r_{r,s} + 0 = r_{r,s}` by the same
+  degeneracy-kill. So (A-diag) reduces to (i) isolating the trivial-shuffle identity summand and
+  (ii) showing every non-trivial shuffle term is degenerate (same `σ_i`-factorization as A-offdiag).
+
+**Reusable API.** `ι_front`/`ι_back` (`Bisimplicial.lean`), `shuffleFstHom`/`shuffleSndHom`,
+`Shuffle` structure + `coordSum_eq`; `SimplexCategory.eq_σ_comp_of_not_injective` (dual to
+`eq_comp_δ_of_not_surjective`); Mathlib DoldKan degeneracy-kill lemmas for `PInfty`
+(`SimplicialObject.σ`-comp-`PInfty` / `HigherFacesVanish` dual — **TODO: locate exact name**, likely
+`DoldKan`'s `PInfty_comp_map_σ`-style or via `Decomposition`/`Degeneracies.lean`). The bidegree
+unfolding of `retractionN₁` reuses the (B) plumbing (`totalFunctor_map`, `ιTotal_map`,
+`mapHomologicalComplex_app_f`) verbatim, dualized to the retraction natural transformations
+(`mooreRetraction`, `PInftyToNormalizedMooreComplex`).
+
+**Plan to finish (A):**
+1. Mechanical reduction (Steps 1–5) — pure plumbing, mirrors (B)'s reduction + `alexanderWhitney.comm'`.
+2. Prove the **dual glue lemma(s)**: degeneracy-factoring map `≫ PInfty/Moore-retraction = 0`
+   (inner + bi-graded), dual to the two (B) glue lemmas already proven.
+3. **(A-offdiag)**: show `ι_front/ι_back ∘ shuffleFst/SndHom μ` is non-injective when `p ≠ r`
+   (combinatorial, `coordSum_eq` + Fin reasoning), feed the dual glue.
+4. **(A-diag)**: isolate the trivial-shuffle `𝟙` summand (`Finset` single-out), show the rest are
+   degenerate (reuse Step 3's non-injectivity), kill with the dual glue.
+
+**Difficulty: HIGH** (the "real grind", per the original build order). Heaviest sub-piece is the
+non-injectivity combinatorics (Step 3) + the trivial-shuffle isolation (Step 4i). The dual glue
+lemmas (Step 2) should be near-mechanical duals of the (B) glue lemmas. Recommend doing Step 2 (dual
+glue) first as standalone `sorry`'d lemmas, then the mechanical reduction (Step 1), leaving the two
+combinatorial cores (Steps 3–4) — exactly the build order that worked for (B).
+
 ---
 
 ## CRITICAL CORRECTION: the original plan was unsound
