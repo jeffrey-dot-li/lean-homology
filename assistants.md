@@ -167,6 +167,7 @@ First, make a trivial Lean MCP call (e.g. `lean_diagnostic_messages` on the targ
 ### 4. Interactive Proof Development
 
 **`lean_multi_attempt`**: Try multiple tactics without modifying the file
+- **Do not use unless explicitly instructed by the user.**
 - Test 3+ tactics at once to find which works
 - Example: `["simp", "ring", "omega"]`
 - Returns goal state for each attempt

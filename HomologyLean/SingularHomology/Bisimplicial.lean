@@ -679,7 +679,7 @@ private lemma sndHom_insertRightStep_comp_δ {p q n : ℕ}
 /-- Composing `δ r ≫ eqToHom ≫ shuffleFstHom` of `swapDiagonalSteps μ` gives the same
 result as for `μ`, because `δ r` maps via `succAbove r` which avoids vertex `r`,
 and `swapDiagonalSteps` only changes the value at `r`. -/
-private lemma fstHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
+lemma fstHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
     (μ : Shuffle p q) (r : Fin (n + 2)) (hn : n + 1 = p + q)
     (h : Shuffle.isDiagonalVertex μ (r.cast (by omega))) :
     SimplexCategory.δ r ≫
@@ -700,7 +700,7 @@ private lemma fstHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
     exact fun heq => absurd (Fin.ext heq)
       (Fin.succAbove_ne r ⟨i, by simp only [SimplexCategory.len_mk] at hi; omega⟩)))
 
-private lemma sndHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
+lemma sndHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
     (μ : Shuffle p q) (r : Fin (n + 2)) (hn : n + 1 = p + q)
     (h : Shuffle.isDiagonalVertex μ (r.cast (by omega))) :
     SimplexCategory.δ r ≫

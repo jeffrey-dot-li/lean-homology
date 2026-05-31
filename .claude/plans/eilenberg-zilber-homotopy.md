@@ -204,6 +204,8 @@ reduce via the Dold–Kan round-trip identities (all `≫` right-associated):
   and ∇-preserves-normalization (EM Lemma I.5.3, `mcl2_sections_1_2.md:91`): once on the normalized
   total, `∇` lands in the normalized diagonal, so the diagonal `PInfty` round-trip is a no-op.
   Tagged `@[reassoc]` so it rewrites under the trailing `AW ≫ retN₁`.
+  **Full proof approach in "Proof of (B)" below** (reduction done; combinatorial core = the same
+  diagonal/non-diagonal split + `swapDiagonalSteps` involution as `ezComponent_boundary`).
 
 **Cheap glue:** `inclusionN₁ X ≫ retractionN₁ X = 𝟙 (N₁.obj X)` — total-complex lift of the Mathlib
 split-mono identity `(splitMonoInclusionOfMooreComplexMap _).id` (`Normalized.lean:102`) via
@@ -211,6 +213,64 @@ functoriality of `totalFunctor` + `NatTrans.mapHomologicalComplex`. Reused by `b
 
 Build order: sorry (A)/(B)/glue, confirm the top-level rewrite chain closes, then fill (B) (PInfty
 algebra), the glue (total-complex functoriality), and finally (A)'s shuffle-pairing (the real grind).
+
+### Proof of (B): `inclusionN₁ ≫ shuffleMap ≫ PInfty = inclusionN₁ ≫ shuffleMap`
+
+`(B)` is **∇ preserves normalization** (EM Lemma I.5.3). After (G1) folds `retN₂ ≫ inclN₂ = PInfty`
+(Mathlib `PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap`), the remaining goal is
+`inclusionN₁ X ≫ shuffleMap X ≫ PInfty = inclusionN₁ X ≫ shuffleMap X`. The split-mono structure of
+`inclusionOfMooreComplexMap (diag X)` makes "factors through the Moore complex" *equivalent* to this
+goal (circular), so the real content is a degreewise **`HigherFacesVanish`** statement.
+
+**Reduction (mechanical, done — `BisimplicialNormalized.lean`):**
+1. `ext (_|n)` + `comp_P_eq_self` (mirrors Mathlib `inclusionOfMooreComplexMap_comp_PInfty`,
+   `Normalized.lean:86`) ⇒ reduce to a private lemma
+   `HigherFacesVanish (X := diag.obj X) (n+1) ((inclusionN₁ X ≫ shuffleMap X).f (n+1))`.
+2. `intro j hj`; `HomologicalComplex.comp_f`; `HomologicalComplex₂.total.hom_ext` ⇒ per-summand
+   `(p,q)`, `p+q=n+1`. The plumbing collapses (`totalFunctor_map`, `ιTotal_map_assoc`,
+   `ι_totalDesc_assoc`) to a single `ezComponent` term.
+3. `simp only [SimplicialObject.δ, diag_obj_map]` (the `Bisimplicial.lean:773` pattern) splits the
+   diagonal face `(diag X).δ_{j+1}` into vertical (`(X.map δᵒᵖ).app`, p-dir) and horizontal
+   (`X⟦n+1⟧.map δᵒᵖ`, q-dir) pieces.
+4. Expand `ezComponent` (`∑_μ sign • (sndHom ≫ fstHom)`), then **mirror `ezComponent_boundary`'s
+   eqToHom dance** (`Bisimplicial.lean:774–811`): one naturality commute
+   (`← (X.map δᵒᵖ).naturality`), `generalize_proofs` the index-transport `eqToHom`, split it into
+   `eqToHom_vert ≫ eqToHom_horiz`, fold each half into the adjacent `X.map`/`X⟦_⟧.map` via
+   `eqToHom_map`/`eqToHom_app`/`Functor.map_comp`, a second naturality commute, and fuse adjacent
+   same-direction maps. **Result (current `sorry`):**
+   ```
+   incl ≫ ∑ μ, μ.sign •
+       X⟦p⟧.map ((shuffleSndHom μ)ᵒᵖ ≫ (δ_{j+1})ᵒᵖ)              -- q-direction
+         ≫ (X.map ((shuffleFstHom μ)ᵒᵖ ≫ (δ_{j+1})ᵒᵖ)).app⟦n⟧    -- p-direction   = 0
+   ```
+   (index-transport `eqToHom`s absorbed into the homs).
+
+**Combinatorial core (the real work, NOT termwise zero).** Per shuffle `μ`, vertex `j+1`
+(`∈ {1,…,p+q}`, never 0) is classified by `Shuffle.isDiagonalVertex μ (j+1)` (is it a *corner* —
+one p-step, one q-step?):
+
+- **Non-diagonal** (both adjacent steps the same type): the matching projection misses value
+  `≥ 1`, so `shuffleFstHom μ ∘ δ_{j+1}` (both p-steps) resp. `shuffleSndHom μ ∘ δ_{j+1}` (both
+  q-steps) factors through a **higher coface `δ_v`, `v ≥ 1`**. Contravariantly the corresponding
+  directional `X.map` then *begins* (right after the inclusion) with a higher face `d_v`; the
+  matching leg of the bi-Moore inclusion — outer `inclusionOfMooreComplexMap X` (p-dir) / inner
+  `mooreInclusion` (q-dir), both landing in `⋂_{k≥1} ker d_k` — annihilates it. The factorization
+  is exactly the existing `Shuffle.insertLeftStep_face` / `insertRightStep_face`
+  (`Bisimplicial.lean:586–669`). The top vertex `j+1 = p+q` always lands here.
+- **Diagonal / corner** (one p-step, one q-step): both `fstHom∘δ` and `sndHom∘δ` stay surjective,
+  so normalization gives nothing — instead these terms **cancel in sign-reversing pairs**. The
+  partner `Shuffle.swapDiagonalSteps μ (j+1)` agrees with `μ` at every vertex except `j+1`; since
+  `δ_{j+1}` deletes exactly that vertex, `fstHom`/`sndHom` agree after `∘ δ_{j+1}`, but the swap
+  flips the sign (`Shuffle.swapDiagonalSteps_neg_sign`), so the pair cancels.
+
+**This is the same diagonal/non-diagonal split + involution as `ezComponent_boundary`'s Steps 6–8
+(`Bisimplicial.lean:812–871`).** Reusable `Shuffle` API: `isDiagonalVertex`(`_decidable`),
+`swapDiagonalSteps`(`_neg_sign`/`_vertex`/`_involutive`/`_ne`), `insertLeftStep_face`,
+`insertRightStep_face`. Plan to finish:
+1. Bring `incl` into the sum (`Preadditive.comp_sum`), split `∑_μ` on `isDiagonalVertex μ (j+1)`.
+2. Diagonal part → cancel via the `swapDiagonalSteps` involution (mirror `Bisimplicial.lean:829–871`).
+3. Non-diagonal part → factor through `δ_v` (`v ≥ 1`) via `insert…Step_face`, kill with the
+   `inclusionOfMooreComplexMap`/`mooreInclusion` kernel property.
 
 ---
 
