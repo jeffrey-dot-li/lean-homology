@@ -74,6 +74,87 @@ lemma inclusionN₁_comp_retractionN₁ (X : BisimplicialObject C) :
 projection `sndHom x ∘ δ_{j+1}` (both steps vertical, RR) or the horizontal projection
 `fstHom x ∘ δ_{j+1}` (both steps horizontal, LL). This is the combinatorial core feeding the
 termwise Moore vanishing in `higherFacesVanish_inclusionN₁_shuffleMap`. -/
+private lemma comp_δ_not_surjective {a b : ℕ} (f : (⦋a⦌ : SimplexCategory) ⟶ ⦋b⦌)
+    (k : Fin (b + 2)) :
+    ¬ Function.Surjective ⇑(SimplexCategory.Hom.toOrderHom (f ≫ SimplexCategory.δ k)) := by
+  intro hsurj
+  obtain ⟨x, hx⟩ := hsurj k
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.δ, SimplexCategory.Hom.toOrderHom_mk, Fin.succAboveOrderEmb_apply] at hx
+  exact Fin.succAbove_ne k _ hx
+
+private lemma shuffleSndHom_zero_left {q : ℕ} (x : Shuffle 0 q) :
+    shuffleSndHom x = eqToHom (congrArg SimplexCategory.mk (by omega : 0 + q = q)) := by
+  ext r
+  simp only [shuffleSndHom, SimplexCategory.comp_toOrderHom, OrderHom.comp_coe,
+    Function.comp_apply, SimplexCategory.Hom.toOrderHom_mk, SimplexCategory.eqToHom_toOrderHom]
+  set s : Fin (0 + q + 1) := (Fin.castOrderIso (by simp)).toOrderEmbedding.toOrderHom r
+  have hfst := Fin.eq_zero ((x.1 s).1)
+  simp only [Fin.ext_iff, Fin.val_zero] at hfst
+  have hsum := Shuffle.coordSum_eq x s
+  have hs : s.val = r.val := by simp [s]
+  simp only [SimplexCategory.len_mk] at hsum
+  have hsnd : ((x.1 s).2 : ℕ) = s.val := by omega
+  simpa [hs] using hsnd
+
+private lemma shuffleFstHom_zero_right {p : ℕ} (x : Shuffle p 0) :
+    shuffleFstHom x = eqToHom (congrArg SimplexCategory.mk (by omega : p + 0 = p)) := by
+  ext r
+  simp only [shuffleFstHom, SimplexCategory.comp_toOrderHom, OrderHom.comp_coe,
+    Function.comp_apply, SimplexCategory.Hom.toOrderHom_mk, SimplexCategory.eqToHom_toOrderHom]
+  set s : Fin (p + 0 + 1) := (Fin.castOrderIso (by simp)).toOrderEmbedding.toOrderHom r
+  have hsnd := Fin.eq_zero ((x.1 s).2)
+  simp only [Fin.ext_iff, Fin.val_zero] at hsnd
+  have hsum := Shuffle.coordSum_eq x s
+  have hs : s.val = r.val := by simp [s]
+  simp only [SimplexCategory.len_mk] at hsum
+  have hfst : ((x.1 s).1 : ℕ) = s.val := by omega
+  simpa [hs] using hfst
+
+private lemma fstHom_insertLeftStep_comp_δ {p q n : ℕ}
+    (ν : Shuffle p q) (j : Fin (p + 2)) (hn : n + 1 = (p + 1) + q) :
+    SimplexCategory.δ ((ν.insertLeftIndex j).cast (by omega)) ≫
+      eqToHom (congrArg SimplexCategory.mk hn) ≫
+      shuffleFstHom (ν.insertLeftStep j) =
+    eqToHom (congrArg SimplexCategory.mk (by omega : n = p + q)) ≫
+      shuffleFstHom ν ≫ SimplexCategory.δ j := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.Hom.toOrderHom_mk, SimplexCategory.eqToHom_toOrderHom,
+    SimplexCategory.len_mk, shuffleFstHom]
+  simp only [SimplexCategory.len_mk] at hi
+  have hface := Shuffle.insertLeftStep_face ν j ⟨i, by omega⟩
+  suffices harg : ∀ (a b : Fin ((p + 1) + q + 1)), a.val = b.val →
+      (ν.insertLeftStep j).1 a = (ν.insertLeftStep j).1 b from
+    congrArg (fun x => (x.1 : ℕ)) ((harg _ _ (by
+      dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom,
+        SimplexCategory.eqToHom_toOrderHom, Fin.castOrderIso]
+      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+      split_ifs <;> simp_all)).trans hface)
+  exact fun _ _ h => congr_arg _ (Fin.ext h)
+
+private lemma sndHom_insertRightStep_comp_δ {p q n : ℕ}
+    (ν : Shuffle p q) (k : Fin (q + 2)) (hn : n + 1 = p + (q + 1)) :
+    SimplexCategory.δ ((ν.insertRightIndex k).cast (by omega)) ≫
+      eqToHom (congrArg SimplexCategory.mk hn) ≫
+      shuffleSndHom (ν.insertRightStep k) =
+    eqToHom (congrArg SimplexCategory.mk (by omega : n = p + q)) ≫
+      shuffleSndHom ν ≫ SimplexCategory.δ k := by
+  ext ⟨i, hi⟩
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.Hom.toOrderHom_mk, SimplexCategory.eqToHom_toOrderHom,
+    SimplexCategory.len_mk, shuffleSndHom]
+  simp only [SimplexCategory.len_mk] at hi
+  have hface := Shuffle.insertRightStep_face ν k ⟨i, by omega⟩
+  suffices harg : ∀ (a b : Fin (p + (q + 1) + 1)), a.val = b.val →
+      (ν.insertRightStep k).1 a = (ν.insertRightStep k).1 b from
+    congrArg (fun x => (x.2 : ℕ)) ((harg _ _ (by
+      dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb, SimplexCategory.comp_toOrderHom,
+        SimplexCategory.eqToHom_toOrderHom, Fin.castOrderIso]
+      simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
+      split_ifs <;> simp_all)).trans hface)
+  exact fun _ _ h => congr_arg _ (Fin.ext h)
+
 private lemma nondiag_sndHom_or_fstHom_comp_δ_not_surjective
     {p q n : ℕ} (x : Shuffle p q) (hpq : p + q = n + 1) (j : Fin (n + 1))
     (hx : ¬ x.isDiagonalVertex ⟨(j : ℕ) + 1, by omega⟩) :
@@ -83,7 +164,34 @@ private lemma nondiag_sndHom_or_fstHom_comp_δ_not_surjective
     ¬ Function.Surjective ⇑(SimplexCategory.Hom.toOrderHom
         (SimplexCategory.δ j.succ ≫ eqToHom (congrArg SimplexCategory.mk hpq.symm) ≫
           shuffleFstHom x)) := by
-  sorry
+  rcases p with _ | p
+  · left
+    have hx0 : x = default := Subsingleton.elim _ _
+    subst hx0
+    simpa [hpq, shuffleSndHom_zero_left] using
+      (comp_δ_not_surjective (𝟙 (⦋n⦌ : SimplexCategory)) j.succ)
+  rcases q with _ | q
+  · right
+    have hx0 : x = default := Subsingleton.elim _ _
+    subst hx0
+    simpa [hpq, shuffleFstHom_zero_right] using
+      (comp_δ_not_surjective (𝟙 (⦋n⦌ : SimplexCategory)) j.succ)
+  obtain ⟨k, ν, hkx, hkr⟩ | ⟨k, ν, hkx, hkr⟩ :=
+    Shuffle.nondiag_mem_insertLeft_or_insertRight x ⟨(j : ℕ) + 1, by omega⟩ hx
+  · right
+    have hr : j.succ = (Shuffle.insertLeftIndex ν k).cast (by omega) := by
+      apply Fin.ext
+      simpa using hkr.symm
+    rw [hkx, hr, fstHom_insertLeftStep_comp_δ ν k hpq.symm]
+    exact comp_δ_not_surjective
+      (eqToHom (congrArg SimplexCategory.mk (by omega : n = p + (q + 1))) ≫ shuffleFstHom ν) k
+  · left
+    have hr : j.succ = (Shuffle.insertRightIndex ν k).cast (by omega) := by
+      apply Fin.ext
+      simpa using hkr.symm
+    rw [hkx, hr, sndHom_insertRightStep_comp_δ ν k hpq.symm]
+    exact comp_δ_not_surjective
+      (eqToHom (congrArg SimplexCategory.mk (by omega : n = (p + 1) + q)) ≫ shuffleSndHom ν) k
 
 /-- A Moore inclusion `N(Y) ↪ K(Y)` at degree `q`, postcomposed with `Y.map g.op` for a
 non-surjective `g : ⦋n⦌ ⟶ ⦋q⦌` whose image contains `0`, vanishes: `g` factors through a coface
