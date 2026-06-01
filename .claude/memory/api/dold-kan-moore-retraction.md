@@ -105,3 +105,18 @@ slice_lhs 1 2 => rw [← Functor.map_comp, ← op_comp]                         
 ```
 
 (See also `api/eqToHom-casting.md` Principle 10 for the general "fuse verticals + naturality" recipe.)
+
+### Mismatched-split twin: `ezawSummand_offDiag_merge`
+
+When the Alexander–Whitney split `(b, c)` differs from the shuffle's bidegree `(r, s)` (with
+`b + c = r + s`), the merge gets a C-level **diagonal cast** `eqToHom` wedged between the two outer
+operators (ez lands at `⦋r+s⦌`, aw starts at `⦋b+c⦌`). The merged legs become *non-endo*:
+outer `A = ι_front b c ≫ eqToHom ≫ shuffleFstHom μ : ⦋b⦌ ⟶ ⦋r⦌`, inner
+`B = ι_back b c ≫ eqToHom ≫ shuffleSndHom μ : ⦋c⦌ ⟶ ⦋s⦌`. The cast changes **both** simplicial
+indices, so you must first decompose it into two single-variable casts (`have hcast`) and then run the
+3-step skeleton **twice**. Full recipe + gotchas: `api/eqToHom-casting.md` **Principle 11**.
+
+The non-endo `A`, `B` are then killed by the **generalized** `outer_/inner_map_op_comp_retraction_eq_zero`
+(Patterns 2/4 relaxed from `⦋n⦌ ⟶ ⦋n⦌` to `⦋b⦌ ⟶ ⦋r⦌`): `degeneracy_comp_PInfty` already allows
+arbitrary codomain `θ : ⦋n⦌ ⟶ Δ'`, so the generalization is free. Dimension count picks the dead leg:
+`b > r ⟹ A` non-mono (via `SimplexCategory.le_of_mono`); `b < r ⟹ c = n-b > s ⟹ B` non-mono.

@@ -653,7 +653,28 @@ private lemma ezawSummand_offDiag_merge (X : BisimplicialObject C) (r s b c : �
       (X.obj (Opposite.op ⦋r⦌)).map
             (ι_back b c ≫ eqToHom (by rw [hbc]) ≫ shuffleSndHom μ).op ≫
         (X.map (ι_front b c ≫ eqToHom (by rw [hbc]) ≫ shuffleFstHom μ).op).app (Opposite.op ⦋c⦌) := by
-  sorry
+  have hS : (⦋b + c⦌ : SimplexCategory) = ⦋r + s⦌ := by rw [hbc]
+  -- Decompose the bisimplicial diagonal cast into its two single-variable casts.
+  have hcast : (eqToHom (by rw [show r + s = b + c from hbc.symm]) :
+        (X.obj (Opposite.op ⦋r + s⦌)).obj (Opposite.op ⦋r + s⦌) ⟶
+          (X.obj (Opposite.op ⦋b + c⦌)).obj (Opposite.op ⦋b + c⦌)) =
+      (X.map (eqToHom hS).op).app (Opposite.op ⦋r + s⦌) ≫
+        (X.obj (Opposite.op ⦋b + c⦌)).map (eqToHom hS).op := by
+    rw [eqToHom_op, eqToHom_map, eqToHom_app, eqToHom_map, eqToHom_trans]
+  rw [hcast]
+  -- Fuse outer `fstHom μ` with the first-variable cast.
+  slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]
+  -- Slide the second-variable cast past the outer `ι_front` operator (bifunctor naturality).
+  slice_lhs 3 4 => rw [(X.map (ι_front b c).op).naturality (eqToHom hS).op]
+  -- Fuse the two adjacent outer operators into the merged outer map `A`.
+  slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]
+  -- Fuse the second-variable cast with the inner `ι_back` operator.
+  slice_lhs 3 4 => rw [← Functor.map_comp, ← op_comp]
+  -- Push the merged outer `A` past the inner operator (bifunctor naturality).
+  rw [← (X.map (ι_front b c ≫ eqToHom hS ≫ shuffleFstHom μ).op).naturality
+    (ι_back b c ≫ eqToHom hS).op]
+  -- Fuse the two adjacent inner operators into the merged inner map `B`.
+  rw [← Category.assoc, ← Functor.map_comp, ← op_comp, Category.assoc]
 
 /-- **(B-off) Off-diagonal summands vanish.** When the Alexander–Whitney split `(b, c)` differs
 from the shuffle's bidegree `(r, s)` (`b ≠ r`, with `b + c = r + s`), the merged outer face
@@ -673,7 +694,19 @@ private lemma ezawSummand_offDiag_comp_retraction_eq_zero (X : BisimplicialObjec
                       ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
                     ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
                       (PInftyToNormalizedMooreComplex X)).f b).f c = 0 := by
-  sorry
+  -- Collapse the four-map summand into the merged double-operator (outer `A : ⦋b⦌ ⟶ ⦋r⦌`,
+  -- inner `B : ⦋c⦌ ⟶ ⦋s⦌`), absorbing the trailing bi-retraction `R'_{b,c}`.
+  rw [reassoc_of% ezawSummand_offDiag_merge X r s b c hbc μ]
+  -- The split `(b,c) ≠ (r,s)` forces a dimension drop on exactly one merged leg.
+  rcases Nat.lt_or_gt_of_ne hb with hlt | hgt
+  · -- `b < r` ⟹ `c > s`: the inner merged face `B : ⦋c⦌ ⟶ ⦋s⦌` cannot be mono.
+    refine inner_map_op_comp_retraction_eq_zero X _ _ (fun hmono => ?_)
+    have := @SimplexCategory.le_of_mono _ _ _ hmono
+    omega
+  · -- `b > r`: the outer merged face `A : ⦋b⦌ ⟶ ⦋r⦌` cannot be mono.
+    rw [outer_map_op_comp_retraction_eq_zero X _ (fun hmono => ?_), comp_zero]
+    have := @SimplexCategory.le_of_mono _ _ _ hmono
+    omega
 
 /-- **(A) EM `f∇ = i` modulo norms.** Unnormalized, `shuffleMap ≫ alexanderWhitney = 𝟙 + D` with
 `D` landing in the degenerate subcomplex; the bi-normalized retraction `retractionN₁` annihilates
@@ -765,7 +798,18 @@ lemma shuffleMap_alexanderWhitney_comp_retractionN₁ (X : BisimplicialObject C)
     --      `Finset.sum_eq_zero` per-summand.
     -- Riskiest part: the `eqToHom` cast bookkeeping in step 2; the vanishing (3–4) is straightforward.
     intro b _ hb
-    sorry
+    have hb' : (b : ℕ) ≠ r := fun h => hb (Fin.ext h)
+    have hbc : (b : ℕ) + (n - b) = r + s := by have := b.isLt; omega
+    -- Expand `ez` into its shuffle sum and distribute `≫ (casts) ≫ aw ≫ R' ≫ ιTotal` through it.
+    simp only [ezComponent, awComponent, Preadditive.sum_comp, Preadditive.zsmul_comp,
+      Category.assoc]
+    -- Every summand vanishes: merge the two diagonal casts, then the off-diagonal kill (absorbing
+    -- the trailing `ιTotal`).
+    apply Finset.sum_eq_zero
+    intro μ _
+    rw [eqToHom_trans_assoc,
+      reassoc_of% ezawSummand_offDiag_comp_retraction_eq_zero X r s (b : ℕ) (n - b) hbc hb' μ,
+      zero_comp, smul_zero]
 
 /-- **EM Thm 2.1a, first half (`f∇ = i`).** On normalized complexes the composite `∇ ≫ AW`
 is the identity *strictly* — the degenerate cross-terms that obstruct this on the unnormalized

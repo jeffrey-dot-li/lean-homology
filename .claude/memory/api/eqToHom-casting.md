@@ -269,6 +269,54 @@ There is **no** off-the-shelf lemma `α.app _ ≫ eqToHom _ = eqToHom _ ≫ α.a
 - **Prove `Opposite.op ⦋a⦌ = Opposite.op ⦋b⦌` with `by rw [show a = b from by omega]`**, not `by congr 1; omega`. `congr 1` on the `op`/`mk` layers leaves a goal `omega` can't see (it reported a bogus counterexample involving unrelated vars), whereas rewriting the `Nat` makes both sides syntactically identical.
 - **Verify in the real file, not just `lean_multi_attempt`.** Line-based `lean_multi_attempt` gave **false positives** here (reported `goals: []` for sequences that failed on real elaboration). Always confirm with `lean_diagnostic_messages` after editing.
 
+## Principle 11: Bifunctor (BisimplicialObject) diagonal cast — decompose into two single-variable casts
+
+**Problem**: For a bisimplicial object `X : SimplexCategoryᵒᵖ ⥤ (SimplexCategoryᵒᵖ ⥤ C)`, a `Nat`
+equation (e.g. `r + s = b + c`) produces a *single* C-level cast between **diagonal** objects:
+`eqToHom : (X.obj op⦋r+s⦌).obj op⦋r+s⦌ ⟶ (X.obj op⦋b+c⦌).obj op⦋b+c⦌`. It changes **both** simplicial
+indices at once, so the merge (e.g. the off-diagonal `ezawSummand_offDiag_merge`, mirroring
+`ezawSummand_merge`) can't fuse the outer operators around it — Principle 10's single-index slide
+doesn't directly apply.
+
+**Recipe**: First split the bifunctor cast into its two single-variable casts via a `have hcast`,
+then run the diagonal merge skeleton (fuse outer / naturality slide / fuse inner) **twice**.
+
+```lean
+have hS : (⦋b + c⦌ : SimplexCategory) = ⦋r + s⦌ := by rw [hbc]
+have hcast : (eqToHom (by rw [show r + s = b + c from hbc.symm]) :
+      (X.obj (op ⦋r + s⦌)).obj (op ⦋r + s⦌) ⟶ (X.obj (op ⦋b + c⦌)).obj (op ⦋b + c⦌)) =
+    (X.map (eqToHom hS).op).app (op ⦋r + s⦌) ≫        -- FIRST-variable cast (a NatTrans .app)
+      (X.obj (op ⦋b + c⦌)).map (eqToHom hS).op := by  -- SECOND-variable cast (inner functor .map)
+  rw [eqToHom_op, eqToHom_map, eqToHom_app, eqToHom_map, eqToHom_trans]
+rw [hcast]
+-- now the cast is genuine `X.map`/`X.obj.map` operators; run the merge skeleton twice:
+slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]      -- fuse outer w/ 1st cast
+slice_lhs 3 4 => rw [(X.map (ι_front b c).op).naturality (eqToHom hS).op]      -- slide 2nd cast past outer
+slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]      -- fuse outer pair → A
+slice_lhs 3 4 => rw [← Functor.map_comp, ← op_comp]                           -- fuse 2nd cast w/ ι_back
+rw [← (X.map A.op).naturality (ι_back b c ≫ eqToHom hS).op]                   -- push A past inner
+rw [← Category.assoc, ← Functor.map_comp, ← op_comp, Category.assoc]          -- fuse inner pair → B
+```
+
+**Key gotchas (each cost a real iteration):**
+- **Proving `hcast`: `simp`'s `eqToHom_app` silently does NOT fire** on `(eqToHom (F = G)).app X`
+  even when supplied. Use the **explicit `rw` chain** `[eqToHom_op, eqToHom_map, eqToHom_app,
+  eqToHom_map, eqToHom_trans]`. Note `eqToHom_op` rewrites **all** copies of the *same* `(eqToHom hS).op`
+  at once (both occurrences share `hS`), so you need only ONE `eqToHom_op` even though the cast appears
+  twice; the two `eqToHom_map`s then hit `X.map (…)` and the inner `X.obj _ .map (…)` separately.
+  `rw`'s trailing `rfl` closes the final `eqToHom h = eqToHom h'` by proof irrelevance.
+- **`slice_lhs i j` sometimes grabs only morphism `i`** (the conv focus comes back as a single factor),
+  making the inner `rw` fail with "did not find pattern … in target `<just morphism i>`". Two fallbacks
+  that worked: (a) for a naturality slide whose `app ≫ map` pattern is already a subterm, use a **bare
+  `rw [← M.naturality m]`** (no slice); (b) for a final two-`F.map` fuse, **left-associate then fuse then
+  re-associate**: `rw [← Category.assoc, ← Functor.map_comp, ← op_comp, Category.assoc]`.
+- The merged outer `A = ι_front b c ≫ eqToHom hS ≫ shuffleFstHom μ : ⦋b⦌ ⟶ ⦋r⦌` and inner
+  `B = ι_back b c ≫ eqToHom hS ≫ shuffleSndHom μ : ⦋c⦌ ⟶ ⦋s⦌` end up matching the target RHS up to
+  proof-irrelevant `eqToHom` and `Category.assoc` (handled by the trailing `Category.assoc`).
+
+(Cf. `ezawSummand_offDiag_merge` in `BisimplicialNormalized.lean`; it is the mismatched-split twin of
+`ezawSummand_merge` / Pattern 5 in `dold-kan-moore-retraction.md`.)
+
 ## Pitfall: `SimplexCategory.len` is opaque to `omega`
 
 When `ext` destructs `⟨i, hi⟩ : Fin ((SimplexCategory.mk n).len + 1)`, the bound `hi` involves `.len` which `omega` can't reduce. Fix: `simp only [SimplexCategory.len_mk] at hi` to get `hi : i < n + 1`.
