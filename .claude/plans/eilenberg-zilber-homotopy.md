@@ -40,6 +40,18 @@ Key EM facts (see `mcl2_sections_1_2.md`):
 homotopy formula (3.3) and the EM recursion (3.4). Franz's `C(X)` is the **normalized** complex,
 and (3.6) is *cited* from EM [4, Thm 2.1a] — Franz does not reprove it.
 
+**Survey finding on the hard half (`homotopyInvHomId`).** We looked specifically for a proof of
+`AW ≫ ∇ ≃ 𝟙` (equivalently `∂Φ + Φ∂ = ∇f - i`) that starts from the **closed Rubio–Morace
+formula** for `Φ` and verifies the homotopy identity directly. We did **not** find such a source.
+What the literature supports is:
+- **EM**: prove the identity by the **recursive** definition of `Φ` and an induction using
+  derived operators (`pdfs/mcl2_sections_1_2.md:163`–`194`).
+- **Franz**: states the explicit formula and the contraction identities, but cites EM for the
+  latter; no direct closed-form proof.
+- **Sergeraert** (`www-fourier.univ-grenoble-alpes.fr/~sergerar/Papers/EZ-submitted.pdf`): proves
+  the **explicit** Rubio–Morace formula satisfies the **recursive** Eilenberg–Mac Lane definition,
+  i.e. explicit ⇒ recursive ⇒ EM, not explicit ⇒ homotopy identity directly.
+
 ## ★ CURRENT APPROACH (chosen): prove EZ on normalized, transport to unnormalized
 
 This **supersedes Route B** (the direct unnormalized construction below, kept for history).
@@ -65,8 +77,83 @@ EM Thm 2.1a). Asymmetric and that asymmetry is the whole point of going normaliz
   - `homotopyHomInvId` = `∇ ≫ AW = 𝟙 N₁` **strictly** (`Homotopy.ofEq`); the degenerate
     cross-term `∂₁x ⊗ s₀y` that blocks this unnormalized is zero modulo norms. **Cheap.**
   - `homotopyInvHomId` = `AW ≫ ∇ ≃ 𝟙 N₂` via the explicit EM homotopy `Φ`. **The real work**
-    (EM induction with derived operators, or verify Rubio–Morace `Φ`); now *sourced* and the
-    "modulo norms" steps are literally `0` on normalized chains.
+    (EM induction with derived operators). **Important survey result:** the sources we found do
+    **not** give a direct proof from the closed Rubio–Morace formula alone; the literature-backed
+    routes are either EM's recursive proof, or proving the explicit formula satisfies EM's
+    recursion first (Sergeraert), then inheriting the EM argument. On the normalized complex the
+    "modulo norms" steps are literally `0`.
+
+**Lean implementation plan for `homotopyInvHomId` (EM recursive route, working from
+`BisimplicialNormalized.lean`).** Keep the proof **local** to the normalized file and reuse
+existing Mathlib Dold–Kan API rather than building a general quotient/derived-operator library.
+
+1. **Work on the unnormalized diagonal side first.**
+   - Let `h := alexanderWhitney X ≫ shuffleMap X : F₂.obj X ⟶ F₂.obj X` (EM's `∇f`).
+   - Define the recursive EM operator on the diagonal complex `F₂.obj X`, degreewise:
+     `phiRaw X n : (F₂.obj X).X n ⟶ (F₂.obj X).X (n+1)`.
+   - Package it as a `Homotopy.hom`-style family exactly as in
+     `Bisimplicial.lean`'s `emHomotopyHom`, so we can reuse the `dNext` / `prevD` form of
+     `Homotopy.comm`.
+
+2. **Use `PInfty`, not an abstract “mod norms” quotient theory.**
+   - EM's “maps norms into norms” / “equal modulo norms” should be represented by postcomposing
+     with `retractionN₂ = PInftyToNormalizedMooreComplex (diag.obj X)`.
+   - Reuse Mathlib lemmas already present in the project:
+     `PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap`,
+     `inclusionOfMooreComplexMap_comp_PInfty`,
+     `HigherFacesVanish.comp_P_eq_self`,
+     `degeneracy_comp_PInfty`,
+     and the naturality/idempotence lemmas for `PInfty`.
+   - So the “preserves norms” proofs become “this term is killed by `≫ retractionN₂`”.
+
+3. **Create only a tiny local derived-operator API.**
+   - No general Mathlib-quality framework; just enough to express EM `(2.13)` and the induction.
+   - Definitions/lemmas needed locally:
+     - the derived operator `prime` (EM's `M ↦ M'`) for the class of diagonal operators used here;
+     - a `Frontal` predicate for those operators;
+     - the identities EM uses:
+       `prime_comp_D0`, interaction with the truncated boundary `∂'`,
+       and the “higher faces are degenerate / killed by `PInfty`” consequence.
+   - This layer should be tailored to `F₂.obj X`, not abstracted over arbitrary simplicial gadgets.
+
+4. **Define the recursive homotopy operator following EM `(2.13)`.**
+   - Base case: `phiRaw X 0 = 0`.
+   - Recursive step for `q > 0`:
+     `Φ_q = - Φ'_q + h'_q D₀`.
+   - Prove the structural side facts EM needs:
+     - `phiRaw` is frontal;
+     - `phiRaw` is killed by `PInfty` on degenerate inputs (“preserves norms”);
+     - the corresponding facts for `h'`.
+
+5. **Prove the homotopy identity on `F₂` modulo norms, degreewise.**
+   - Follow EM `pdfs/mcl2_sections_1_2.md:169`–`194`.
+   - Use the same decomposition `∂ = F₀ - ∂'`.
+   - Reuse the existing `dNext` / `prevD` notation from `Bisimplicial.lean`; do not invent a new
+     boundary language.
+   - Target statement: after postcomposing with `retractionN₂`,
+     `(dNext n phiRawHom + prevD n phiRawHom + 𝟙.f n)` agrees with
+     `(alexanderWhitney X ≫ shuffleMap X).f n`.
+   - This is the Lean form of EM's “`∂Φ + Φ∂ = h - i` modulo norms”.
+
+6. **Transfer the raw EM identity to the normalized diagonal.**
+   - Define the normalized homotopy components by conjugation:
+     `phiNorm X n := inclusionN₂ X.f n ≫ phiRaw X n ≫ retractionN₂ X.f (n+1)`.
+   - Prove `Homotopy.zero` for the packaged family as in `emHomotopyHom_zero`.
+   - Derive `Homotopy.comm` for
+     `normalizedAlexanderWhitney X ≫ normalizedShuffleMap X`
+     from the raw modulo-`PInfty` identity plus the normalization round-trip lemmas.
+   - Package this as
+     `homotopyNormalizedAlexanderWhitneyShuffle (X) :
+        Homotopy (normalizedAlexanderWhitney X ≫ normalizedShuffleMap X) (𝟙 (N₂.obj X))`.
+
+7. **Scope control: what we do *not* need initially.**
+   - No general quotient formalization of “norms”.
+   - No direct proof from the Rubio–Morace closed formula.
+   - No side conditions `Φ∇ = 0`, `fΦ = 0`, `ΦΦ = 0` unless needed later.
+   - No new file/module unless the tiny local derived-operator layer becomes too noisy.
+
+This is the smallest plan that stays faithful to EM and avoids duplicating Mathlib's existing
+normalization machinery.
 
 **Ingredient 2 — `bridge₂ : HomotopyEquiv N₂ (F₂.obj X)`** — **FREE from Mathlib:**
 `AlgebraicTopology.DoldKan.homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex` at
@@ -80,6 +167,58 @@ a homotopy in one direction of a double complex lifts to the total complex. Sub-
       framework that `mapBifunctorMapHomotopy` is phrased in (iso, or re-derive for `totalFunctor`);
   (b) apply the inner-direction normalization equivalence (lift via `…₂`) and the outer (via `…₁`);
   (c) compose to `N₁ ≃ F₁`.
+
+**Concrete construction of `bridge₁` (replace the vague "main plumbing" by a 2-step factorization):**
+
+Introduce the intermediate total complex
+
+```lean
+noncomputable abbrev M₁ (X : BisimplicialObject C) : ChainComplex C ℕ :=
+  (HomologicalComplex₂.totalFunctor _ _ _ _).obj
+    (((normalizedMooreComplex C).mapHomologicalComplex _).obj
+      ((alternatingFaceMapComplex (SimplicialObject C)).obj X))
+```
+
+This is "outer unnormalized, inner normalized": first take the outer alternating-face-map complex
+of `X`, then normalize each resulting simplicial object in `C`, then totalize. With `M₁`, the
+`N₁ → F₁` comparison splits cleanly into:
+
+```text
+N₁(X)  --bridge₁_outer-->  M₁(X)  --bridge₁_inner-->  F₁(X)
+```
+
+- **Outer step `bridge₁_outer : HomotopyEquiv (N₁.obj X) (M₁ X)`**
+  - `hom` is `totalFunctor.map (((normalizedMooreComplex C).mapHomologicalComplex _).map
+    (inclusionOfMooreComplexMap X))`
+  - `inv` is `totalFunctor.map (((normalizedMooreComplex C).mapHomologicalComplex _).map
+    (PInftyToNormalizedMooreComplex X))`
+  - `hom ≫ inv = 𝟙` is strict by functoriality from
+    `(splitMonoInclusionOfMooreComplexMap X).id`
+  - `inv ≫ hom ≃ 𝟙` is the outer Dold–Kan homotopy
+    `PInftyToNormalizedMooreComplex X ≫ inclusionOfMooreComplexMap X ≃ 𝟙`
+    from `.lake/.../DoldKan/HomotopyEquivalence.lean:78`, pushed through
+    `((normalizedMooreComplex C).mapHomologicalComplex _)` and then `totalFunctor`
+    (this is the `…₁` lift)
+
+- **Inner step `bridge₁_inner : HomotopyEquiv (M₁ X) (F₁.obj X)`**
+  - let `Y := (alternatingFaceMapComplex (SimplicialObject C)).obj X`
+  - `hom` is `totalFunctor.map ((NatTrans.mapHomologicalComplex mooreInclusion _).app Y)`
+  - `inv` is `totalFunctor.map ((NatTrans.mapHomologicalComplex mooreRetraction _).app Y)`
+  - `hom ≫ inv = 𝟙` is strict by functoriality from
+    `mooreInclusion ≫ mooreRetraction = 𝟙`
+  - `inv ≫ hom ≃ 𝟙` is the pointwise inner Dold–Kan homotopy
+    `mooreRetraction.app _ ≫ mooreInclusion.app _ ≃ 𝟙`, lifted degreewise through the outer chain
+    complex and then totalized (this is the `…₂` lift)
+
+- **Assemble**
+  - `bridge₁ := bridge₁_outer.trans bridge₁_inner`
+  - check that `bridge₁.hom` simplifies to the already-defined `inclusionN₁ X`
+  - check that `bridge₁.inv` simplifies to the already-defined `retractionN₁ X`
+
+So the real missing work is **not** defining new chain maps: those are already present as
+`inclusionN₁` / `retractionN₁`. The missing work is packaging the two Dold–Kan homotopies
+(`PInfty ≃ 𝟙` in the outer direction and pointwise `PInfty ≃ 𝟙` in the inner direction) and
+showing `totalFunctor` carries them to homotopies of the total complexes.
 
 ### Caveats / open decisions
 
@@ -174,8 +313,9 @@ def eilenbergZilberNormalized (X) : HomotopyEquiv (N₁.obj X) (N₂.obj X) wher
 4. `bridge₂` (one-liner via Mathlib). NB its chain-map halves are already `inclusionN₂`/`retractionN₂`.
 5. `eilenbergZilberNormalized`: `normalizedShuffle_alexanderWhitney` (strict, cheaper) then the
    explicit `Φ` homotopy (the hard, sourced part — EM 2.1a on the general bisimplicial object).
-6. `bridge₁` (total-complex Dold–Kan via `mapBifunctorMapHomotopy₁/₂`; chain-map halves are already
-   `inclusionN₁`/`retractionN₁`, so only the homotopy data remains).
+6. `bridge₁`: define `M₁`, build `bridge₁_outer : N₁ ≃ M₁`, build `bridge₁_inner : M₁ ≃ F₁`,
+   and compose. Chain-map halves are already `inclusionN₁`/`retractionN₁`; only the homotopy
+   packaging/lifting remains.
 7. Assemble `eilenbergZilber` by transport; then add naturality.
 
 ### Proof skeleton: `normalizedShuffle_alexanderWhitney` (`∇ ≫ AW = 𝟙 N₁`, EM `f∇ = i`)
@@ -554,6 +694,27 @@ cancellation in one of four ways:
 4. **Algebraic Morse theory / discrete vector fields:** builds the whole contraction `(f,g,h)`
    from a matching; the identities `fg=1`, `1−gf=dh+hd`, `hh=0` follow from general AMT lemmas,
    *not* from manipulating the shuffle sum (Sergeraert; Sköldberg; Kozlov).
+
+### Literature survey: what is actually sourced for `homotopyInvHomId` on normalized chains?
+
+**Finding: the sourced proof is recursive.** For the normalized identity
+`AW ≫ ∇ ≃ 𝟙` / `∂Φ + Φ∂ = ∇f - i`, the literature we checked supports:
+
+1. **Eilenberg–Mac Lane** (`pdfs/mcl2_sections_1_2.md:163`–`194`): define `Φ` recursively by
+   `(2.13)`, prove it preserves norms, and prove the homotopy identity by induction using derived
+   operators. This is the primary source.
+2. **Franz** (`pdfs/Franz_EilenbergZilberMap.pdf`): gives the explicit Rubio–Morace formula and
+   restates the contraction identities, but explicitly cites EM for those identities rather than
+   reproving them.
+3. **Sergeraert** (`EZ-submitted.pdf`, §12, especially the roadmap point 5): proves the
+   Rubio–Morace closed formula satisfies the recursive Eilenberg–Mac Lane definition. This gives
+   a sourced bridge `explicit formula ⇒ recursion ⇒ EM identity`, but still routes through the
+   recursive argument.
+
+**Practical consequence for Lean.** If we want `homotopyInvHomId` to follow a literature proof,
+the safe route is to set up enough recursive/derived-operator machinery to run EM (or enough to
+show the explicit formula satisfies EM recursion, which in practice still requires the recursive
+layer). A direct closed-form verification appears to be unsourced.
 
 The explicit-`H` shuffle-form sources all work **normalized** and drop degenerate summands, citing
 EM for the contraction identities rather than reproving `dH+Hd`:

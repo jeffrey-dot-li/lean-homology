@@ -440,12 +440,332 @@ lemma inclusionN₁_shuffleMap_diag_normalize (X : BisimplicialObject C) :
   · rw [HomologicalComplex.comp_f, PInfty_f]
     exact (higherFacesVanish_inclusionN₁_shuffleMap X n).comp_P_eq_self
 
+omit [Abelian C] in
+/-- **Summand merge.** For a single shuffle `x`, the four-map Eilenberg–Zilber ∘ Alexander–Whitney
+summand (vertical `sndHom x`, horizontal `fstHom x`, horizontal `ι_front`, vertical `ι_back`)
+collapses — by functoriality of `X.map` and bifunctor naturality — to a single bisimplicial
+double-operator with inner part `β_x = ι_back ≫ shuffleSndHom x : ⦋m⦌ ⟶ ⦋m⦌` and outer part
+`α_x = ι_front ≫ shuffleFstHom x : ⦋r⦌ ⟶ ⦋r⦌`. -/
+private lemma ezawSummand_merge (X : BisimplicialObject C) (r m : ℕ) (x : Shuffle r m) :
+    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom x).op ≫
+        (X.map (shuffleFstHom x).op).app (Opposite.op ⦋r + m⦌) ≫
+          (X.map (ι_front r m).op).app (Opposite.op ⦋r + m⦌) ≫
+            (X.obj (Opposite.op ⦋r⦌)).map (ι_back r m).op =
+      (X.obj (Opposite.op ⦋r⦌)).map (ι_back r m ≫ shuffleSndHom x).op ≫
+        (X.map (ι_front r m ≫ shuffleFstHom x).op).app (Opposite.op ⦋m⦌) := by
+  -- Fuse the two adjacent horizontal (outer) operators into a single `X.map (ι_front ≫ fstHom x).op`.
+  slice_lhs 2 3 => rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]
+  -- Push the inner `ι_back` leftward past the outer operator via bifunctor naturality.
+  slice_lhs 2 3 => rw [← (X.map (ι_front r m ≫ shuffleFstHom x).op).naturality (ι_back r m).op]
+  -- Fuse the two adjacent vertical (inner) operators into `X.map (ι_back ≫ sndHom x).op`.
+  slice_lhs 1 2 => rw [← Functor.map_comp, ← op_comp]
+
+/-- **Dual glue (inner direction).** A vertical operator `Y.map g.op` for a non-mono (degenerate)
+`g : ⦋n⦌ ⟶ Δ'` (any codomain) is annihilated by the inner Moore retraction `PInfty` at level `n`.
+Dual to `inclusionOfMooreComplexMap_comp_map_op_eq_zero`; proved via `degeneracy_comp_PInfty`,
+which itself allows arbitrary codomain. -/
+private lemma map_op_comp_PInftyToNormalizedMooreComplex_eq_zero {A : Type*} [Category A]
+    [Abelian A] (Y : SimplicialObject A) {n : ℕ} {Δ' : SimplexCategory}
+    (g : (⦋n⦌ : SimplexCategory) ⟶ Δ') (hg : ¬ Mono g) :
+    Y.map g.op ≫ (PInftyToNormalizedMooreComplex Y).f n = 0 := by
+  have h := AlgebraicTopology.DoldKan.degeneracy_comp_PInfty Y n g hg
+  rw [← PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap Y,
+    HomologicalComplex.comp_f, ← Category.assoc] at h
+  haveI : Mono ((inclusionOfMooreComplexMap Y).f n) := by
+    rw [inclusionOfMooreComplexMap_f]; infer_instance
+  exact zero_of_comp_mono _ h
+
+/-- **Inner-direction kill on the merged operator.** When the inner part `B : ⦋c⦌ ⟶ ⦋s⦌` is
+non-mono (degenerate), the merged double-operator (outer `A : ⦋b⦌ ⟶ ⦋r⦌`, possibly mono) composed
+with the bi-retraction `R'_{b,c}` vanishes: commute `B` past the outer `A` (bifunctor naturality),
+then apply the inner dual glue at level `c`. The endo case `b = r`, `c = s` recovers the diagonal. -/
+private lemma inner_map_op_comp_retraction_eq_zero (X : BisimplicialObject C) {r s b c : ℕ}
+    (A : (⦋b⦌ : SimplexCategory) ⟶ ⦋r⦌)
+    (B : (⦋c⦌ : SimplexCategory) ⟶ ⦋s⦌) (hB : ¬ Mono B) :
+    (X.obj (Opposite.op ⦋r⦌)).map B.op ≫ (X.map A.op).app (Opposite.op ⦋c⦌) ≫
+        (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+              ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+            ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+              (PInftyToNormalizedMooreComplex X)).f b).f c = 0 := by
+  slice_lhs 1 2 => rw [(X.map A.op).naturality B.op]
+  rw [Category.assoc]
+  simp only [HomologicalComplex.comp_f, NatTrans.mapHomologicalComplex_app_f, mooreRetraction,
+    alternatingFaceMapComplex_obj_X]
+  rw [← Category.assoc (X _⦋b⦌.map B.op),
+    map_op_comp_PInftyToNormalizedMooreComplex_eq_zero (X _⦋b⦌) B hB, zero_comp, comp_zero]
+
+/-- **Outer-direction kill on the merged operator.** When the outer part `A : ⦋b⦌ ⟶ ⦋r⦌` is
+non-mono (degenerate), the outer operator composed with the bi-retraction `R'_{b,c}` vanishes:
+commute the inner `PInfty` leg past `A` (naturality of `PInftyToNormalizedMooreComplex`), then the
+outer Moore retraction `factorThru` annihilates the degeneracy. The endo case `b = r` recovers the
+diagonal. Dual to `biInclusion_comp_outer_map_op_eq_zero`. -/
+private lemma outer_map_op_comp_retraction_eq_zero (X : BisimplicialObject C) {r b c : ℕ}
+    (A : (⦋b⦌ : SimplexCategory) ⟶ ⦋r⦌) (hA : ¬ Mono A) :
+    (X.map A.op).app (Opposite.op ⦋c⦌) ≫
+        (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+              ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+            ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+              (PInftyToNormalizedMooreComplex X)).f b).f c = 0 := by
+  simp only [HomologicalComplex.comp_f, NatTrans.mapHomologicalComplex_app_f, mooreRetraction,
+    Functor.mapHomologicalComplex_map_f, alternatingFaceMapComplex_obj_X]
+  -- Commute the outer operator past the inner `PInfty` leg via `PInfty` naturality.
+  have hnat := HomologicalComplex.congr_hom
+    (PInftyToNormalizedMooreComplex_naturality (X.map A.op)) c
+  simp only [HomologicalComplex.comp_f, AlternatingFaceMapComplex.map_f] at hnat
+  slice_lhs 1 2 => rw [hnat]
+  -- Fold the two outer Moore maps; the outer degeneracy `A` is killed by the outer retraction.
+  slice_lhs 2 3 => rw [← HomologicalComplex.comp_f, ← normalizedMooreComplex_map,
+    ← Functor.map_comp, map_op_comp_PInftyToNormalizedMooreComplex_eq_zero X A hA,
+    Functor.map_zero, HomologicalComplex.zero_f]
+  rw [comp_zero]
+
+/-- **Combinatorial core.** Any shuffle other than the staircase `trivialShuffle` has a degenerate
+front or back face: either its outer face `α_x = ι_front ≫ shuffleFstHom x` or its inner face
+`β_x = ι_back ≫ shuffleSndHom x` is non-mono (non-injective). Proved from `coordSum_eq`: both faces
+mono forces the staircase coordinates `x.1 k = (min(k,r), k - r)`. -/
+private lemma shuffle_ne_trivialShuffle_not_mono (r m : ℕ) (x : Shuffle r m)
+    (hx : x ≠ Shuffle.trivialShuffle r m) :
+    ¬ Mono (ι_front r m ≫ shuffleFstHom x) ∨ ¬ Mono (ι_back r m ≫ shuffleSndHom x) := by
+  refine Or.inl (fun hmono => hx ?_)
+  rw [SimplexCategory.mono_iff_injective] at hmono
+  set f := (ι_front r m ≫ shuffleFstHom x).toOrderHom with hf
+  have hfi : ∀ i : Fin (r + 1), (f i).val = (x.1 ⟨i.val, by omega⟩).1.val := by
+    intro i
+    simp [hf, shuffleFstHom, ι_front, SimplexCategory.comp_toOrderHom]
+  have hsm : StrictMono f := f.monotone.strictMono_of_injective hmono
+  have ha : ∀ i : Fin (r + 1), (x.1 ⟨i.val, by omega⟩).1.val = i.val := by
+    intro i
+    have h1 : (i : ℕ) ≤ (f i : ℕ) := hsm.le_apply
+    have h2 : (f i : ℕ) ≤ (i : ℕ) := hsm.dual.le_apply
+    rw [hfi] at h1 h2
+    omega
+  have hmin : ∀ k : Index (r + m), (x.1 k).1.val = min k.val r := by
+    intro k
+    by_cases hk : (k : ℕ) ≤ r
+    · rw [min_eq_left hk]
+      have h := ha ⟨k.val, by omega⟩
+      rw [show (⟨(⟨k.val, by omega⟩ : Fin (r + 1)).val, by omega⟩ : Index (r + m)) = k from
+        Fin.ext rfl] at h
+      exact h
+    · rw [min_eq_right (by omega : r ≤ (k : ℕ))]
+      have hr : ((x.1 (⟨r, by omega⟩ : Index (r + m))).1 : ℕ) = r := by
+        have h := ha ⟨r, by omega⟩
+        rw [show (⟨(⟨r, by omega⟩ : Fin (r + 1)).val, by omega⟩ : Index (r + m))
+          = ⟨r, by omega⟩ from Fin.ext rfl] at h
+        exact h
+      have hle : ((x.1 (⟨r, by omega⟩ : Index (r + m))).1 : ℕ) ≤ ((x.1 k).1 : ℕ) :=
+        (x.1.monotone (show (⟨r, by omega⟩ : Index (r + m)) ≤ k by
+          rw [Fin.le_def]; change r ≤ (k : ℕ); omega)).1
+      have hb : ((x.1 k).1 : ℕ) < r + 1 := (x.1 k).1.isLt
+      omega
+  apply Subtype.ext
+  ext k
+  · rw [Shuffle.trivialShuffle_apply]
+    exact hmin k
+  · rw [Shuffle.trivialShuffle_apply]
+    have h1 := hmin k
+    have h2 := Shuffle.coordSum_eq x k
+    show (x.1 k).2.val = (k : ℕ) - r
+    omega
+
+/-- **A (identity summand).** The staircase shuffle's EZ∘AW summand is the identity: its front-`r`
+face and back-`m` face are the identities (`α = 𝟙`, `β = 𝟙`), so the merged operator is `𝟙`. -/
+private lemma ezawSummand_trivial (X : BisimplicialObject C) (r m : ℕ) :
+    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom (Shuffle.trivialShuffle r m)).op ≫
+        (X.map (shuffleFstHom (Shuffle.trivialShuffle r m)).op).app (Opposite.op ⦋r + m⦌) ≫
+          (X.map (ι_front r m).op).app (Opposite.op ⦋r + m⦌) ≫
+            (X.obj (Opposite.op ⦋r⦌)).map (ι_back r m).op =
+      𝟙 ((X.obj (Opposite.op ⦋r⦌)).obj (Opposite.op ⦋m⦌)) := by
+  rw [ezawSummand_merge X r m (Shuffle.trivialShuffle r m)]
+  have hsnd : ι_back r m ≫ shuffleSndHom (Shuffle.trivialShuffle r m) = 𝟙 _ := by
+    ext x : 3
+    simp [ι_back, shuffleSndHom, Shuffle.trivialShuffle]
+  have hfst : ι_front r m ≫ shuffleFstHom (Shuffle.trivialShuffle r m) = 𝟙 _ := by
+    ext x : 3
+    simp only [SimplexCategory.len_mk, ι_front, SimplexCategory.mkHom, shuffleFstHom,
+      Shuffle.trivialShuffle, OrderHom.fst_comp_prod, SimplexCategory.comp_toOrderHom,
+      SimplexCategory.Hom.toOrderHom_mk, OrderHom.mk_comp_mk, OrderHom.coe_mk, Function.comp_apply,
+      SimplexCategory.id_toOrderHom, OrderHom.id_coe, id_eq]
+    apply Fin.ext
+    show min (x : ℕ) r = (x : ℕ)
+    have : (x : ℕ) < r + 1 := x.isLt
+    omega
+  rw [hsnd, hfst]
+  simp
+
+/-- **B (degenerate summands).** Every non-staircase shuffle's summand is killed by the
+bi-retraction `R'`. Combines the merge with the combinatorial non-mono dichotomy and the two
+dual glue lemmas. -/
+private lemma ezawSummand_comp_retraction_eq_zero (X : BisimplicialObject C) (r m : ℕ)
+    (x : Shuffle r m) (hx : x ≠ Shuffle.trivialShuffle r m) :
+    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom x).op ≫
+        (X.map (shuffleFstHom x).op).app (Opposite.op ⦋r + m⦌) ≫
+          (X.map (ι_front r m).op).app (Opposite.op ⦋r + m⦌) ≫
+            (X.obj (Opposite.op ⦋r⦌)).map (ι_back r m).op ≫
+              (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+                    ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+                  ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+                    (PInftyToNormalizedMooreComplex X)).f r).f m = 0 := by
+  rw [reassoc_of% ezawSummand_merge X r m x]
+  rcases shuffle_ne_trivialShuffle_not_mono r m x hx with hα | hβ
+  · rw [outer_map_op_comp_retraction_eq_zero X _ hα, comp_zero]
+  · exact inner_map_op_comp_retraction_eq_zero X _ _ hβ
+
+/-- **A-diag: the diagonal Eilenberg–MacLane identity.** On the diagonal `(p,q) = (r,m)` the
+shuffle/Alexander–Whitney pairing `ezComponent ≫ awComponent` is the identity *plus* degenerate
+cross-terms; the bi-normalized retraction component `R'` (the Dold–Kan `PInfty` projection in
+both simplicial directions, taken at bidegree `(r,m)`) annihilates the degenerate part, so
+`ez ≫ aw ≫ R' = R'`. This is the combinatorial heart of `(A)`. -/
+lemma ezComponent_awComponent_comp_retraction (X : BisimplicialObject C) (r m : ℕ) :
+    X.ezComponent r m ≫ X.awComponent r m ≫
+        (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+              ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+            ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+              (PInftyToNormalizedMooreComplex X)).f r).f m =
+      (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+            ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+          ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+            (PInftyToNormalizedMooreComplex X)).f r).f m := by
+  -- Step 1: expand `ez` into its shuffle sum and distribute `≫ aw ≫ R'` through it.
+  simp only [ezComponent, awComponent, Preadditive.sum_comp, Preadditive.zsmul_comp,
+    Category.assoc]
+  -- Step 2: only the staircase (trivial) shuffle survives; every other shuffle is degenerate and
+  -- killed by `R'`. The surviving summand has `sign = 1` and a merged operator equal to `𝟙`.
+  rw [Finset.sum_eq_single (Shuffle.trivialShuffle r m)
+      (fun x _ hx => by rw [ezawSummand_comp_retraction_eq_zero X r m x hx, smul_zero])
+      (fun h => absurd (Finset.mem_univ _) h),
+    Shuffle.sign_trivialShuffle, one_zsmul, reassoc_of% ezawSummand_trivial X r m]
+
+omit [Abelian C] in
+/-- **Off-diagonal summand merge.** Same functoriality collapse as `ezawSummand_merge`, but for a
+*mismatched* Alexander–Whitney split `(b, c)` with `b + c = r + s` differing from the shuffle's
+bidegree `(r, s)`. The four-map summand (vertical `sndHom μ`, horizontal `fstHom μ`, the cast to
+`⦋b+c⦌`, horizontal `ι_front b c`, vertical `ι_back b c`) collapses to a single bisimplicial
+double-operator whose inner part is `ι_back b c ≫ cast ≫ sndHom μ : ⦋c⦌ ⟶ ⦋s⦌` and outer part is
+`ι_front b c ≫ cast ≫ fstHom μ : ⦋b⦌ ⟶ ⦋r⦌`. -/
+private lemma ezawSummand_offDiag_merge (X : BisimplicialObject C) (r s b c : ℕ)
+    (hbc : b + c = r + s) (μ : Shuffle r s) :
+    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom μ).op ≫
+        (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋r + s⦌) ≫
+          eqToHom (by rw [show r + s = b + c from hbc.symm]) ≫
+            (X.map (ι_front b c).op).app (Opposite.op ⦋b + c⦌) ≫
+              (X.obj (Opposite.op ⦋b⦌)).map (ι_back b c).op =
+      (X.obj (Opposite.op ⦋r⦌)).map
+            (ι_back b c ≫ eqToHom (by rw [hbc]) ≫ shuffleSndHom μ).op ≫
+        (X.map (ι_front b c ≫ eqToHom (by rw [hbc]) ≫ shuffleFstHom μ).op).app (Opposite.op ⦋c⦌) := by
+  sorry
+
+/-- **(B-off) Off-diagonal summands vanish.** When the Alexander–Whitney split `(b, c)` differs
+from the shuffle's bidegree `(r, s)` (`b ≠ r`, with `b + c = r + s`), the merged outer face
+`ι_front b c ≫ fstHom μ : ⦋b⦌ ⟶ ⦋r⦌` (when `b > r`) or inner face `ι_back b c ≫ sndHom μ :
+⦋c⦌ ⟶ ⦋s⦌` (when `b < r`, so `c > s`) drops dimension, hence is non-mono (`SimplexCategory.le_of_mono`)
+and is annihilated by the corresponding `PInfty` leg of the bi-retraction `R'_{b,c}`. The
+off-diagonal analogue of `ezawSummand_comp_retraction_eq_zero`; proved via `ezawSummand_offDiag_merge`
+plus the (non-endo–generalized) outer/inner kill lemmas. -/
+private lemma ezawSummand_offDiag_comp_retraction_eq_zero (X : BisimplicialObject C)
+    (r s b c : ℕ) (hbc : b + c = r + s) (hb : b ≠ r) (μ : Shuffle r s) :
+    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom μ).op ≫
+        (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋r + s⦌) ≫
+          eqToHom (by rw [show r + s = b + c from hbc.symm]) ≫
+            (X.map (ι_front b c).op).app (Opposite.op ⦋b + c⦌) ≫
+              (X.obj (Opposite.op ⦋b⦌)).map (ι_back b c).op ≫
+                (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
+                      ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+                    ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
+                      (PInftyToNormalizedMooreComplex X)).f b).f c = 0 := by
+  sorry
+
 /-- **(A) EM `f∇ = i` modulo norms.** Unnormalized, `shuffleMap ≫ alexanderWhitney = 𝟙 + D` with
 `D` landing in the degenerate subcomplex; the bi-normalized retraction `retractionN₁` annihilates
 `D`, leaving `retractionN₁`. The combinatorial core is the shuffle pairing
 `ezComponent ≫ awComponent` (diagonal `(r,s) = (p,q)` ↦ identity; off-diagonal ↦ degenerate). -/
 lemma shuffleMap_alexanderWhitney_comp_retractionN₁ (X : BisimplicialObject C) :
-    shuffleMap X ≫ alexanderWhitney X ≫ retractionN₁ X = retractionN₁ X := sorry
+    shuffleMap X ≫ alexanderWhitney X ≫ retractionN₁ X = retractionN₁ X := by
+  ext n
+  simp only [HomologicalComplex.comp_f]
+  apply HomologicalComplex₂.total.hom_ext
+  intro r s hrs
+  simp only [ComplexShape.π_def] at hrs
+  dsimp only [shuffleMap]
+  rw [HomologicalComplex₂.ι_totalDesc_assoc]
+  dsimp only [alexanderWhitney]
+  simp only [id_eq, Preadditive.comp_sum, Preadditive.sum_comp, Category.assoc]
+  simp only [retractionN₁]
+  dsimp only [HomologicalComplex₂.totalFunctor]
+  simp only [HomologicalComplex₂.ιTotal_map, HomologicalComplex₂.ιTotal_map_assoc]
+  -- Step 5: the `ιTotal` coproduct inclusions are independent, so match the sum summand-by-summand.
+  -- Only the diagonal term `x = r` survives; off-diagonal `x ≠ r` terms vanish after `≫ r_{x,n-x}`.
+  rw [Finset.sum_eq_single (⟨r, by omega⟩ : Fin (n + 1))
+    ?offdiag (fun h => absurd (Finset.mem_univ _) h)]
+  · -- Diagonal `x = r`: `ez_{r,s} ≫ aw_{r,s} ≫ r_{r,s} = r_{r,s}` (identity modulo degenerate).
+    obtain rfl : n = r + s := hrs.symm
+    simp only [Fin.val_mk]
+    -- `r + s - r = s` lives in dependent positions (awComponent indices, ιTotal proof
+    -- witnesses), so `rw` fails with "motive is not type correct". Generalize the term to a
+    -- fresh variable everywhere (including proofs), then `subst` it.
+    have k : r + s - r = s := by omega
+    generalize_proofs at *
+    generalize r + s - r = m at *
+    subst k
+    simp only [eqToHom_trans, eqToHom_refl]
+    -- The two `eqToHom` casts are mutually inverse, so they collapse to `𝟙`; drop it. The
+    -- trailing `ιTotal` is identical on both sides, so the goal is `ez ≫ aw ≫ R' = R'`
+    -- precomposed into `ιTotal`. Close it with the A-diag identity (reassociated past `ιTotal`).
+    rw [Category.id_comp]
+    simp only [Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X,
+      Functor.comp_obj, normalizedMooreComplex_obj, HomologicalComplex₂.totalFunctor_obj,
+      diag_obj_obj, NormalizedMooreComplex.obj_X, HomologicalComplex.comp_f,
+      NatTrans.mapHomologicalComplex_app_f, Functor.mapHomologicalComplex_map_f,
+      PInftyToNormalizedMooreComplex_f, normalizedMooreComplex_map, NormalizedMooreComplex.map_f,
+      Category.assoc, Category.id_comp]
+    -- `ezComponent_awComponent_comp_retraction` is stated in clean chain-map form, but the goal
+    -- was put in simp-nf (retraction `R'` unfolded into `factorThru`/`arrow`). Normalize the
+    -- instantiated lemma with the same simp set so its LHS matches, then close past `ιTotal`.
+    have key := ezComponent_awComponent_comp_retraction X r m
+    simp only [Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X,
+      normalizedMooreComplex_obj, NormalizedMooreComplex.obj_X, HomologicalComplex.comp_f,
+      NatTrans.mapHomologicalComplex_app_f, Functor.mapHomologicalComplex_map_f,
+      PInftyToNormalizedMooreComplex_f, normalizedMooreComplex_map, NormalizedMooreComplex.map_f]
+      at key
+    rw [reassoc_of% key]
+  case offdiag =>
+    -- Off-diagonal `b ≠ r`: `ez_{r,s} ≫ aw_{b,n-b}` factors through a degeneracy, killed by `R'_{b,n-b}`.
+    --
+    -- PLAN (mirrors the diagonal `(A)` machinery, but with a *mismatched* split):
+    -- Expand `ezComponent r s = ∑_{μ : Shuffle r s} sign μ • (…)` and merge each summand's two
+    -- outer (first-variable) legs and two inner (second-variable) legs by functoriality, exactly
+    -- as `ezawSummand_merge` does on the diagonal. The merged legs are
+    --   outer  `A := ι_front b (n-b) ≫ shuffleFstHom μ : ⦋b⦌ ⟶ ⦋r⦌`
+    --   inner  `B := ι_back b (n-b) ≫ shuffleSndHom μ : ⦋n-b⦌ ⟶ ⦋s⦌`.
+    -- A dimension count finishes it. Since `b ≠ r` and `r + s = n`:
+    --   • `b > r`  ⟹  `A : ⦋b⦌ ⟶ ⦋r⦌` cannot be mono (`SimplexCategory.le_of_mono` would force
+    --     `b ≤ r`), so the outer `PInfty` at level `b` kills it.
+    --   • `b < r`  ⟹  `n - b = r + s - b > s`, so `B : ⦋n-b⦌ ⟶ ⦋s⦌` cannot be mono, so the inner
+    --     `PInfty` at level `n-b` kills it.
+    -- So every off-diagonal summand has exactly one dimension-dropping (non-injective) leg,
+    -- annihilated by the corresponding `PInfty` in `R'`.
+    --
+    -- The hard glue already generalizes: the diagonal helpers are stated for endomorphisms
+    -- `g : ⦋n⦌ ⟶ ⦋n⦌`, but they reduce to `AlgebraicTopology.DoldKan.degeneracy_comp_PInfty`, which
+    -- is stated for arbitrary codomain `θ : ⦋n⦌ ⟶ Δ'` with `¬Mono θ` (and `…_assoc` for the
+    -- precomposed form). So `A`, `B` (non-endo) are already supported.
+    --
+    -- IMPLEMENTATION STEPS:
+    --   1. Generalize the 3 private glue helpers (`map_op_comp_PInftyToNormalizedMooreComplex_eq_zero`,
+    --      `inner_/outer_map_op_comp_retraction_eq_zero`) to non-endo `g : ⦋m⦌ ⟶ ⦋n⦌`. Cheap, since
+    --      the underlying Mathlib lemma needs no endo restriction. Diagonal + off-diagonal then share them.
+    --   2. A merge lemma for mismatched splits: same proof shape as `ezawSummand_merge` but with
+    --      independent `(r,s)` (shuffle) and `(b, n-b)` (front/back) indices, producing `A`, `B`.
+    --      Wrinkle vs. diagonal: discharge the two `eqToHom` casts (`⦋b+(n-b)⦌ = ⦋n⦌ = ⦋r+s⦌`) first,
+    --      probably via `generalize`/`subst` on `n - b` (cf. lines 665–668) or `eqToHom`-through-`X.map`.
+    --   3. Off-diagonal summand-zero lemma mirroring `ezawSummand_comp_retraction_eq_zero`:
+    --      `rcases Nat.lt_or_gt_of_ne hb`; `b > r` ⟹ `¬Mono A` (via `SimplexCategory.le_of_mono`) + outer
+    --      kill; `b < r` ⟹ `¬Mono B` + inner kill.
+    --   4. Assemble here: expand the sum (`simp only [ezComponent, Preadditive.sum_comp, …]`), then
+    --      `Finset.sum_eq_zero` per-summand.
+    -- Riskiest part: the `eqToHom` cast bookkeeping in step 2; the vanishing (3–4) is straightforward.
+    intro b _ hb
+    sorry
 
 /-- **EM Thm 2.1a, first half (`f∇ = i`).** On normalized complexes the composite `∇ ≫ AW`
 is the identity *strictly* — the degenerate cross-terms that obstruct this on the unnormalized

@@ -2,6 +2,7 @@ import HomologyLean.SingularHomology.Bisimplicial
 import Mathlib.CategoryTheory.Abelian.FunctorCategory
 import Mathlib.AlgebraicTopology.MooreComplex
 import Mathlib.AlgebraicTopology.DoldKan.Normalized
+import Mathlib.AlgebraicTopology.DoldKan.Degeneracies
 
 /-!
 # Normalized Eilenberg–Zilber: definitions

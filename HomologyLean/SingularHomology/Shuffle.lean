@@ -389,6 +389,40 @@ def default_0_0 : Shuffle 0 0 :=
 lemma sign_0_0 : (default_0_0 : Shuffle 0 0).sign = 1 := by
   simp [sign, invCount]
 
+/-- The **staircase** `(r,m)`-shuffle `k ↦ (min(k,r), k - r)`: it goes right `r` steps then up
+`m` steps (the lexicographically smallest shuffle path). Its front-`r` face and back-`m` face
+recover the identity, so it is the unique shuffle contributing the identity summand to the
+diagonal Eilenberg–Zilber/Alexander–Whitney pairing. -/
+def trivialShuffle (r m : ℕ) : Shuffle r m :=
+  ⟨OrderHom.prod
+      ⟨fun k => ⟨min k.val r, by omega⟩, fun a b h => by
+        simp only [Fin.mk_le_mk]; have : a.val ≤ b.val := h; omega⟩
+      ⟨fun k => ⟨k.val - r, by have := k.isLt; omega⟩, fun a b h => by
+        simp only [Fin.mk_le_mk]; have : a.val ≤ b.val := h; omega⟩,
+    fun a b hab => by
+      have h1 : min a.val r = min b.val r := congrArg (fun p => (p.1 : ℕ)) hab
+      have h2 : a.val - r = b.val - r := congrArg (fun p => (p.2 : ℕ)) hab
+      apply Fin.ext
+      have ha := a.isLt; have hb := b.isLt
+      omega⟩
+
+/-- The coordinates of the staircase shuffle: `fst = min(·, r)`, `snd = · - r`. -/
+@[simp] lemma trivialShuffle_apply (r m : ℕ) (k : Index (r + m)) :
+    (trivialShuffle r m).1 k = (⟨min k.val r, by omega⟩, ⟨k.val - r, by have := k.isLt; omega⟩) :=
+  rfl
+
+/-- The staircase shuffle has no inversions, hence sign `1`. -/
+lemma sign_trivialShuffle (r m : ℕ) : (trivialShuffle r m).sign = 1 := by
+  have hinv : (trivialShuffle r m).invCount = 0 := by
+    apply Finset.sum_eq_zero
+    intro i _
+    simp only [trivialShuffle_apply, Fin.val_succ, fin_val_castSucc, Fin.mk_lt_mk]
+    split_ifs with h
+    · -- `fst` strictly increases at step `i` ⟹ `i < r` ⟹ `snd = i - r = 0`.
+      omega
+    · rfl
+  rw [sign, hinv, pow_zero]
+
 /-! #### Face-shuffle decomposition (Leibniz rule infrastructure)
 
 **Why "remove step" doesn't work.**  An earlier attempt defined `removeLeftStep μ r`

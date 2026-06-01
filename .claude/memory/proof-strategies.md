@@ -130,6 +130,38 @@ context; anonymous holes (`_`) are matched but not named.
 ---
 
 
+## Pitfall: `omega` atomizes `Fin.val (⟨_, _⟩)` and `⦋n⦌.len`
+
+When `omega` fails on a goal that *looks* obviously true and involves `Fin`/`SimplexCategory`,
+read its reported atoms (`a := ...`, `b := ...`). The usual cause is that `omega` **atomized** a
+subterm it should have reduced:
+
+1. **`Fin.val` of a literal `Fin.mk` not reduced.** A goal like `↑⟨min ↑x r, h⟩ = ↑x` can leave
+   `omega` treating `↑⟨min ↑x r, h⟩` as one opaque integer instead of `min ↑x r` — especially when
+   the `Fin.mk` proof `h` mentions opaque terms (e.g. `⦋r⦌.len`) or is wrapped in coercion layers
+   (tell-tale double `↑↑` in the atom display, from `OrderHom`/`SimplexCategory` application).
+   **Fix**: force the plain-ℕ goal with `show`/`change`, which makes the kernel strip the `Fin.mk`
+   wrapper by defeq:
+   ```lean
+   apply Fin.ext
+   show min (x : ℕ) r = (x : ℕ)   -- ↑⟨min ↑x r, _⟩ is defeq to `min ↑x r`
+   omega
+   ```
+
+2. **`⦋n⦌.len` is not syntactically `n`.** `SimplexCategory.len ⦋r⦌` is `(SimplexCategory.mk r).len`,
+   a distinct atom from `r`, so a bound phrased with `⦋r⦌.len` never connects to an `r` elsewhere in
+   the goal. **Fix**: launder it into `n` with a **defeq type-ascription** when introducing the bound
+   (`x.isLt : ↑x < ⦋r⦌.len + 1`, but ascribe to `r`):
+   ```lean
+   have : (x : ℕ) < r + 1 := x.isLt   -- ⦋r⦌.len ⟶ r by defeq at the ascription boundary
+   ```
+   (Alternatively `simp only [SimplexCategory.len_mk]` to rewrite `⦋r⦌.len` to `r` everywhere.)
+
+These two fixes together close staircase/shuffle coordinate identities like
+`ι_front ≫ shuffleFstHom (trivialShuffle r m) = 𝟙` (see `ezawSummand_trivial`).
+
+---
+
 ## `lean_goal` does NOT confirm a tactic compiled (CRITICAL)
 
 `lean_goal` on the line *after* a tactic will show a goal state even if the tactic has an error
