@@ -1,4 +1,5 @@
 import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
+import HomologyLean.SingularHomology.BisimplicialBridge1
 
 /-!
 # Normalized Eilenberg–Zilber for bisimplicial objects
@@ -581,29 +582,12 @@ private lemma ezawSummand_trivial (X : BisimplicialObject C) (r m : ℕ) :
   rw [hsnd, hfst]
   simp
 
-/-- **B (degenerate summands).** Every non-staircase shuffle's summand is killed by the
-bi-retraction `R'`. Combines the merge with the combinatorial non-mono dichotomy and the two
-dual glue lemmas. -/
-private lemma ezawSummand_comp_retraction_eq_zero (X : BisimplicialObject C) (r m : ℕ)
-    (x : Shuffle r m) (hx : x ≠ Shuffle.trivialShuffle r m) :
-    (X.obj (Opposite.op ⦋r⦌)).map (shuffleSndHom x).op ≫
-        (X.map (shuffleFstHom x).op).app (Opposite.op ⦋r + m⦌) ≫
-          (X.map (ι_front r m).op).app (Opposite.op ⦋r + m⦌) ≫
-            (X.obj (Opposite.op ⦋r⦌)).map (ι_back r m).op ≫
-              (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
-                    ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
-                  ((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).map
-                    (PInftyToNormalizedMooreComplex X)).f r).f m = 0 := by
-  rw [reassoc_of% ezawSummand_merge X r m x]
-  rcases shuffle_ne_trivialShuffle_not_mono r m x hx with hα | hβ
-  · rw [outer_map_op_comp_retraction_eq_zero X _ hα, comp_zero]
-  · exact inner_map_op_comp_retraction_eq_zero X _ _ hβ
-
 /-- **A-diag: the diagonal Eilenberg–MacLane identity.** On the diagonal `(p,q) = (r,m)` the
 shuffle/Alexander–Whitney pairing `ezComponent ≫ awComponent` is the identity *plus* degenerate
 cross-terms; the bi-normalized retraction component `R'` (the Dold–Kan `PInfty` projection in
 both simplicial directions, taken at bidegree `(r,m)`) annihilates the degenerate part, so
-`ez ≫ aw ≫ R' = R'`. This is the combinatorial heart of `(A)`. -/
+`ez ≫ aw ≫ R' = R'`. Non-staircase summands vanish via `ezawSummand_merge`, the combinatorial
+non-mono dichotomy, and the dual inner/outer kill lemmas. This is the combinatorial heart of `(A)`. -/
 lemma ezComponent_awComponent_comp_retraction (X : BisimplicialObject C) (r m : ℕ) :
     X.ezComponent r m ≫ X.awComponent r m ≫
         (((NatTrans.mapHomologicalComplex mooreRetraction (ComplexShape.down ℕ)).app
@@ -617,7 +601,11 @@ lemma ezComponent_awComponent_comp_retraction (X : BisimplicialObject C) (r m : 
   simp only [ezComponent, awComponent, Preadditive.sum_comp, Preadditive.zsmul_comp,
     Category.assoc]
   rw [Finset.sum_eq_single (Shuffle.trivialShuffle r m)
-      (fun x _ hx => by rw [ezawSummand_comp_retraction_eq_zero X r m x hx, smul_zero])
+      (fun x _ hx => by
+        rw [reassoc_of% ezawSummand_merge X r m x]
+        rcases shuffle_ne_trivialShuffle_not_mono r m x hx with hα | hβ
+        · rw [outer_map_op_comp_retraction_eq_zero X _ hα, comp_zero, smul_zero]
+        · rw [inner_map_op_comp_retraction_eq_zero X _ _ hβ, smul_zero])
       (fun h => absurd (Finset.mem_univ _) h),
     Shuffle.sign_trivialShuffle, one_zsmul, reassoc_of% ezawSummand_trivial X r m]
 
@@ -661,8 +649,8 @@ from the shuffle's bidegree `(r, s)` (`b ≠ r`, with `b + c = r + s`), the merg
 `ι_front b c ≫ fstHom μ : ⦋b⦌ ⟶ ⦋r⦌` (when `b > r`) or inner face
 `ι_back b c ≫ sndHom μ : ⦋c⦌ ⟶ ⦋s⦌` (when `b < r`, so `c > s`) drops dimension, hence is
 non-mono (`SimplexCategory.le_of_mono`) and is annihilated by the corresponding `PInfty` leg of
-the bi-retraction `R'_{b,c}`. The off-diagonal analogue of
-`ezawSummand_comp_retraction_eq_zero`; proved via `ezawSummand_offDiag_merge` plus the
+the bi-retraction `R'_{b,c}`. The off-diagonal analogue of the degenerate summand kill in
+`ezComponent_awComponent_comp_retraction`; proved via `ezawSummand_offDiag_merge` plus the
 (non-endo–generalized) outer/inner kill lemmas. -/
 private lemma ezawSummand_offDiag_comp_retraction_eq_zero (X : BisimplicialObject C)
     (r s b c : ℕ) (hbc : b + c = r + s) (hb : b ≠ r) (μ : Shuffle r s) :
@@ -766,6 +754,18 @@ noncomputable def eilenbergZilberNormalized (X : BisimplicialObject C) :
   inv := normalizedAlexanderWhitney X
   homotopyHomInvId := Homotopy.ofEq (normalizedShuffle_alexanderWhitney X)
   homotopyInvHomId := homotopyNormalizedAlexanderWhitneyShuffle X
+
+/-- The unnormalized Eilenberg–Zilber homotopy equivalence `F₁(X) ≃ F₂(X)`, obtained by
+transporting the normalized equivalence `eilenbergZilberNormalized` across the Dold–Kan bridges:
+
+`F₁(X) ≃ N₁(X) ≃ N₂(X) ≃ F₂(X)`,
+
+where `bridge₁` is the inner/outer Moore normalization of the total complex (`BisimplicialBridge1`),
+and `bridge₂` is Mathlib's normalized-Moore ≃ alternating-face-map equivalence at the diagonal. -/
+noncomputable def eilenbergZilber (X : BisimplicialObject C) :
+    HomotopyEquiv (F₁.obj X) (F₂.obj X) :=
+  (bridge₁ X).symm.trans <| (eilenbergZilberNormalized X).trans <|
+    homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex (A := C) (Y := diag.obj X)
 
 end BisimplicialObject
 

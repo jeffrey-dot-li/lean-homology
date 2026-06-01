@@ -25,7 +25,8 @@ Then read the full section from the matching file if needed.
 | [`api/transport-cast.md`](api/transport-cast.md) | `h ▸` transport elimination, `generalize`+`rcases` trick, successor-index blockers, `cast`↔`eqToHom` |
 | [`api/eqToHom-casting.md`](api/eqToHom-casting.md) | `eqToHom` through functors (TopCat/SimplexCategory), `eqToHom_map`, `Functor.map_comp` folding, `slice_lhs`/`slice_rhs`, Fin.succAbove simp recipe |
 | [`api/sset-yoneda-ulift.md`](api/sset-yoneda-ulift.md) | `SSet.yonedaEquiv`, `stdSimplex.objEquiv`, `ULift` bridge lemmas, namespace collision with `SSet.stdSimplex`, `uliftYonedaEquiv` |
-| [`api/dold-kan-moore-retraction.md`](api/dold-kan-moore-retraction.md) | `degeneracy_comp_PInfty`, `PInftyToNormalizedMooreComplex` glue (kill degenerate ops), generalizing inner glue to fire at outer/bisimplicial level, decomposing bi-graded retraction `R'`, EZ∘AW summand merge |
+| [`api/dold-kan-moore-retraction.md`](api/dold-kan-moore-retraction.md) | `degeneracy_comp_PInfty`, `PInftyToNormalizedMooreComplex` glue (kill degenerate ops), generalizing inner glue to fire at outer/bisimplicial level, decomposing bi-graded retraction `R'`, EZ∘AW summand merge, naturality of `homotopyPToId`/`homotopyPInftyToId` operators |
+| [`api/bicomplex-homotopy.md`](api/bicomplex-homotopy.md) | `HomologicalComplex₂` `flip`/`flipFunctor` component lemmas, lifting a natural family of homotopies through `flip ∘ mapHomologicalComplex` (the `comm` symbolic-`next`/`prev` trick), `mapHomologicalComplex` defeq for composites |
 
 ## When to update memory
 

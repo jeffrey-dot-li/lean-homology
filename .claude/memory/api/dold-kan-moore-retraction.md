@@ -120,3 +120,31 @@ The non-endo `A`, `B` are then killed by the **generalized** `outer_/inner_map_o
 (Patterns 2/4 relaxed from `⦋n⦌ ⟶ ⦋n⦌` to `⦋b⦌ ⟶ ⦋r⦌`): `degeneracy_comp_PInfty` already allows
 arbitrary codomain `θ : ⦋n⦌ ⟶ Δ'`, so the generalization is free. Dimension count picks the dead leg:
 `b > r ⟹ A` non-mono (via `SimplexCategory.le_of_mono`); `b < r ⟹ c = n-b > s ⟹ B` non-mono.
+
+## Pattern 6: naturality of the Dold–Kan contraction homotopy operator `homotopyPToId`/`homotopyPInftyToId`
+
+To get *naturality in the simplicial object* of the homotopy operator
+`homotopyPInftyToId.hom i j` (e.g. as the `hnat` input when lifting the Dold–Kan contraction through
+`mapHomologicalComplex`/`flip`), don't fight the operator directly — reduce and induct:
+
+1. `homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex.homotopyInvHomId` simps (via the
+   `@[simps]` lemma `…_homotopyInvHomId`, then `Homotopy.trans_hom`, `Homotopy.ofEq_hom`,
+   `Pi.add_apply`, `Pi.zero_apply`, `zero_add`, `homotopyPInftyToId_hom`) down to
+   `(homotopyPToId · (j+1)).hom i j`.
+2. Extract the general lemma over **all** `q i j` (not just `j+1`) and **induct on `q`**:
+   - `zero`: `homotopyPToId · 0 = Homotopy.refl`, `simp [homotopyPToId]` closes (operator is `0`).
+   - `succ q`: unfold with
+     `simp only [homotopyPToId, homotopyHσToZero, Homotopy.trans_hom, Homotopy.ofEq_hom,`
+     `Pi.zero_apply, Homotopy.add_hom, Homotopy.compLeft_hom, Homotopy.nullHomotopy'_hom,`
+     `Pi.add_apply, add_zero, zero_add]`
+     giving `(homotopyPToId · q).hom i j + (P q).f i ≫ dite ((down ℕ).Rel j i) (hσ' q i j) 0`.
+     Then `rw [Preadditive.comp_add, Preadditive.add_comp, ih]; congr 1; split_ifs with h`:
+     - `pos`: `rw [← Category.assoc, P_f_naturality, Category.assoc, hσ'_naturality, Category.assoc]`.
+     - `neg`: `simp` (the `dite` is `0`).
+
+Key Mathlib naturalities: **`P_f_naturality`** (projections `P q` are natural, `Projections.lean`)
+and **`hσ'_naturality`** (homotopy operators `hσ'` are natural, `Homotopies.lean`). Both are
+`f.app ⦋n⦌.op ≫ _ = _ ≫ f.app ⦋m⦌.op`. Use `alternatingFaceMapComplex_map_f` to turn
+`((alternatingFaceMapComplex C).map f).f n` into `f.app ⦋n⦌.op` so they fire. Gotcha: in this repo
+the bare `comp_add`/`add_comp`/`assoc` are *not* in scope — use `Preadditive.comp_add`,
+`Preadditive.add_comp`, `Category.assoc`.

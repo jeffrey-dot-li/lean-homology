@@ -1354,17 +1354,17 @@ noncomputable def homotopyAWShuffleId (X : BisimplicialObject C) :
   zero := emHomotopyHom_zero X
   comm := awShuffle_eq_id_add_dH X
 
-/-- **Eilenberg-Zilber theorem for bisimplicial objects.**
+-- /-- **Eilenberg-Zilber theorem for bisimplicial objects.**
 
-The total complex of the double complex (applying `alternatingFaceMapComplex` in
-both simplicial directions) is homotopy equivalent to the chain complex of
-the diagonal. -/
-noncomputable def eilenbergZilber (X : BisimplicialObject C) :
-    HomotopyEquiv (F₁.obj X) (F₂.obj X) where
-  hom := shuffleMap X
-  inv := alexanderWhitney X
-  homotopyHomInvId := homotopyShuffleAWId X
-  homotopyInvHomId := homotopyAWShuffleId X
+-- The total complex of the double complex (applying `alternatingFaceMapComplex` in
+-- both simplicial directions) is homotopy equivalent to the chain complex of
+-- the diagonal. -/
+-- -- noncomputable def eilenbergZilber (X : BisimplicialObject C) :
+-- --     HomotopyEquiv (F₁.obj X) (F₂.obj X) where
+-- --   hom := shuffleMap X
+-- --   inv := alexanderWhitney X
+-- --   homotopyHomInvId := homotopyShuffleAWId X
+-- --   homotopyInvHomId := homotopyAWShuffleId X
 
 end BisimplicialObject
 

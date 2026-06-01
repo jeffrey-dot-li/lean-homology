@@ -64,7 +64,7 @@ unnormalized `shuffleMap`/`alexanderWhitney`; an abstract `HomotopyEquiv` (event
 ### Architecture (three pieces, composed by `HomotopyEquiv.trans`/`.symm`)
 
 ```
-eilenbergZilber := bridge₁.symm.trans (eilenbergZilberNormalized.trans bridge₂)
+eilenbergZilber := bridge₁.symm.trans(eilenbergZilberNormalized.trans bridge₂)
    F₁  ≃[bridge₁]  N₁  ≃[EZ_norm]  N₂  ≃[bridge₂]  F₂
 ```
 
