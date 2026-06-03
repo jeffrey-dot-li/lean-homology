@@ -680,9 +680,73 @@ noncomputable def phiOp : (q : ℕ) → DerivedOp q (q + 1)
   | 0 => 0
   | (q + 1) => -(phiOp q).prime + (hOp (q + 1)).prime.comp (D0op (q + 1))
 
-/-- `Φ` is frontal (EM: by induction, since `Φ'` and `h'` are frontal). -/
+/-- Composition of frontal `SimplexCategory` maps is frontal (`0 ↦ 0 ↦ 0`). -/
+lemma IsFrontalHom.comp {a b c : ℕ} {f : (⦋a⦌ : SimplexCategory) ⟶ ⦋b⦌}
+    {g : (⦋b⦌ : SimplexCategory) ⟶ ⦋c⦌} (hf : IsFrontalHom f) (hg : IsFrontalHom g) :
+    IsFrontalHom (f ≫ g) := by
+  simp only [IsFrontalHom, SimplexCategory.comp_toOrderHom, OrderHom.comp_coe,
+    Function.comp_apply] at *
+  rw [hf, hg]
+
+/-- The zero operator is (vacuously) frontal. -/
+lemma DerivedOp.Frontal.zero {s q : ℕ} : (0 : DerivedOp s q).Frontal := by
+  intro l hl
+  simp only [Finsupp.support_zero, Finset.notMem_empty] at hl
+
+/-- A single frontal letter gives a frontal operator. -/
+lemma DerivedOp.Frontal.single {s q : ℕ} (l : OpLetter s q) (c : ℤ)
+    (hl : IsFrontalHom l.fst ∧ IsFrontalHom l.snd) :
+    DerivedOp.Frontal (Finsupp.single l c) := by
+  intro l' hl'
+  rw [Finset.mem_singleton.mp (Finsupp.support_single_subset hl')]
+  exact hl
+
+/-- Frontality is preserved by negation (same support). -/
+lemma DerivedOp.Frontal.neg {s q : ℕ} {M : DerivedOp s q} (hM : M.Frontal) : (-M).Frontal :=
+  fun l hl => hM l (by simpa using hl)
+
+/-- Frontality is preserved by addition (support ⊆ union). -/
+lemma DerivedOp.Frontal.add {s q : ℕ} {M N : DerivedOp s q} (hM : M.Frontal) (hN : N.Frontal) :
+    (M + N).Frontal := by
+  intro l hl
+  rcases Finset.mem_union.mp (Finsupp.support_add hl) with h | h
+  · exact hM l h
+  · exact hN l h
+
+/-- Frontality is preserved by right composition with a single frontal letter. -/
+lemma DerivedOp.Frontal.comp_single {s q r : ℕ} {M : DerivedOp q r} (hM : M.Frontal)
+    (l₁ : OpLetter s q) (c₁ : ℤ) (hl₁ : IsFrontalHom l₁.fst ∧ IsFrontalHom l₁.snd) :
+    (M.comp (Finsupp.single l₁ c₁)).Frontal := by
+  induction M using Finsupp.induction with
+  | zero =>
+      rw [show DerivedOp.comp (0 : DerivedOp q r) (Finsupp.single l₁ c₁) = 0 from by
+        simp [DerivedOp.comp]]
+      exact DerivedOp.Frontal.zero
+  | single_add l₂ c₂ g hlg hc₂ ih =>
+      have hl₂ := hM l₂ (by
+        rw [Finsupp.mem_support_iff, Finsupp.add_apply, Finsupp.single_eq_same,
+          Finsupp.notMem_support_iff.mp hlg, add_zero]
+        exact hc₂)
+      have hg : DerivedOp.Frontal g := fun l' hl' => hM l' (by
+        rw [Finsupp.mem_support_iff, Finsupp.add_apply,
+          Finsupp.single_eq_of_ne (by rintro rfl; exact hlg hl'), zero_add,
+          ← Finsupp.mem_support_iff]
+        exact hl')
+      rw [DerivedOp.add_comp, DerivedOp.single_comp_single]
+      exact (DerivedOp.Frontal.single (l₂.comp l₁) (c₁ * c₂)
+        ⟨hl₂.1.comp hl₁.1, hl₂.2.comp hl₁.2⟩).add (ih hg)
+
+/-- `Φ` is frontal: `Φ₀ = 0` is vacuously frontal; the step `Φ_{q+1} = −Φ'_q + h'_{q+1} D₀` is a
+sum of a primed operator (frontal by `prime_frontal`, no induction hypothesis needed) and a primed
+operator composed with the frontal degeneracy `D₀ = ⟨σ₀,σ₀⟩`. -/
 lemma phiOp_frontal (q : ℕ) : (phiOp q).Frontal := by
-  sorry
+  cases q with
+  | zero => exact DerivedOp.Frontal.zero
+  | succ q =>
+      have hσ : IsFrontalHom (SimplexCategory.σ (0 : Fin (q + 1 + 1))) := by
+        simp [IsFrontalHom, SimplexCategory.σ, Fin.predAbove]
+      rw [phiOp, D0op]
+      exact ((prime_frontal _).neg).add ((prime_frontal _).comp_single _ 1 ⟨hσ, hσ⟩)
 
 /-! ### Packaging the homotopy on `F₂` (raw, modulo norms) -/
 
@@ -735,24 +799,6 @@ lemma lastFace_comp_hPrime (q : ℕ) :
 lemma lastFace_comp_hPrime_comp_D0 (q : ℕ) :
     (lastFaceOp (q + 1)).comp (((hOp (q + 1)).prime).comp (D0op (q + 1))) = hOp (q + 1) := by
   sorry
-
-/-- **EM (2.12): `h` maps degeneracies into (diagonal) norms — `h'D₀ ∈ D(K×L)`** (md lines 155–161:
-`f` and `∇` separately map norms into norms, hence so does `h = ∇f`). The element `h'D₀` is a
-diagonal degeneracy, killed by `retractionN₂`. Stated as the kill rather than a structural
-factorization because `h'` itself has `β ≠ γ`: it is the *result* `h'D₀` that is degenerate, a
-genuine property of `∇f` (not syntactic), so we assume it abstractly (treat `hOp` opaquely). -/
-lemma hOp_prime_comp_D0_comp_retractionN₂ (X : BisimplicialObject C) (q : ℕ) :
-    DerivedOp.realize X (((hOp (q + 1)).prime).comp (D0op (q + 1))) ≫
-        (retractionN₂ X).f (q + 2) = 0 := by
-  sorry
-
-/-- Right-composable form of EM (2.12): `h'D₀` post-anything still dies (`h'D₀∂'`, etc.). Immediate
-from `hOp_prime_comp_D0_comp_retractionN₂` via `realize_comp` + associativity. -/
-lemma hOp_prime_comp_D0_comp_comp_retractionN₂ {r : ℕ} (X : BisimplicialObject C) (q : ℕ)
-    (N : DerivedOp r (q + 1)) :
-    DerivedOp.realize X ((((hOp (q + 1)).prime).comp (D0op (q + 1))).comp N) ≫
-        (retractionN₂ X).f (q + 2) = 0 := by
-  rw [realize_comp, Category.assoc, hOp_prime_comp_D0_comp_retractionN₂, Limits.comp_zero]
 
 /-- **Base case (EM line 169, `q = 0`).** `h₀ = i` modulo norms: `∇f` is the identity in degree 0
 (`AW`/`∇` are inverse there). -/
@@ -907,6 +953,73 @@ lemma comp_idOp {s q : ℕ} (M : DerivedOp s q) : M.comp (idOp s) = M := by
       congr 1
       simp only [OpLetter.comp, Category.comp_id]
 
+/-! #### EM (2.12): `f` and `∇` preserve norms ⟹ `h = ∇f` preserves norms
+
+EM (2.12) is a *composition* fact: `f = AW` and `∇ = shuffleMap` each carry the (diagonal)
+degenerate subcomplex into the (bi-)degenerate subcomplex, so `h = ∇f` does too. The two halves are
+genuine Dold–Kan combinatorial inputs (Phase-4-level); the composite `h`-statement then follows
+*for free* via `realize_hOp`.
+
+* **`∇`-half (6b):** `retractionN₁_inclusionN₁_shuffleMap_retractionN₂` — a degenerate-`F₁` element
+  (image of `1 − retractionN₁ ≫ inclusionN₁`) is sent by `∇` to a degenerate diagonal element,
+  killed by `retractionN₂`.
+* **`f`-half:** `alexanderWhitney_diagDegen_comp_retractionN₁` — a diagonal degeneracy `⟨θ,θ⟩`
+  followed by `AW` lands in the degenerate part of `F₁`, killed by `retractionN₁`. -/
+
+/-- **Dold–Kan round-trip absorption, `PInfty` form.** The `PInfty`-idempotent round-trip
+`retractionN₁ ≫ inclusionN₁` on `F₁` is absorbed under `shuffleMap … ≫ PInfty` on the diagonal `F₂`:
+the degenerate-`F₁` correction `(1 − retractionN₁ ≫ inclusionN₁)` is sent by `∇` to a degenerate
+element of the diagonal, which `PInfty` annihilates. -/
+@[reassoc]
+lemma retractionN₁_inclusionN₁_shuffleMap_PInfty (X : BisimplicialObject C) :
+    retractionN₁ X ≫ inclusionN₁ X ≫ shuffleMap X ≫ (PInfty : F₂.obj X ⟶ F₂.obj X)
+      = shuffleMap X ≫ PInfty := by
+  sorry
+
+/-- **`∇`-norm, `retractionN₂` form** (the (6b) `PInfty` absorption, repackaged with the diagonal
+retraction by cancelling the split-mono `inclusionN₂`). -/
+@[reassoc]
+lemma retractionN₁_inclusionN₁_shuffleMap_retractionN₂ (X : BisimplicialObject C) :
+    retractionN₁ X ≫ inclusionN₁ X ≫ shuffleMap X ≫ retractionN₂ X
+      = shuffleMap X ≫ retractionN₂ X := by
+  haveI : Mono (inclusionN₂ X) := by rw [inclusionN₂]; infer_instance
+  rw [← cancel_mono (inclusionN₂ X)]
+  simp only [Category.assoc]
+  rw [inclusionN₂, retractionN₂, PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap]
+  simp only [Functor.comp_obj, normalizedMooreComplex_obj, HomologicalComplex₂.totalFunctor_obj,
+    retractionN₁_inclusionN₁_shuffleMap_PInfty X]
+
+/-- **`f = AW` preserves norms** (EM (2.12), the `f` half). A diagonal degeneracy `⟨θ,θ⟩`
+(`θ` non-mono) followed by `alexanderWhitney` lands in the degenerate part of `F₁`, killed by the
+bi-normalized retraction `retractionN₁`. **Genuine Dold–Kan combinatorial input** (Phase-4-level):
+`AW`'s front/back-face split of a degenerate diagonal simplex is degenerate in at least one factor.
+-/
+lemma alexanderWhitney_diagDegen_comp_retractionN₁ {s q : ℕ} (X : BisimplicialObject C)
+    (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) :
+    DerivedOp.realize X (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1) ≫
+        (alexanderWhitney X).f q ≫ (retractionN₁ X).f q = 0 := by
+  sorry
+
+/-- **`h = ∇f` preserves norms — for free.** A diagonal degeneracy `⟨θ,θ⟩` (`θ` non-mono) followed
+by `hOp` dies under `retractionN₂`. Assembled from the `f`-half
+(`alexanderWhitney_diagDegen_comp_retractionN₁`) and the `∇`-half (6b,
+`retractionN₁_inclusionN₁_shuffleMap_retractionN₂`) via `realize_hOp` (`h = AW ≫ ∇`). This is the
+`k = 0` base of `hPrimeIter_diagDegen_comp_retractionN₂`. -/
+lemma hOp_diagDegen_comp_retractionN₂ {s q : ℕ} (X : BisimplicialObject C)
+    (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) :
+    DerivedOp.realize X ((hOp q).comp (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1)) ≫
+        (retractionN₂ X).f q = 0 := by
+  -- `realize (h ∘ ⟨θ,θ⟩) = ⟨θ,θ⟩ ≫ h`, and `h = AW ≫ ∇`; split the chain maps levelwise.
+  rw [realize_comp, realize_hOp]
+  simp only [HomologicalComplex.comp_f, Category.assoc]
+  -- `∇`-half (levelwise): insert `retractionN₁ ≫ inclusionN₁` between `AW` and `∇`.
+  have h6 := HomologicalComplex.congr_hom (retractionN₁_inclusionN₁_shuffleMap_retractionN₂ X) q
+  simp only [HomologicalComplex.comp_f] at h6
+  rw [← h6]
+  -- `f`-half: the leading `⟨θ,θ⟩ ≫ AW ≫ retractionN₁` is already zero.
+  slice_lhs 1 3 => rw [alexanderWhitney_diagDegen_comp_retractionN₁ X θ hθ]
+  simp only [Limits.zero_comp]
+
 /-- **EM (2.12), general form** — the single abstract `hOp` input feeding the norm class: `h` with
 any number of primes, applied after a diagonal degeneracy `⟨θ,θ⟩` (`¬Mono θ`), lands in the diagonal
 Moore-degenerate part and so dies under `retractionN₂`. (`prime`-stable: `prime` bumps `k` and shifts
@@ -917,7 +1030,17 @@ lemma hPrimeIter_diagDegen_comp_retractionN₂ {m r s : ℕ} (X : BisimplicialOb
         (((DerivedOp.primeIter k (hOp m)).comp
           (Finsupp.single (⟨θ, θ⟩ : OpLetter s (m + k)) 1)).comp N) ≫
       (retractionN₂ X).f (m + k) = 0 := by
-  sorry
+  induction k with
+  | zero =>
+      -- `primeIter 0 (hOp m) = hOp m`, so this is the `k = 0` base `hOp_diagDegen_comp_retractionN₂`
+      -- pushed past the trailing `N` via `realize_comp` (which absorbs the leading `realize N`).
+      have key : ((DerivedOp.primeIter 0 (hOp m)).comp
+          (Finsupp.single (⟨θ, θ⟩ : OpLetter s (m + 0)) 1)).realize X ≫
+            (retractionN₂ X).f (m + 0) = 0 :=
+        hOp_diagDegen_comp_retractionN₂ X θ hθ
+      rw [realize_comp, Category.assoc, key, Limits.comp_zero]
+  | succ k ih =>
+      sorry
 
 /-- A `DerivedOp` is a **norm** (EM, for the diagonal `K×_N L`), defined *structurally* so that
 closure under `prime` is manifest (no `realize`-bridge needed). Generators: diagonal degeneracies
@@ -1077,6 +1200,13 @@ lemma phi_comm_retraction (X : BisimplicialObject C) (n : ℕ) :
 
 /-! ### Descent to the normalized diagonal `N₂` -/
 
+/-- The normalized Moore complex `N₂` is a retract of `F₂`: `inclusionN₂ ≫ retractionN₂ = 𝟙`. -/
+@[reassoc]
+lemma inclusionN₂_comp_retractionN₂ (X : BisimplicialObject C) :
+    inclusionN₂ X ≫ retractionN₂ X = 𝟙 (N₂.obj X) := by
+  rw [inclusionN₂, retractionN₂]
+  exact (AlgebraicTopology.DoldKan.splitMonoInclusionOfMooreComplexMap (diag.obj X)).id
+
 /-- `Φ` conjugated onto the normalized diagonal `N₂.obj X` (EM's homotopy on `K ×_N L`):
 `inclusionN₂ ≫ phiOp.realize ≫ retractionN₂`. -/
 noncomputable def phiHomNorm (X : BisimplicialObject C) (i j : ℕ) :
@@ -1089,6 +1219,48 @@ lemma phiHomNorm_zero (X : BisimplicialObject C) (i j : ℕ)
     (hij : ¬ (ComplexShape.down ℕ).Rel j i) : phiHomNorm X i j = 0 :=
   dif_neg fun h => hij (by rw [ComplexShape.down_Rel]; omega)
 
+/-- `phiHomNorm` is the conjugate of `phiHomRaw` by `inclusionN₂ … retractionN₂`. -/
+lemma phiHomNorm_eq (X : BisimplicialObject C) (i j : ℕ) :
+    phiHomNorm X i j = (inclusionN₂ X).f i ≫ phiHomRaw X i j ≫ (retractionN₂ X).f j := by
+  by_cases h : j = i + 1
+  · simp only [phiHomNorm, phiHomRaw, dif_pos h, Category.assoc]
+  · simp only [phiHomNorm, phiHomRaw, dif_neg h, Limits.comp_zero, Limits.zero_comp]
+
+/-- `phiHomNorm` as an explicit family (for the `dNext`/`prevD` conjugation lemmas). -/
+private lemma phiHomNorm_funext (X : BisimplicialObject C) :
+    phiHomNorm X = fun a b => (inclusionN₂ X).f a ≫ phiHomRaw X a b ≫ (retractionN₂ X).f b := by
+  funext a b; exact phiHomNorm_eq X a b
+
+/-- `dNext` commutes with the `inclusionN₂ … retractionN₂` conjugation (both are chain maps). -/
+lemma dNext_phiHomNorm (X : BisimplicialObject C) (i : ℕ) :
+    dNext i (phiHomNorm X) =
+      (inclusionN₂ X).f i ≫ dNext i (phiHomRaw X) ≫ (retractionN₂ X).f i := by
+  rw [phiHomNorm_funext, dNext_comp_left, dNext_comp_right]
+
+/-- `prevD` commutes with the `inclusionN₂ … retractionN₂` conjugation (both are chain maps). -/
+lemma prevD_phiHomNorm (X : BisimplicialObject C) (j : ℕ) :
+    prevD j (phiHomNorm X) =
+      (inclusionN₂ X).f j ≫ prevD j (phiHomRaw X) ≫ (retractionN₂ X).f j := by
+  rw [phiHomNorm_funext, prevD_comp_left, prevD_comp_right]
+
+
+/-- **(6b)** The normalized `AW ≫ ∇` is the `N₂`-conjugate of the unnormalized `AW ≫ ∇`.
+Unfolding the definitions, `normalizedAlexanderWhitney ≫ normalizedShuffleMap`
+`= ι₂ ≫ AW ≫ (retractionN₁ ≫ inclusionN₁) ≫ ∇ ≫ ρ₂`; the inner Dold–Kan round-trip
+`retractionN₁ ≫ inclusionN₁` (the `PInfty` idempotent on `F₁`) is absorbed, leaving
+`ι₂ ≫ (AW ≫ ∇) ≫ ρ₂`. -/
+lemma normalizedAW_shuffle_eq (X : BisimplicialObject C) :
+    normalizedAlexanderWhitney X ≫ normalizedShuffleMap X
+      = inclusionN₂ X ≫ (alexanderWhitney X ≫ shuffleMap X) ≫ retractionN₂ X := by
+  rw [normalizedAlexanderWhitney, normalizedShuffleMap]
+  simp only [Category.assoc]
+  haveI : Mono (inclusionN₂ X) := by rw [inclusionN₂]; infer_instance
+  rw [← cancel_mono (inclusionN₂ X)]
+  simp only [Category.assoc]
+  rw [inclusionN₂, retractionN₂, PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap]
+  simp only [Functor.comp_obj, normalizedMooreComplex_obj, HomologicalComplex₂.totalFunctor_obj,
+    retractionN₁_inclusionN₁_shuffleMap_PInfty X]
+
 /-- **`AW ≫ ∇ ≃ 𝟙` on the normalized diagonal `N₂`** via the Eilenberg–Mac Lane homotopy `Φ`
 (EM Thm 2.1a, `∂Φ + Φ∂ = ∇f − i`). This is the contraction homotopy that discharges the remaining
 `sorry` in `homotopyNormalizedAlexanderWhitneyShuffle` (`BisimplicialNormalized.lean`). -/
@@ -1096,7 +1268,18 @@ noncomputable def homotopyAWShuffleNormalized (X : BisimplicialObject C) :
     Homotopy (normalizedAlexanderWhitney X ≫ normalizedShuffleMap X) (𝟙 (N₂.obj X)) where
   hom := phiHomNorm X
   zero := phiHomNorm_zero X
-  comm := by sorry
+  comm := by
+    intro i
+    -- `𝟙 N₂` factors through `F₂`: `(𝟙 N₂).f i = ι₂.f i ≫ ρ₂.f i` (`inclusionN₂_comp_retractionN₂`).
+    have hid : (𝟙 (N₂.obj X) : (N₂.obj X) ⟶ (N₂.obj X)).f i
+        = (inclusionN₂ X).f i ≫ (retractionN₂ X).f i := by
+      rw [← HomologicalComplex.comp_f, inclusionN₂_comp_retractionN₂]
+    -- Conjugate everything onto `F₂` (6a/6b), then replace `(AW≫∇)≫ρ₂` by the EM identity (5c).
+    rw [normalizedAW_shuffle_eq, dNext_phiHomNorm, prevD_phiHomNorm, hid,
+      HomologicalComplex.comp_f, HomologicalComplex.comp_f, ← phi_comm_retraction X i]
+    -- Both sides are now `ι₂ ≫ (…) ≫ ρ₂`; distribute the sum and kill the `𝟙` term.
+    simp only [Preadditive.comp_add, Preadditive.add_comp, Category.assoc,
+      HomologicalComplex.id_f, Category.id_comp]
 
 end BisimplicialObject
 
@@ -1247,14 +1430,25 @@ one genuinely hard combinatorial step is **(4)**, extracting `hOp`'s representat
 
 ### Phase 6 — descent to `N₂` (medium)
 
-- [ ] **(6a)** Relate `phiHomNorm` to `inclusionN₂ ≫ phiHomRaw ≫ retractionN₂`, and `dNext`/`prevD` of
-      `phiHomNorm` to the conjugation of `phi_comm_retraction` (the inclusion/retraction are chain
-      maps, so they commute with `dNext`/`prevD`).
-- [ ] **(6b)** Relate `normalizedAlexanderWhitney X ≫ normalizedShuffleMap X` to
-      `inclusionN₂ ≫ (alexanderWhitney ≫ shuffleMap) ≫ retractionN₂` modulo the Dold–Kan round-trip
-      (reuse `inclusionN₁_comp_retractionN₁`-style glue + `retractionN₂ ≫ inclusionN₂ = PInfty`
-      lemmas from `BisimplicialNormalizedDefs`/the (B) machinery).
-- [ ] **(6c)** `homotopyAWShuffleNormalized.comm` — assemble (6a)+(6b)+`phi_comm_retraction`.
+- [x] **(6a)** **DONE** — `phiHomNorm_eq` (`phiHomNorm = ι₂ ≫ phiHomRaw ≫ ρ₂`), `dNext_phiHomNorm`/
+      `prevD_phiHomNorm` (the inclusion/retraction are chain maps, so they commute with `dNext`/`prevD`
+      via `dNext_comp_left/right`, `prevD_comp_left/right`), and `inclusionN₂_comp_retractionN₂`
+      (`ι₂ ≫ ρ₂ = 𝟙 N₂`).
+- [~] **(6b)** **SCAFFOLDED** — `normalizedAW_shuffle_eq` (**proved**): `normAW ≫ norm∇ =`
+      `ι₂ ≫ (AW ≫ ∇) ≫ ρ₂`. Unfolds (defs + `Category.assoc`) to
+      `ι₂ ≫ AW ≫ (ρ₁ ≫ ι₁) ≫ ∇ ≫ ρ₂`; the inner Dold–Kan round-trip `ρ₁ ≫ ι₁` is absorbed by
+      `retractionN₁_inclusionN₁_shuffleMap_retractionN₂` (**proved**: cancel the split-mono `ι₂` then
+      fold `ρ₂ ≫ ι₂ = PInfty`). ⚠️ NB the naive "`AW ≫ ρ₁ ≫ ι₁ = AW`" (AW lands bi-normalized) is
+      **FALSE** — the slack is on the `ρ₂` side, not AW. Lone remaining `sorry`:
+      - `retractionN₁_inclusionN₁_shuffleMap_PInfty` — `ρ₁ ≫ ι₁ ≫ ∇ ≫ PInfty = ∇ ≫ PInfty` on `F₂`.
+        Genuine Dold–Kan combinatorics: `(1 − ρ₁ι₁)` projects onto degenerate-`F₁`, `∇` (a sum of
+        degeneracies `⟨σ,σ⟩`) carries it to a degenerate diagonal simplex, killed by `PInfty`. Likely
+        needs a per-shuffle-summand kill lemma via `degeneracy_comp_PInfty` (memory Patterns 1/2/4),
+        comparable in size to `shuffleMap_alexanderWhitney_comp_retractionN₁`.
+- [x] **(6c)** **DONE** — `homotopyAWShuffleNormalized.comm`: pure plumbing, assembled from (6a)+(6b)
+      +`phi_comm_retraction` (5c). `rw [normalizedAW_shuffle_eq, dNext_phiHomNorm, prevD_phiHomNorm,
+      hid, comp_f, comp_f, ← phi_comm_retraction]` reduces both sides to `ι₂ ≫ (…) ≫ ρ₂`; then
+      `simp [Preadditive.comp_add, Preadditive.add_comp, id_f, id_comp]` distributes and matches.
 - [ ] **(6d)** Wire into `BisimplicialNormalized.lean:745`:
       `homotopyNormalizedAlexanderWhitneyShuffle X := homotopyAWShuffleNormalized X` (add the import).
 
