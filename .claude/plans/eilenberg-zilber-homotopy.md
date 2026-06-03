@@ -68,6 +68,14 @@ eilenbergZilber := bridge₁.symm.trans(eilenbergZilberNormalized.trans bridge�
    F₁  ≃[bridge₁]  N₁  ≃[EZ_norm]  N₂  ≃[bridge₂]  F₂
 ```
 
+> **STATUS (2026-06):** `eilenbergZilber` is **assembled and compiling**
+> (`BisimplicialNormalized.lean:757`). `bridge₁` ✅ (axiom-clean, `BisimplicialBridge1.lean`),
+> `bridge₂` ✅ (inline Mathlib equiv), `eilenbergZilberNormalized.homotopyHomInvId` ✅ (strict).
+> **The only remaining `sorry`** in the entire pipeline is
+> `eilenbergZilberNormalized.homotopyInvHomId = homotopyNormalizedAlexanderWhitneyShuffle`
+> (the EM `Φ` homotopy `AW ≫ ∇ ≃ 𝟙 N₂`). Naturality of `eilenbergZilber` in `X` is still TODO.
+> See **Milestones** below for the full breakdown.
+
 - **`N₂ = diag ⋙ normalizedMooreComplex C`** — normalized diagonal.
 - **`N₁ = normalizedMooreComplex _ ⋙ (normalizedMooreComplex C).mapHomologicalComplex _ ⋙ totalFunctor`**
   — bi-normalized total complex (normalize both simplicial directions, then total).
@@ -309,14 +317,31 @@ def eilenbergZilberNormalized (X) : HomotopyEquiv (N₁.obj X) (N₂.obj X) wher
    `inclusionN₂`/`retractionN₂` (diagonal), then `normalizedShuffleMap`/`normalizedAlexanderWhitney`
    by conjugation (DONE — sorry-free; only the additivity instance + the two contraction proofs
    remain `sorry`).
-3. Discharge `normalizedMooreComplex` additivity `sorry`.
-4. `bridge₂` (one-liner via Mathlib). NB its chain-map halves are already `inclusionN₂`/`retractionN₂`.
-5. `eilenbergZilberNormalized`: `normalizedShuffle_alexanderWhitney` (strict, cheaper) then the
-   explicit `Φ` homotopy (the hard, sourced part — EM 2.1a on the general bisimplicial object).
-6. `bridge₁`: define `M₁`, build `bridge₁_outer : N₁ ≃ M₁`, build `bridge₁_inner : M₁ ≃ F₁`,
-   and compose. Chain-map halves are already `inclusionN₁`/`retractionN₁`; only the homotopy
-   packaging/lifting remains.
-7. Assemble `eilenbergZilber` by transport; then add naturality.
+3. ✅ Discharge `normalizedMooreComplex` additivity `sorry` (DONE — pipeline is additivity-clean).
+4. ✅ `bridge₂` (one-liner via Mathlib). Built **inline** inside `eilenbergZilber` as
+   `homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex (A := C) (Y := diag.obj X)`, whose
+   endpoints are *definitionally* `N₂.obj X`/`F₂.obj X`. (DONE — axiom-clean.)
+5. ⚠️ `eilenbergZilberNormalized`: assembled. `homotopyHomInvId` = `normalizedShuffle_alexanderWhitney`
+   (the strict `∇ ≫ AW = 𝟙 N₁`) is **DONE, sorry-free**. `homotopyInvHomId` =
+   `homotopyNormalizedAlexanderWhitneyShuffle` (`AW ≫ ∇ ≃ 𝟙 N₂`, the explicit EM `Φ` homotopy —
+   the hard, sourced part) is the **only remaining `sorry`** in the whole pipeline
+   (`BisimplicialNormalized.lean:746`).
+6. ✅ `bridge₁` (DONE — **axiom-clean**, in its own file `BisimplicialBridge1.lean`). Defined `M₁`,
+   built `bridge₁Outer : N₁ ≃ M₁` and `bridge₁Inner : M₁ ≃ F₁`, composed to
+   `bridge₁ : N₁ ≃ F₁`. The inner lift required a generalized outer-lift `totalMapHomotopy`
+   (abstract `TotalComplexShape c₁ c₂ c`), a `totalFlipIso`-conjugation `totalMapHomotopy₂`, a global
+   `TotalComplexShapeSymmetry (down ℕ)³` instance, a reusable flip-lift
+   `flipMapHomologicalComplexHomotopy`, and naturality of the Dold–Kan contraction operator
+   (`homotopyInvHomId_hom_naturality`). All `sorry`-free.
+7. ⚠️ `eilenbergZilber` **assembled** (`BisimplicialNormalized.lean:757`):
+   `(bridge₁ X).symm.trans <| (eilenbergZilberNormalized X).trans <| bridge₂`. Compiles and gives
+   `HomotopyEquiv (F₁.obj X) (F₂.obj X)`. Depends on exactly one `sorryAx`, tracing to milestone 5's
+   `homotopyNormalizedAlexanderWhitneyShuffle`. **Naturality in `X` still TODO.**
+
+### ⟹ Current status (2026-06): the *transport scaffolding is complete and axiom-clean*; the sole
+remaining mathematical gap is the EM homotopy `AW ≫ ∇ ≃ 𝟙` on the normalized diagonal
+(`homotopyNormalizedAlexanderWhitneyShuffle`). `bridge₁`, `bridge₂`, the strict identity, additivity,
+and the final `eilenbergZilber` composite are all done.
 
 ### Proof skeleton: `normalizedShuffle_alexanderWhitney` (`∇ ≫ AW = 𝟙 N₁`, EM `f∇ = i`)
 

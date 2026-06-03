@@ -463,3 +463,98 @@ convert stdSimplex.map_id_apply ⟨i, hi⟩  -- Lean unifies f with id automatic
 **Why it works**: `convert` operates on the goal's already-elaborated terms. It doesn't require
 you to re-elaborate the problematic expression — it just asks "what subgoals would make this
 lemma's conclusion match the current goal?" and lets Lean's unifier handle the rest.
+
+---
+
+## `clear ih` before a **nested** `Finsupp.induction` (CRITICAL)
+
+When proving a bilinear identity (e.g. `realize (M₂.comp M₁) = realize M₁ ≫ realize M₂`) by
+inducting on the outer argument and then the inner one, the **outer** `ih` usually mentions the
+inner variable. If it's still in context when you `induction M₂ using Finsupp.induction`, Lean
+generalizes `ih` along with `M₂`, turning the inner `ih₂` into a useless *conditional*
+hypothesis (`(outer statement for g) → (goal for g)`), and you get leftover subgoals like the
+hypothesis of `ih₂` reappearing.
+
+**Fix**: `clear ih` (and any other hypothesis depending on the variable you're about to induct
+on) immediately before the nested induction:
+```lean
+induction M₁ using Finsupp.induction with
+| zero => simp [DerivedOp.comp]
+| single_add l₁ c₁ f _ _ ih =>
+  rw [comp_add_right, realize_add, ih, realize_add, Preadditive.add_comp]
+  congr 1
+  clear ih            -- ih mentions M₂; without this the inner ih₂ becomes conditional
+  induction M₂ using Finsupp.induction with
+  | zero => simp [DerivedOp.comp]
+  | single_add l₂ c₂ g _ _ ih₂ => ...
+```
+
+Notes:
+- `Finsupp.induction` case names are **`zero`** and **`single_add`** (not `h0`/`ha`). The
+  `single_add` case binds 6 args: `a b f (h_notmem) (h_ne_zero) (ih)`.
+- Reduce a bilinear realize identity all the way to the **single–single** case (one `OpLetter`
+  composed with one), where a letter-level lemma closes it; pair with `Preadditive.zsmul_comp`,
+  `Preadditive.comp_zsmul`, `smul_smul`, and a final `rw [mul_comm c₂ c₁]` to fix coefficient
+  order. Build bilinearity helpers (`comp_add_right`, `add_comp`, `comp_single_right`,
+  `single_comp_single`) via `Finsupp.sum_add_index'` / `Finsupp.sum_single_index (by simp)`.
+- Dot notation `.comp` on a literal `Finsupp.single …` resolves to the (nonexistent)
+  `Finsupp.comp`. Call the abbreviation's namespace explicitly: `DerivedOp.comp (single …) (single …)`.
+
+---
+
+## `simp only [NatTrans.comp_app]` may not split a composite `.app` — use `rw`
+
+`simp only [..., Functor.map_comp, NatTrans.comp_app]` sometimes leaves
+`(α ≫ β).app c` **un-split** (e.g. when `α ≫ β` was just produced by `Functor.map_comp` in the
+same pass). The fix is to fire it explicitly with `rw [NatTrans.comp_app]` *after* the `simp only`,
+then continue:
+```lean
+simp only [op_comp, Functor.map_comp]
+rw [NatTrans.comp_app]                                  -- forces (α ≫ β).app c ↦ α.app c ≫ β.app c
+slice_lhs 2 3 => rw [(X.map f.op).naturality g.op]      -- now the naturality pattern matches
+simp only [Category.assoc]
+```
+This merges the two legs of a bisimplicial `OpLetter` composition (`realize (l₂.comp l₁) =
+realize l₁ ≫ realize l₂`) via naturality of `X.map _`.
+
+**Pitfall — `lean_multi_attempt` can disagree with the real file here.** For this proof,
+`multi_attempt` reported `goals: []` for a `simp only [..., NatTrans.comp_app]; slice` snippet
+that actually **failed** in the file (stale elaboration). Always confirm with
+`lean_diagnostic_messages` on the edited lines; don't trust a green `multi_attempt` alone.
+
+---
+
+## `Fin.mk` with proof terms: `generalize_proofs`, avoid `split_ifs`, peel with `congr`
+
+Proving a `SimplexCategory`/`OrderHom` map equality (e.g. `primeHom (g ≫ f) = primeHom g ≫
+primeHom f`) by `Hom.ext`/`OrderHom.ext`/`funext` lands you in a goal full of
+`⟨value, proof⟩ : Fin n` where `value` involves `if`/`min`/`Fin.val` and `proof` is a `⋯`
+bound. Three gotchas, each with a fix:
+
+**1. `generalize_proofs` to share/name `Fin.mk` proof terms.** Two occurrences of the *same*
+subterm (e.g. `(toOrderHom g) ⟨↑j - 1, ⋯⟩`) can print identically but carry *different* `⋯`
+proofs, so `set`/`rw`/`congr` won't unify them. `generalize_proofs h1 h2 …` names the proof
+obligations and **shares** equal ones, making the subterms syntactically identical (and letting
+you write `⟨…, hp⟩` explicitly afterwards). Do it right after the `simp` that exposes the
+`Fin.mk`s.
+
+**2. Do NOT `split_ifs` when an `if` is buried in a dependent proof term.** If the `Fin.mk`'s
+proof `⋯` itself mentions `if ↑j = 0 …`, `split_ifs` splits on *that* too, producing spurious
+`↑j = 0 / ¬↑j = 0` subgoals your bullets don't cover (symptom: "unsolved goals" reported at the
+enclosing `·` with the *full* original goal, and no error on the inner tactics). Instead kill the
+one goal-level `if` with a targeted `rw [if_neg (by omega)]` (the condition is inferred; `by
+omega` discharges `¬ min (… + 1) (q+1) = 0` from a `Fin.isLt` bound).
+
+**3. Peel down to the `Fin` argument with a `congr` chain, then `Fin.ext` + `omega`.** To equate
+`min (↑(f X) + 1) (s+1) = min (↑(f Y) + 1) (s+1)` reduce to `X = Y`:
+```lean
+congr 2          -- min _ (s+1) = min _ (s+1)  ↦  ↑(f X) = ↑(f Y)
+congr 1          -- peel Fin.val               ↦  f X = f Y
+congr 1          -- peel (toOrderHom f) app    ↦  X = Y   (Fin n)
+apply Fin.ext    -- ↦ ↑X = ↑⟨value, ⋯⟩
+simp only [Fin.val_mk]   -- reduce Fin.val of the mk (omega will NOT reduce it on its own)
+omega
+```
+Count the `congr` levels by stepping with a trailing `sorry` and reading `lean_goal` — one too
+few leaves `f X = f Y` and `apply Fin.ext` then *loops back* to `↑(f X) = ↑(f Y)`. Note `omega`
+cannot reduce `Fin.val ⟨v, h⟩`; insert `simp only [Fin.val_mk]` first.

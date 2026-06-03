@@ -321,6 +321,16 @@ rw [← Category.assoc, ← Functor.map_comp, ← op_comp, Category.assoc]      
 
 When `ext` destructs `⟨i, hi⟩ : Fin ((SimplexCategory.mk n).len + 1)`, the bound `hi` involves `.len` which `omega` can't reduce. Fix: `simp only [SimplexCategory.len_mk] at hi` to get `hi : i < n + 1`.
 
+## Pitfall: `simp only` won't beta-reduce a `SimplexCategory.mkHom`/`OrderHom` application until you add `SimplexCategory.len_mk`
+
+When evaluating a hand-built `SimplexCategory` map (e.g. `primeHom θ = SimplexCategory.mkHom {toFun := fun j => ⟨…⟩, monotone' := …}`) applied at a concrete index, the natural set
+`simp only [primeHom, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.coe_mk, Fin.val_succ]`
+**fails to fire `OrderHom.coe_mk`** — the goal keeps the unreduced application `↑({toFun := fun j ↦ …} c.succ)`, the `if`/`min` stay hidden under the lambda, and `split_ifs`/`omega`/`rw [if_neg …]` all fail ("no if-then-else", "could not prove", "did not find pattern"). It looks like `coe_mk` is broken.
+
+**Fix: add `SimplexCategory.len_mk` to the `simp only` set.** The application's index types involve `⦋s⦌.len`; until those reduce, the coercion/beta is blocked. With `len_mk` present the application beta-reduces and the `if … min …` body is exposed. This is the same simp recipe `primeHom_δ` uses. Then finish with `rw [if_neg (by omega)]`, `simp only [Nat.add_sub_cancel, Fin.eta]`, `omega` (and prove the value-bound side-goal via `Nat.lt_succ_iff.mp (toOrderHom θ c).isLt`).
+
+Note: prefer `rw [if_neg (by omega)]` over `split_ifs` here — `split_ifs` spawned a spurious `min 0 …` branch with `h✝ : False`.
+
 ## Project-specific helper lemmas
 
 | Lemma | Purpose |

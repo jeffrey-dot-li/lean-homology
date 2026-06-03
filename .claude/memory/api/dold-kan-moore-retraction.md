@@ -148,3 +148,39 @@ and **`hσ'_naturality`** (homotopy operators `hσ'` are natural, `Homotopies.le
 `((alternatingFaceMapComplex C).map f).f n` into `f.app ⦋n⦌.op` so they fire. Gotcha: in this repo
 the bare `comp_add`/`add_comp`/`assoc` are *not* in scope — use `Preadditive.comp_add`,
 `Preadditive.add_comp`, `Category.assoc`.
+
+## Pattern 7: bridging a `DerivedOp` to the `F₂ = diag ⋙ alternatingFaceMapComplex` chain data
+
+Used in `BisimplicialDerivedOp.lean` (`realize_faceOp`, `realize_boundaryOp`) to identify the
+*realization* of a formal EM operator with the actual differential / faces of `F₂.obj X`.
+
+**(a) A single face letter realizes to the diagonal face — a naturality square.**
+`faceOp q i = single ⟨δ i, δ i⟩ 1`, so `(faceOp q i).realize X` is the *vertical-then-horizontal*
+leg `(X.obj ⦋q+1⦌).map (δ i).op ≫ (X.map (δ i).op).app ⦋q⦌`, while `(diag.obj X).δ i` (after
+`SimplicialObject.δ`, `diag_obj_map`) is the *horizontal-then-vertical* leg
+`(X.map (δ i).op).app ⦋q+1⦌ ≫ (X.obj ⦋q⦌).map (δ i).op`. These are the two sides of the naturality
+square of the natural transformation `X.map (δ i).op` (since `X : BisimplicialObject C` makes
+`X.map g` a `NatTrans` between `SimplexCategoryᵒᵖ ⥤ C` functors):
+
+```lean
+lemma realize_faceOp (X) (q) (i : Fin (q + 2)) :
+    (faceOp q i).realize X = (diag.obj X).δ i := by
+  rw [faceOp, realize_single, one_smul, OpLetter.realize, SimplicialObject.δ, diag_obj_map]
+  exact (X.map (SimplexCategory.δ i).op).naturality (SimplexCategory.δ i).op
+```
+
+`diag_obj_map : (diag.obj X).map f = (X.map f).app _ ≫ (X.obj _).map f` is the key splitter.
+
+**(b) Realize the whole boundary = the chain differential, termwise.**
+- Expand `(F₂.obj X).d (n+1) n` with **`AlternatingFaceMapComplex.obj_d_eq`**
+  (`= ∑ i, (-1)^↑i • X.δ i`). It is stated about `AlternatingFaceMapComplex.obj`, but the goal has
+  `(alternatingFaceMapComplex C).obj` — bridge with a defeq `show ... = (AlternatingFaceMapComplex.obj
+  (diag.obj X)).d _ _ from rfl` (the functor's `.obj` is definitionally the bare `.obj`).
+- Distribute `realize` over the `Finset.sum`/`zsmul` defining `boundaryOp` via the bundled
+  `realizeAddMonoidHom X` (`map_sum`, `map_zsmul`); convert `DerivedOp.realize X M ↔
+  realizeAddMonoidHom X M` with `show ... from rfl` (defeq), then `Finset.sum_congr` + `realize_faceOp`.
+
+**General lesson** (recurs across (1c)/(1e)): to push a `Finsupp`-linear operation (`realize`,
+`prime`) through a `Finset.sum`/`zsmul`, **bundle it as an `AddMonoidHom`** (mirroring
+`realizeAddMonoidHom`) so `map_sum`/`map_zsmul` apply, and use `show lhs = hom x from rfl` to expose
+the bare function as the bundled hom where `rw` needs a syntactic match.
