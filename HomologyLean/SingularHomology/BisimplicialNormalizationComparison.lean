@@ -3,10 +3,11 @@ import Mathlib.Algebra.Homology.BifunctorHomotopy
 import Mathlib.AlgebraicTopology.DoldKan.HomotopyEquivalence
 
 /-!
-# The bridge₁ equivalence
+# The normalization comparison equivalence
 
 This file constructs the homotopy equivalence
-`bridge₁ : HomotopyEquiv (N₁.obj X) (F₁.obj X)` used in the normalized Eilenberg-Zilber argument.
+`normalizationComparison : HomotopyEquiv (N₁.obj X) (F₁.obj X)` used in the normalized
+Eilenberg-Zilber argument.
 
 The construction is factored as
 
@@ -46,7 +47,7 @@ namespace BisimplicialObject
 
 variable {C : Type*} [Category* C] [Abelian C]
 
-/-- The intermediate total complex for `bridge₁`: outer unnormalized, inner normalized. -/
+/-- The intermediate total complex: outer unnormalized and inner normalized. -/
 noncomputable abbrev M₁ (X : BisimplicialObject C) : ChainComplex C ℕ :=
   (HomologicalComplex₂.totalFunctor _ _ _ _).obj
     (((normalizedMooreComplex C).mapHomologicalComplex _).obj
@@ -317,7 +318,7 @@ end InnerLift
 end HomologicalComplex₂
 
 /-- The outer Dold-Kan homotopy equivalence before totalization. -/
-noncomputable def bridge₁OuterPreTotal :
+noncomputable def outerNormalizationComparisonPreTotal :
     HomotopyEquiv
       (((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).obj
         ((normalizedMooreComplex (SimplicialObject C)).obj X))
@@ -327,15 +328,16 @@ noncomputable def bridge₁OuterPreTotal :
     homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex
       (A := SimplicialObject C) (Y := X)
 
-/-- The outer half of `bridge₁`. -/
-noncomputable def bridge₁Outer : HomotopyEquiv (N₁.obj X) (M₁ X) where
+/-- The outer half of `normalizationComparison`. -/
+noncomputable def outerNormalizationComparison : HomotopyEquiv (N₁.obj X) (M₁ X) where
   hom := inclusionM₁ X
   inv := retractionM₁ X
   homotopyHomInvId := Homotopy.ofEq (inclusionM₁_comp_retractionM₁ X)
   homotopyInvHomId := by
-    simpa [retractionM₁, inclusionM₁, M₁, bridge₁OuterPreTotal, HomologicalComplex₂.totalFunctor]
+    simpa [retractionM₁, inclusionM₁, M₁, outerNormalizationComparisonPreTotal,
+      HomologicalComplex₂.totalFunctor]
       using HomologicalComplex₂.totalMapHomotopy (c := ComplexShape.down ℕ)
-        ((bridge₁OuterPreTotal (C := C) X).homotopyInvHomId)
+        ((outerNormalizationComparisonPreTotal (C := C) X).homotopyInvHomId)
 
 /-- A natural family of homotopies between chain-complex-valued functors lifts, after `flip`, to a
 homotopy between the corresponding `mapHomologicalComplex` morphisms. -/
@@ -390,7 +392,8 @@ lemma alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom {Y Z : SimplicialOb
 
 /-- Naturality, in the simplicial object, of the Dold–Kan contraction homotopy operator for
 `PInfty ≃ 𝟙` (i.e. `homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex.homotopyInvHomId`).
-This is the `hnat` input to `flipMapHomologicalComplexHomotopy` for the inner half of `bridge₁`. -/
+This is the `hnat` input to `flipMapHomologicalComplexHomotopy` for the inner normalization
+comparison. -/
 lemma homotopyInvHomId_hom_naturality {Y Z : SimplicialObject C} (f : Y ⟶ Z) (i j : ℕ) :
     ((alternatingFaceMapComplex C).map f).f i ≫
         (homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex
@@ -403,7 +406,7 @@ lemma homotopyInvHomId_hom_naturality {Y Z : SimplicialObject C} (f : Y ⟶ Z) (
     homotopyPInftyToId_hom]
   exact alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom f (j + 1) i j
 
-/-- The flipped inner Dold-Kan homotopy used in `bridge₁Inner`. -/
+/-- The flipped inner Dold-Kan homotopy used in `innerNormalizationComparison`. -/
 noncomputable def retractionF₁InclusionF₁FlipHomotopy :
     Homotopy
       ((HomologicalComplex₂.flipFunctor C (ComplexShape.down ℕ) (ComplexShape.down ℕ)).map
@@ -419,8 +422,8 @@ noncomputable def retractionF₁InclusionF₁FlipHomotopy :
     (fun f i j => homotopyInvHomId_hom_naturality f i j)
     ((alternatingFaceMapComplex (SimplicialObject C)).obj X)
 
-/-- The inner half of `bridge₁`. -/
-noncomputable def bridge₁Inner : HomotopyEquiv (M₁ X) (F₁.obj X) where
+/-- The inner half of `normalizationComparison`. -/
+noncomputable def innerNormalizationComparison : HomotopyEquiv (M₁ X) (F₁.obj X) where
   hom := inclusionF₁ X
   inv := retractionF₁ X
   homotopyHomInvId := Homotopy.ofEq (inclusionF₁_comp_retractionF₁ X)
@@ -431,19 +434,19 @@ noncomputable def bridge₁Inner : HomotopyEquiv (M₁ X) (F₁.obj X) where
     simpa [retractionF₁, inclusionF₁, HomologicalComplex₂.totalFunctor,
       HomologicalComplex₂.total.map_comp, HomologicalComplex₂.total.map_id] using H
 
-/-- The full equivalence `bridge₁ : N₁(X) ≃ F₁(X)`. -/
-noncomputable def bridge₁ : HomotopyEquiv (N₁.obj X) (F₁.obj X) :=
-  (bridge₁Outer X).trans (bridge₁Inner X)
+/-- The full comparison between the normalized and unnormalized total complexes. -/
+noncomputable def normalizationComparison : HomotopyEquiv (N₁.obj X) (F₁.obj X) :=
+  (outerNormalizationComparison X).trans (innerNormalizationComparison X)
 
 @[reassoc]
-lemma bridge₁_hom_eq :
-    (bridge₁ X).hom = inclusionN₁ X := by
+lemma normalizationComparison_hom_eq :
+    (normalizationComparison X).hom = inclusionN₁ X := by
   show inclusionM₁ X ≫ inclusionF₁ X = inclusionN₁ X
   exact inclusionM₁_comp_inclusionF₁ X
 
 @[reassoc]
-lemma bridge₁_inv_eq :
-    (bridge₁ X).inv = retractionN₁ X := by
+lemma normalizationComparison_inv_eq :
+    (normalizationComparison X).inv = retractionN₁ X := by
   show retractionF₁ X ≫ retractionM₁ X = retractionN₁ X
   exact retractionF₁_comp_retractionM₁ X
 

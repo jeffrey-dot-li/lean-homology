@@ -1,5 +1,5 @@
 import HomologyLean.SingularHomology.Bisimplicial
-import HomologyLean.SingularHomology.BisimplicialBridge1
+import HomologyLean.SingularHomology.BisimplicialNormalizationComparison
 import HomologyLean.SingularHomology.BisimplicialDerivedOp
 
 /-!
@@ -9,11 +9,11 @@ The literature (Eilenberg–Mac Lane II, Thm 2.1a) proves the Eilenberg–Zilber
 **normalized** complexes, where one direction is a strict identity and the other is a chain
 homotopy via the explicit Eilenberg–Mac Lane homotopy. We assemble that here on the bi-normalized
 total complex `N₁` and the normalized Moore complex of the diagonal `N₂` (both defined in
-`BisimplicialNormalizedDefs.lean`).
+`Bisimplicial.lean`).
 
 The intended use is to transport this normalized equivalence to the unnormalized `F₁`/`F₂`
-(in `Bisimplicial.lean`) along the Dold–Kan homotopy equivalence
-`AlgebraicTopology.DoldKan.homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex`,
+(in `Bisimplicial.lean`) along the normalization comparisons
+`normalizationComparison` and `diagonalNormalizationComparison`,
 to obtain `eilenbergZilber : HomotopyEquiv (F₁.obj X) (F₂.obj X)`.
 
 Everything here requires `[Abelian C]` (for the normalized Moore complex); the unnormalized
@@ -37,7 +37,8 @@ private lemma mooreInclusion_comp_mooreRetraction :
 
 /-- **Glue (split mono, lifted to the total complex).** The bi-normalized inclusion is a section
 of the retraction. This lifts the Mathlib split-mono identity `(splitMonoInclusionOfMooreComplexMap
-_).id` through `totalFunctor` in both simplicial directions. (Reused by `bridge₁`.) -/
+_).id` through `totalFunctor` in both simplicial directions. (Reused by
+`normalizationComparison`.) -/
 @[reassoc]
 lemma inclusionN₁_comp_retractionN₁ (X : BisimplicialObject C) :
     inclusionN₁ X ≫ retractionN₁ X = 𝟙 (N₁.obj X) := by
@@ -751,17 +752,25 @@ noncomputable def eilenbergZilberNormalized (X : BisimplicialObject C) :
   homotopyHomInvId := Homotopy.ofEq (normalizedShuffle_alexanderWhitney X)
   homotopyInvHomId := homotopyAWShuffleNormalized X
 
+/-- The normalization comparison on the diagonal simplicial object. -/
+noncomputable abbrev diagonalNormalizationComparison (X : BisimplicialObject C) :
+    HomotopyEquiv (N₂.obj X) (F₂.obj X) :=
+  homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex (A := C) (Y := diag.obj X)
+
 /-- The unnormalized Eilenberg–Zilber homotopy equivalence `F₁(X) ≃ F₂(X)`, obtained by
-transporting the normalized equivalence `eilenbergZilberNormalized` across the Dold–Kan bridges:
+transporting the normalized equivalence `eilenbergZilberNormalized` across the normalization
+comparisons:
 
 `F₁(X) ≃ N₁(X) ≃ N₂(X) ≃ F₂(X)`,
 
-where `bridge₁` is the inner/outer Moore normalization of the total complex (`BisimplicialBridge1`),
-and `bridge₂` is Mathlib's normalized-Moore ≃ alternating-face-map equivalence at the diagonal. -/
+where `normalizationComparison` is the inner/outer Moore normalization of the total complex
+(`BisimplicialNormalizationComparison`),
+and `diagonalNormalizationComparison` is the corresponding comparison for the diagonal simplicial
+object. -/
 noncomputable def eilenbergZilber (X : BisimplicialObject C) :
     HomotopyEquiv (F₁.obj X) (F₂.obj X) :=
-  (bridge₁ X).symm.trans <| (eilenbergZilberNormalized X).trans <|
-    homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex (A := C) (Y := diag.obj X)
+  (normalizationComparison X).symm.trans <| (eilenbergZilberNormalized X).trans <|
+    diagonalNormalizationComparison X
 
 #print axioms eilenbergZilber
 
