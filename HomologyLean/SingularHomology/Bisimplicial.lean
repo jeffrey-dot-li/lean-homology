@@ -4,10 +4,16 @@ import Mathlib.Algebra.Homology.TotalComplex
 import Mathlib.CategoryTheory.Preadditive.FunctorCategory
 import HomologyLean.SingularHomology.Shuffle
 import HomologyLean.Tactic.NameParts
+import Mathlib.CategoryTheory.Abelian.FunctorCategory
+import Mathlib.AlgebraicTopology.MooreComplex
+import Mathlib.AlgebraicTopology.DoldKan.Normalized
+import Mathlib.AlgebraicTopology.DoldKan.Degeneracies
+
 
 open HomologyLean.Tactic.NameParts
 
-open AlgebraicTopology CategoryTheory.Limits
+open AlgebraicTopology AlgebraicTopology.DoldKan CategoryTheory.Limits
+
 open scoped Simplicial
 open HomologyLean.SingularHomology
 
@@ -24,11 +30,17 @@ namespace BisimplicialObject
 def diag : BisimplicialObject C ⥤ SimplicialObject C :=
   Functor.uncurry ⋙ (Functor.whiskeringLeft _ _ _).obj (Functor.diag _)
 
-variable [Preadditive C] [HasFiniteCoproducts C]
+variable [Abelian C] [HasFiniteCoproducts C]
 
--- SimplicialObject is a `def` (not `abbrev`), so typeclass search doesn't
--- unfold it to `Functor SimplexCategoryᵒᵖ C` to find functorCategoryPreadditive.
-instance : Preadditive (SimplicialObject C) := CategoryTheory.functorCategoryPreadditive
+-- -- SimplicialObject is a `def` (not `abbrev`), so typeclass search doesn't
+-- -- unfold it to `Functor SimplexCategoryᵒᵖ C` to find functorCategoryPreadditive.
+-- instance : Preadditive (SimplicialObject C) := CategoryTheory.functorCategoryPreadditive
+
+
+-- `SimplicialObject C` is a `def`, so the functor-category `Abelian` instance is not found by
+-- unfolding; provide it explicitly (needed for the outer `normalizedMooreComplex`).
+noncomputable instance : Abelian (SimplicialObject C) :=
+  CategoryTheory.Abelian.functorCategoryAbelian
 
 instance : (alternatingFaceMapComplex C).Additive := { }
 
@@ -57,7 +69,7 @@ abbrev F₂ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
 
 /-- The double complex obtained by applying `alternatingFaceMapComplex` in both simplicial
 directions. Its `(p, q)` entry is `X_{p,q}`. -/
-abbrev doubleComplex (X : BisimplicialObject C) :
+noncomputable abbrev doubleComplex (X : BisimplicialObject C) :
     HomologicalComplex (ChainComplex C ℕ) (ComplexShape.down ℕ) :=
   ((alternatingFaceMapComplex C).mapHomologicalComplex _).obj
     ((alternatingFaceMapComplex (SimplicialObject C)).obj X)
@@ -173,7 +185,7 @@ noncomputable def awComponent (X : BisimplicialObject C) (p q : ℕ) :
   (X.map (ι_front p q).op).app (Opposite.op ⦋p + q⦌) ≫
     (X.obj (Opposite.op ⦋p⦌)).map (ι_back p q).op
 
-omit [Preadditive C] [HasFiniteCoproducts C] in
+omit [Abelian C] [HasFiniteCoproducts C] in
 /-- Rewrite a diagonal face composed with an Alexander-Whitney component.
 
 The result splits according to whether the face lands in the front block or the back block. -/
@@ -239,7 +251,7 @@ private lemma diag_δ_comp_eqToHom_awComponent (X : BisimplicialObject C)
     simp only [eqToHom_refl, Category.id_comp]
     rfl
 
-omit [Preadditive C] [HasFiniteCoproducts C] in
+omit [Abelian C] [HasFiniteCoproducts C] in
 /-- The top face of `awComponent (p+1, q)` agrees with the bottom face of
 `awComponent (p, q+1)`, up to the canonical arithmetic cast. -/
 private lemma awComponent_top_face_eq_bottom_face (X : BisimplicialObject C) (p q : ℕ) :
@@ -1075,6 +1087,93 @@ lemma awShuffle_f_zero (X : BisimplicialObject C) :
   have hid : ∀ (f : (⦋0⦌ : SimplexCategory) ⟶ ⦋0⦌), f = 𝟙 _ :=
     fun f => Subsingleton.elim _ _
   simp [hid, Shuffle.sign, Shuffle.invCount]
+
+
+
+-- Mathlib does not currently provide this `Additive` instance for `normalizedMooreComplex`.
+-- Degreewise, `map_add` follows by cancelling the target subobject inclusion and reducing to
+-- additivity of the simplicial morphism components.
+instance : (normalizedMooreComplex C).Additive where
+  map_add := by
+    intro X Y f g
+    ext n
+    cases n with
+    | zero =>
+        dsimp [normalizedMooreComplex, NormalizedMooreComplex.map]
+        apply (cancel_mono ((⊤ : Subobject (Y.obj (Opposite.op ⦋0⦌))).arrow)).1
+        rw [Preadditive.add_comp, Subobject.factorThru_arrow, Subobject.factorThru_arrow,
+          Subobject.factorThru_arrow, NatTrans.app_add, Preadditive.comp_add]
+    | succ n =>
+        dsimp [normalizedMooreComplex, NormalizedMooreComplex.map]
+        apply (cancel_mono
+          ((Finset.univ.inf fun k : Fin (n + 1) => kernelSubobject (Y.δ k.succ)).arrow)).1
+        rw [Preadditive.add_comp, Subobject.factorThru_arrow, Subobject.factorThru_arrow,
+          Subobject.factorThru_arrow, NatTrans.app_add, Preadditive.comp_add]
+
+/-- The **bi-normalized total complex**: normalize both simplicial directions (via the
+normalized Moore complex), then take the total complex. The normalized analogue of `F₁`. -/
+noncomputable abbrev N₁ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
+  normalizedMooreComplex _ ⋙
+    (normalizedMooreComplex C).mapHomologicalComplex _ ⋙
+      HomologicalComplex₂.totalFunctor _ _ _ _
+
+/-- The **normalized Moore complex of the diagonal**. The normalized analogue of `F₂`. -/
+noncomputable abbrev N₂ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
+  diag ⋙ normalizedMooreComplex C
+
+/-- The Moore inclusion `N[-] ⟶ K[-]` packaged as a natural transformation. Needed to lift the
+inner-direction normalization through `mapHomologicalComplex`. -/
+noncomputable def mooreInclusion :
+    normalizedMooreComplex C ⟶ alternatingFaceMapComplex C where
+  app Y := inclusionOfMooreComplexMap Y
+  naturality _ _ _ := by cat_disch
+
+/-- The Dold–Kan retraction `K[-] ⟶ N[-]` (via `PInfty`) as a natural transformation. -/
+noncomputable def mooreRetraction :
+    alternatingFaceMapComplex C ⟶ normalizedMooreComplex C where
+  app Y := PInftyToNormalizedMooreComplex Y
+  naturality _ _ _ := by cat_disch
+
+variable (X : BisimplicialObject C)
+
+/-- Inclusion `N₁ ↪ F₁` of the bi-normalized total complex into the unnormalized total complex,
+obtained by including both simplicial directions (`inclusionOfMooreComplexMap` outer,
+`mooreInclusion` inner) and totalizing. -/
+noncomputable def inclusionN₁ : N₁.obj X ⟶ F₁.obj X :=
+  (HomologicalComplex₂.totalFunctor _ _ _ _).map
+    (((normalizedMooreComplex C).mapHomologicalComplex _).map (inclusionOfMooreComplexMap X) ≫
+      (NatTrans.mapHomologicalComplex mooreInclusion _).app
+        ((alternatingFaceMapComplex (SimplicialObject C)).obj X))
+
+/-- Retraction `F₁ ↠ N₁` onto the bi-normalized total complex (via `PInfty` in both directions). -/
+noncomputable def retractionN₁ : F₁.obj X ⟶ N₁.obj X :=
+  (HomologicalComplex₂.totalFunctor _ _ _ _).map
+    ((NatTrans.mapHomologicalComplex mooreRetraction _).app
+        ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+      ((normalizedMooreComplex C).mapHomologicalComplex _).map (PInftyToNormalizedMooreComplex X))
+
+/-- Inclusion `N₂ ↪ F₂` for the diagonal (the Moore inclusion). -/
+noncomputable def inclusionN₂ : N₂.obj X ⟶ F₂.obj X :=
+  inclusionOfMooreComplexMap (diag.obj X)
+
+/-- Retraction `F₂ ↠ N₂` for the diagonal (the `PInfty` retraction). -/
+noncomputable def retractionN₂ : F₂.obj X ⟶ N₂.obj X :=
+  PInftyToNormalizedMooreComplex (diag.obj X)
+
+/-- The shuffle map on normalized complexes, `∇ : N₁ → N₂`.
+
+Option 3: the unnormalized `shuffleMap` conjugated by the Dold–Kan inclusion `N₁ ↪ F₁` and the
+retraction `F₂ ↠ N₂`, so it is levelwise-concrete. -/
+noncomputable def normalizedShuffleMap : N₁.obj X ⟶ N₂.obj X :=
+  inclusionN₁ X ≫ shuffleMap X ≫ retractionN₂ X
+
+/-- The Alexander–Whitney map on normalized complexes, `AW : N₂ → N₁`.
+
+Option 3: the unnormalized `alexanderWhitney` conjugated by the Dold–Kan inclusion `N₂ ↪ F₂` and the
+retraction `F₁ ↠ N₁`, so it is levelwise-concrete. -/
+noncomputable def normalizedAlexanderWhitney : N₂.obj X ⟶ N₁.obj X :=
+  inclusionN₂ X ≫ alexanderWhitney X ≫ retractionN₁ X
+
 
 end BisimplicialObject
 

@@ -1,16 +1,14 @@
 import HomologyLean.SingularHomology.Bisimplicial
-import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
 import Mathlib.Algebra.Homology.BifunctorHomotopy
 import Mathlib.AlgebraicTopology.DoldKan.HomotopyEquivalence
 
 /-!
-# Bridge₁ scaffolding
+# The bridge₁ equivalence
 
-This file isolates the `bridge₁ : HomotopyEquiv (N₁.obj X) (F₁.obj X)` work from the normalized
-Eilenberg–Zilber proof file. It intentionally depends on `BisimplicialNormalizedDefs.lean` but not
-on `BisimplicialNormalized.lean`.
+This file constructs the homotopy equivalence
+`bridge₁ : HomotopyEquiv (N₁.obj X) (F₁.obj X)` used in the normalized Eilenberg-Zilber argument.
 
-The intended factorization is
+The construction is factored as
 
 `N₁(X) ≃ M₁(X) ≃ F₁(X)`,
 
@@ -293,9 +291,8 @@ lemma totalFlipIso_hom_naturality (φ : K ⟶ L) :
     HomologicalComplex₂.flipFunctor_obj, HomologicalComplex₂.flipFunctor_map_f_f,
     HomologicalComplex₂.ιTotal_totalFlipIso_f_hom, Linear.comp_units_smul]
 
-/-- The total complex of a bicomplex morphism equals the totalization of its flip, conjugated by
-`totalFlipIso`. This is the bridge that lets the *outer* lift `totalMapHomotopy` serve the *inner*
-direction after flipping. -/
+/-- The totalization of a bicomplex morphism is conjugate to the totalization of its flip by
+`totalFlipIso`. -/
 lemma total_map_eq_flipConjugate (φ : K ⟶ L) :
     HomologicalComplex₂.total.map φ c =
       (K.totalFlipIso c).inv ≫
@@ -303,15 +300,10 @@ lemma total_map_eq_flipConjugate (φ : K ⟶ L) :
         (L.totalFlipIso c).hom := by
   rw [← totalFlipIso_hom_naturality, Iso.inv_hom_id_assoc]
 
-/-- The inner-direction analog of `totalMapHomotopy`. A homotopy between the *flips* of two
-bicomplex morphisms `φ, ψ : K ⟶ L` (equivalently, a homotopy in the inner direction of `K`/`L`)
-induces a homotopy between their totalizations.
+/-- The inner-direction analog of `totalMapHomotopy`.
 
-Mirrors Mathlib's `mapBifunctorMapHomotopy₂` (`BifunctorHomotopy.lean:185`): apply the outer lift
-`totalMapHomotopy h` on `K.flip` to get a homotopy of the flipped totalizations, then transport
-along `totalFlipIso` via `Homotopy.compLeft`/`compRight`, gluing with `Homotopy.ofEq` of
-`total_map_eq_flipConjugate`. Stated over abstract shapes so the `c₂ c₁ c` and symmetry instances
-do not collide with a diagonal canonical instance. -/
+It is obtained by applying `totalMapHomotopy` to the flipped bicomplex and transporting the result
+across `totalFlipIso`. -/
 noncomputable def totalMapHomotopy₂ {φ ψ : K ⟶ L}
     (h : Homotopy ((HomologicalComplex₂.flipFunctor C c₁ c₂).map φ)
         ((HomologicalComplex₂.flipFunctor C c₁ c₂).map ψ)) :
@@ -324,8 +316,7 @@ end InnerLift
 
 end HomologicalComplex₂
 
-/-- The outer Dold–Kan homotopy equivalence before totalization. The remaining `bridge₁Outer`
-step is to transport this equivalence through `totalFunctor`. -/
+/-- The outer Dold-Kan homotopy equivalence before totalization. -/
 noncomputable def bridge₁OuterPreTotal :
     HomotopyEquiv
       (((normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)).obj
@@ -336,8 +327,7 @@ noncomputable def bridge₁OuterPreTotal :
     homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex
       (A := SimplicialObject C) (Y := X)
 
-/-- The outer half of `bridge₁`. The remaining work is to lift
-`bridge₁OuterPreTotal.homotopyInvHomId` through `totalFunctor`. -/
+/-- The outer half of `bridge₁`. -/
 noncomputable def bridge₁Outer : HomotopyEquiv (N₁.obj X) (M₁ X) where
   hom := inclusionM₁ X
   inv := retractionM₁ X
@@ -347,16 +337,8 @@ noncomputable def bridge₁Outer : HomotopyEquiv (N₁.obj X) (M₁ X) where
       using HomologicalComplex₂.totalMapHomotopy (c := ComplexShape.down ℕ)
         ((bridge₁OuterPreTotal (C := C) X).homotopyInvHomId)
 
-/-- **General flip-lift (reusable).** A family of homotopies `α.app Y ≃ β.app Y` between two
-natural transformations of additive `ChainComplex C ℕ`-valued functors, *natural in `Y`* (the
-condition `hnat`), lifts — after `flip` — to a homotopy between the `mapHomologicalComplex`-lifted
-bicomplex maps `(mapHomologicalComplex α).app W` and `(mapHomologicalComplex β).app W`.
-
-The point: `(mapHomologicalComplex α).app W` shifts the *outer* (`𝒜`/`W`) degree by `0` and is
-`α.app` levelwise; after `flip`, the inner `ChainComplex C ℕ` degree becomes the outer one, and the
-homotopy operator is the family `h` applied levelwise. `hnat` is exactly the statement that each
-operator `h _ .hom i j` is a chain map in the `𝒜`-direction (commutes with `W`'s differential),
-which is what lets the levelwise operators assemble into a genuine bicomplex homotopy. -/
+/-- A natural family of homotopies between chain-complex-valued functors lifts, after `flip`, to a
+homotopy between the corresponding `mapHomologicalComplex` morphisms. -/
 noncomputable def flipMapHomologicalComplexHomotopy {𝒜 : Type*} [Category* 𝒜] [Preadditive 𝒜]
     {F G : 𝒜 ⥤ ChainComplex C ℕ} [F.Additive] [G.Additive] {α β : F ⟶ G}
     (h : ∀ Y, Homotopy (α.app Y) (β.app Y))
@@ -387,9 +369,7 @@ noncomputable def flipMapHomologicalComplexHomotopy {𝒜 : Type*} [Category* �
       HomologicalComplex₂.flip_d_f, Functor.mapHomologicalComplex_obj_X]
     exact key
 
-/-- Naturality in the simplicial object of the inductive Dold–Kan homotopy `homotopyPToId`'s
-operator. Proved by induction on `q`, using `P_f_naturality` (the projections `P q` are natural)
-and `hσ'_naturality` (the homotopy operators `hσ'` are natural). -/
+/-- Naturality of the homotopy operator in `homotopyPToId`. -/
 lemma alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom {Y Z : SimplicialObject C}
     (f : Y ⟶ Z) (q i j : ℕ) :
     ((alternatingFaceMapComplex C).map f).f i ≫ (homotopyPToId Z q).hom i j =
@@ -398,13 +378,12 @@ lemma alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom {Y Z : SimplicialOb
   induction q with
   | zero => simp [homotopyPToId]
   | succ q ih =>
-    -- Unfold `homotopyPToId (q+1)` into `(homotopyPToId q).hom + (P q) ≫ (nullHomotopy' (hσ' q))`.
+    -- Unfold the inductive step and use naturality of the projection and homotopy operators.
     simp only [homotopyPToId, homotopyHσToZero, Homotopy.trans_hom, Homotopy.ofEq_hom,
       Pi.zero_apply, Homotopy.add_hom, Homotopy.compLeft_hom, Homotopy.nullHomotopy'_hom,
       Pi.add_apply, add_zero, zero_add]
     rw [Preadditive.comp_add, Preadditive.add_comp, ih]
     congr 1
-    -- Remaining: the `hσ'` summand `f.app ≫ (P q).f i ≫ hσ'… = (P q).f i ≫ hσ'… ≫ f.app`.
     split_ifs with h
     · rw [← Category.assoc, P_f_naturality, Category.assoc, hσ'_naturality, Category.assoc]
     · simp
@@ -424,18 +403,7 @@ lemma homotopyInvHomId_hom_naturality {Y Z : SimplicialObject C} (f : Y ⟶ Z) (
     homotopyPInftyToId_hom]
   exact alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom f (j + 1) i j
 
-/-- The inner Dold–Kan homotopy feeding `totalMapHomotopy₂` for `bridge₁Inner`.
-
-`retractionF₁`/`inclusionF₁` are `totalFunctor.map` of the bicomplex maps `R`/`I` obtained by
-applying `NatTrans.mapHomologicalComplex` (in the inner functor direction) to
-`mooreRetraction`/`mooreInclusion`. The composite `R ≫ I` is `PInfty` in the inner direction, which
-is homotopic to `𝟙` (Dold–Kan). This def packages that homotopy after `flip`, so its operator shifts
-the (flipped) outer = inner-normalization degree — exactly the shape `totalMapHomotopy₂` consumes.
-
-Assembled from the general `flipMapHomologicalComplexHomotopy` applied to the Dold–Kan contraction
-family `homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex.homotopyInvHomId` (with `α`
-the `PInfty`-natural transformation `mooreRetraction ≫ mooreInclusion` and `β = 𝟙`) and its
-naturality `homotopyInvHomId_hom_naturality`. -/
+/-- The flipped inner Dold-Kan homotopy used in `bridge₁Inner`. -/
 noncomputable def retractionF₁InclusionF₁FlipHomotopy :
     Homotopy
       ((HomologicalComplex₂.flipFunctor C (ComplexShape.down ℕ) (ComplexShape.down ℕ)).map
@@ -451,8 +419,7 @@ noncomputable def retractionF₁InclusionF₁FlipHomotopy :
     (fun f i j => homotopyInvHomId_hom_naturality f i j)
     ((alternatingFaceMapComplex (SimplicialObject C)).obj X)
 
-/-- The inner half of `bridge₁`. Assembled from the inner lift `totalMapHomotopy₂` applied to the
-flipped inner Dold–Kan homotopy `retractionF₁InclusionF₁FlipHomotopy`. -/
+/-- The inner half of `bridge₁`. -/
 noncomputable def bridge₁Inner : HomotopyEquiv (M₁ X) (F₁.obj X) where
   hom := inclusionF₁ X
   inv := retractionF₁ X
@@ -460,13 +427,11 @@ noncomputable def bridge₁Inner : HomotopyEquiv (M₁ X) (F₁.obj X) where
   homotopyInvHomId := by
     have H := HomologicalComplex₂.totalMapHomotopy₂ (c := ComplexShape.down ℕ)
       (retractionF₁InclusionF₁FlipHomotopy X)
-    -- H : Homotopy (total.map (R ≫ I)) (total.map (𝟙 _)); reduce via map_comp / map_id to
-    -- `retractionF₁ X ≫ inclusionF₁ X ≃ 𝟙 (F₁.obj X)`.
+    -- Rewrite `H` using `total.map_comp` and `total.map_id`.
     simpa [retractionF₁, inclusionF₁, HomologicalComplex₂.totalFunctor,
       HomologicalComplex₂.total.map_comp, HomologicalComplex₂.total.map_id] using H
 
-/-- The full `bridge₁ : N₁(X) ≃ F₁(X)` assembled from the outer and inner
-normalization equivalences. -/
+/-- The full equivalence `bridge₁ : N₁(X) ≃ F₁(X)`. -/
 noncomputable def bridge₁ : HomotopyEquiv (N₁.obj X) (F₁.obj X) :=
   (bridge₁Outer X).trans (bridge₁Inner X)
 
@@ -485,77 +450,3 @@ lemma bridge₁_inv_eq :
 end BisimplicialObject
 
 end CategoryTheory
-
-/-!
-## Bridge₁ remaining-work checklist
-
-Architecture is correct and matches the plan (`N₁ ≃ M₁ ≃ F₁`); the strict half is done. Items below
-are ordered by dependency. Steps 1–3 are low-risk mechanical ports of Mathlib's
-`mapBifunctorMapHomotopy₁`; step 4 is the one genuinely new construction.
-
-- [x] Factorization `N₁ ≃ M₁ ≃ F₁` with `M₁` outer-unnormalized / inner-normalized.
-- [x] Four strict identities (`inclusionM₁_comp_inclusionF₁`, `retractionF₁_comp_retractionM₁`,
-      `inclusionM₁_comp_retractionM₁`, `inclusionF₁_comp_retractionF₁`) — proved by functoriality.
-- [x] `totalMapHomotopyHom` / `ιTotal_totalMapHomotopyHom` / `totalMapHomotopy_zero` — outer (`₁`)
-      lift scaffolding, faithful clone of Mathlib `mapBifunctorMapHomotopy.hom₁`/`zero₁`.
-
-- [x] **(1) Port `comm₁_aux` → `totalMapHomotopy_comm_aux`.** Analog of
-      `Mathlib/Algebra/Homology/BifunctorHomotopy.lean:94` (`comm₁_aux`). Simpler than the bifunctor
-      version: since `h.hom i₁' i₁` is directly an inner chain map, the bifunctor's
-      `NatTrans.naturality_assoc` + `f₂.comm` collapse to a single `HomologicalComplex.Hom.comm_assoc`;
-      the sign bookkeeping (`ε₁_ε₂`, `neg_mul`, `Units.neg_smul`) and `d₂_eq` /
-      `ιTotal_totalMapHomotopyHom` / `ιTotalOrZero_eq` rewrites are otherwise the same.
-
-- [x] **(2) Finish `totalMapHomotopy_comm`.** Ported from Mathlib `comm₁`
-      (`BifunctorHomotopy.lean:114`). Two adjustments vs. the literal port, both because our `total`
-      terms have one fewer `≫`-factor than the bifunctor terms (no `F.map ≫ F.obj.map` split):
-      each branch drops one `Category.assoc` (and branch ② one `Linear.comp_units_smul`); the
-      degenerate `K.d` is killed by `HomologicalComplex₂.shape_f` (one-step, no `zero_f`). Also
-      split the goal-normalizing `simp only` so `add_left_inj` (cancelling the common `ψ` summand)
-      runs only *after* `add_f_apply`/`comp_f` distribute the LHS.
-
-- [x] **(3) Verify `bridge₁Outer.homotopyInvHomId`.** Resolved automatically — once
-      `totalMapHomotopy` became `sorry`-free, the existing `simpa … using totalMapHomotopy …`
-      closes with no further changes.
-
-- [x] **(4a) Drafted the decomposition for the inner half.** `bridge₁Inner.homotopyInvHomId` is now
-      `sorry`-free: it is `totalMapHomotopy₂ retractionF₁InclusionF₁FlipHomotopy` with the
-      `total.map_comp` / `total.map_id` plumbing handled by `simpa`. The work reduces to two `sorry`d
-      leaves below.
-
-- [x] **(4b) Fill `totalMapHomotopy₂` (inner lift).** Done via **Path B (generalize)**: the whole
-      outer-lift block (`totalMapHomotopyHom`, `…_zero`, `…_comm_aux`, `…_comm`, `totalMapHomotopy`)
-      was generalized from `(down ℕ, down ℕ, down ℕ)` to abstract `c₁ c₂ c` with
-      `[TotalComplexShape c₁ c₂ c] [DecidableEq J] [K.HasTotal c]`. `totalMapHomotopy₂` then lives in
-      a separate `InnerLift` section over abstract shapes (with `[TotalComplexShape c₂ c₁ c]`,
-      `[TotalComplexShapeSymmetry c₁ c₂ c]`): it conjugates `totalMapHomotopy` of the flipped homotopy
-      by `totalFlipIso` via `Homotopy.compLeft`/`compRight`/`ofEq` of `total_map_eq_flipConjugate`
-      (proved from the new `totalFlipIso_hom_naturality`). Because the shapes are abstract there is no
-      diagonal diamond. At `down ℕ` the previously-missing
-      `TotalComplexShapeSymmetry (down ℕ)³` is supplied as a top-level instance w.r.t. the *canonical*
-      `TotalComplexShape` (sign `σ i₁ i₂ = ε (i₁ * i₂)`), so the `down ℕ` instantiation is fully
-      coherent (no `letI`, no diamond).
-
-- [x] **(4c) Drafted the decomposition for `retractionF₁InclusionF₁FlipHomotopy`.** The def itself
-      is now `sorry`-free: it is `flipMapHomologicalComplexHomotopy` applied to the Dold–Kan
-      contraction family `homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex.homotopyInvHomId`
-      (with `α = mooreRetraction ≫ mooreInclusion`, `β = 𝟙`) and its naturality
-      `homotopyInvHomId_hom_naturality`. The `(mapHomologicalComplex α).app W = R ≫ I` and
-      `(mapHomologicalComplex β).app W = 𝟙` matches hold definitionally (both are levelwise `α.app`),
-      so no transport plumbing is needed. The work reduces to two `sorry`d leaves below.
-
-- [x] **(4c-i) Fill `flipMapHomologicalComplexHomotopy` (general, reusable flip-lift).** Done. Built
-      the `Homotopy` structure directly: operator `hom m m'` is the chain map in the `𝒜`-direction
-      with component `(h (W.X r)).hom m m'`, whose `comm'` is exactly `(hnat (W.d r r') m m').symm`
-      after `flip_X_d` + `mapHomologicalComplex_obj_d`; `zero` is `ext r` + `(h (W.X r)).zero`; and
-      `comm` reduces — after `ext r`, `flipFunctor_map_f_f`/`mapHomologicalComplex_app_f`, and
-      expanding `dNext`/`prevD` on both sides (with `flip_d_f`, keeping `next`/`prev` symbolic so no
-      `m = 0` case split) — to exactly `(h (W.X r)).comm m`.
-
-- [x] **(4c-ii) Fill `homotopyInvHomId_hom_naturality` (Dold–Kan operator naturality).** Done. Reduced
-      (via the `@[simps]` forms `…homotopyInvHomId`, `homotopyPInftyToId_hom`) to naturality of
-      `homotopyPToId`'s operator, extracted as the general lemma
-      `alternatingFaceMapComplex_map_f_comp_homotopyPToId_hom`: induction on `q`, unfolding
-      `homotopyPToId (q+1)` (`trans`/`add`/`compLeft`/`nullHomotopy'`) and closing with the Mathlib
-      naturalities `P_f_naturality` (projections) and `hσ'_naturality` (homotopy operators).
--/

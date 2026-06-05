@@ -1,4 +1,4 @@
-import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
+import HomologyLean.SingularHomology.Bisimplicial
 import HomologyLean.SingularHomology.BisimplicialBridge1
 import HomologyLean.SingularHomology.BisimplicialDerivedOp
 
@@ -288,7 +288,7 @@ private lemma higherFacesVanish_inclusionN₁_shuffleMap (X : BisimplicialObject
   simp only [ezComponent, Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
   simp_rw [← (X.map (SimplexCategory.δ _).op).naturality]
   simp_rw [← Category.assoc ((X.map (shuffleFstHom _).op).app (Opposite.op ⦋p + q⦌))]
-  generalize_proofs _ _ _ _ _ heq
+  generalize_proofs _ _ _ _ heq
   have hpqop : Opposite.op ⦋p + q⦌ = Opposite.op (⦋n + 1⦌ : SimplexCategory) :=
     congrArg Opposite.op (congrArg SimplexCategory.mk hpq)
   have heq_vert : (X.obj (Opposite.op ⦋p + q⦌)).obj (Opposite.op ⦋p + q⦌) =

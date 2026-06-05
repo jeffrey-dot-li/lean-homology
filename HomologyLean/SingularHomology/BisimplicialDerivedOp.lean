@@ -1,4 +1,4 @@
-import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
+import HomologyLean.SingularHomology.Bisimplicial
 import Mathlib.Data.Finsupp.Basic
 import Mathlib.Algebra.Category.ModuleCat.Abelian
 import Mathlib.Algebra.Category.ModuleCat.Adjunctions
