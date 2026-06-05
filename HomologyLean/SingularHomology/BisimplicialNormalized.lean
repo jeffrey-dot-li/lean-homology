@@ -1,5 +1,6 @@
 import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
 import HomologyLean.SingularHomology.BisimplicialBridge1
+import HomologyLean.SingularHomology.BisimplicialDerivedOp
 
 /-!
 # Normalized Eilenberg–Zilber for bisimplicial objects
@@ -740,11 +741,6 @@ lemma normalizedShuffle_alexanderWhitney (X : BisimplicialObject C) :
   rw [inclusionN₁_shuffleMap_diag_normalize_assoc,
     shuffleMap_alexanderWhitney_comp_retractionN₁, inclusionN₁_comp_retractionN₁]
 
-/-- **EM Thm 2.1a, second half (`∂Φ + Φ∂ = ∇f − i`).** On normalized complexes the composite
-`AW ≫ ∇` is chain homotopic to the identity via the Eilenberg–Mac Lane homotopy `Φ`. -/
-noncomputable def homotopyNormalizedAlexanderWhitneyShuffle (X : BisimplicialObject C) :
-    Homotopy (normalizedAlexanderWhitney X ≫ normalizedShuffleMap X) (𝟙 (N₂.obj X)) := sorry
-
 /-- **Eilenberg–Zilber theorem on normalized complexes** (Eilenberg–Mac Lane II, Thm 2.1a).
 The bi-normalized total complex is homotopy equivalent to the normalized Moore complex of the
 diagonal. One direction is a strict identity; the other uses the EM homotopy. -/
@@ -753,7 +749,7 @@ noncomputable def eilenbergZilberNormalized (X : BisimplicialObject C) :
   hom := normalizedShuffleMap X
   inv := normalizedAlexanderWhitney X
   homotopyHomInvId := Homotopy.ofEq (normalizedShuffle_alexanderWhitney X)
-  homotopyInvHomId := homotopyNormalizedAlexanderWhitneyShuffle X
+  homotopyInvHomId := homotopyAWShuffleNormalized X
 
 /-- The unnormalized Eilenberg–Zilber homotopy equivalence `F₁(X) ≃ F₂(X)`, obtained by
 transporting the normalized equivalence `eilenbergZilberNormalized` across the Dold–Kan bridges:
