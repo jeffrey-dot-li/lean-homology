@@ -55,25 +55,17 @@ noncomputable abbrev F₁ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
 abbrev F₂ : BisimplicialObject C ⥤ ChainComplex C ℕ :=
   diag ⋙ alternatingFaceMapComplex C
 
-/-- The double chain complex obtained from a bisimplicial object by applying
-`alternatingFaceMapComplex` in both simplicial directions.
-Entry `(K X).X p).X q = X_{p,q}`. -/
+/-- The double complex obtained by applying `alternatingFaceMapComplex` in both simplicial
+directions. Its `(p, q)` entry is `X_{p,q}`. -/
 abbrev doubleComplex (X : BisimplicialObject C) :
     HomologicalComplex (ChainComplex C ℕ) (ComplexShape.down ℕ) :=
   ((alternatingFaceMapComplex C).mapHomologicalComplex _).obj
     ((alternatingFaceMapComplex (SimplicialObject C)).obj X)
 
-/-! ### SimplexCategory morphisms for AW and EZ
+/-! ### Basic simplicial maps
 
-The AW and EZ maps are built from two standard families of `SimplexCategory` morphisms:
-
-- **Front face** `ι_front p q : [p] ⟶ [p+q]` — the order-preserving injection `i ↦ i`
-- **Back face** `ι_back p q : [q] ⟶ [p+q]` — the order-preserving injection `j ↦ p + j`
-
-For AW, we *pull back* along these (using contravariance of simplicial objects):
-`X.map (ι_front p q).op` acts vertically `X_{p+q, -} → X_{p, -}`, and
-`(X.obj _).map (ι_back p q).op` acts horizontally `X_{-, p+q} → X_{-, q}`.
--/
+The Alexander-Whitney and shuffle maps are built from the standard front and back inclusions
+`ι_front` and `ι_back`. -/
 
 /-- Front face inclusion `[p] ⟶ [p+q]`: the unique monotone map sending `i ↦ i`. -/
 def ι_front (p q : ℕ) : (⦋p⦌ : SimplexCategory) ⟶ ⦋p + q⦌ :=
@@ -171,22 +163,10 @@ private lemma δ_zero_comp_ι_back (p q : ℕ) :
 
 /-! ### Alexander-Whitney map
 
-The AW map `F₂(X) ⟶ F₁(X)` sends the diagonal chain complex to the total complex.
+The Alexander-Whitney map `F₂(X) ⟶ F₁(X)` sends the diagonal chain complex to the total complex by
+copairing the component maps `awComponent X p q` over all decompositions `p + q = n`. -/
 
-At degree `n`, the component into the `(p,q)`-summand (where `p + q = n`) is:
-```
-  AW_{p,q} : X_{n,n} → X_{p,q}
-  AW_{p,q} = (X.map (ι_front p q).op).app _ ≫ (X.obj _).map (ι_back p q).op
-```
-i.e., apply the front face vertically (`X_{n,n} → X_{p,n}`) then the back face
-horizontally (`X_{p,n} → X_{p,q}`).
-
-The full map at degree `n` is the copairing into the coproduct:
-`AW_n = ∑_{p+q=n} ι_{p,q} ∘ AW_{p,q} : X_{n,n} → ⨁_{p+q=n} X_{p,q}`
--/
-
-/-- Component `X_{n,n} ⟶ X_{p,q}` of the Alexander-Whitney map,
-using front-face vertically and back-face horizontally. -/
+/-- The `(p, q)` component of the Alexander-Whitney map. -/
 noncomputable def awComponent (X : BisimplicialObject C) (p q : ℕ) :
     (X.obj (Opposite.op ⦋p + q⦌)).obj (Opposite.op ⦋p + q⦌) ⟶
     (X.obj (Opposite.op ⦋p⦌)).obj (Opposite.op ⦋q⦌) :=
@@ -194,11 +174,9 @@ noncomputable def awComponent (X : BisimplicialObject C) (p q : ℕ) :
     (X.obj (Opposite.op ⦋p⦌)).map (ι_back p q).op
 
 omit [Preadditive C] [HasFiniteCoproducts C] in
-/-- Composing a diagonal face map `δ_k` with `eqToHom ≫ awComponent(p, q)` at degree `n+1`.
+/-- Rewrite a diagonal face composed with an Alexander-Whitney component.
 
-This is the key identity for proving `alexanderWhitney.comm'`: the diagonal face map
-composed with a cast and AW component decomposes based on whether `k ≤ p` (face on front)
-or `k > p` (face on back). -/
+The result splits according to whether the face lands in the front block or the back block. -/
 private lemma diag_δ_comp_eqToHom_awComponent (X : BisimplicialObject C)
     (n p q : ℕ) (hpq : p + q = n) (k : Fin (n + 2)) :
     (X.map (SimplexCategory.δ k).op).app (Opposite.op ⦋n + 1⦌) ≫
@@ -262,11 +240,8 @@ private lemma diag_δ_comp_eqToHom_awComponent (X : BisimplicialObject C)
     rfl
 
 omit [Preadditive C] [HasFiniteCoproducts C] in
-/-- Core AW front-back identity with canonical arithmetic casts: the top face of
-`awComponent (p+1, q)` agrees with the bottom face of `awComponent (p, q+1)`.
-This is the simplicial identity underlying the cross-term cancellation in
-`alexanderWhitney.comm'`; the wrapper below only adapts arbitrary `eqToHom`
-witnesses from the total-complex expression. -/
+/-- The top face of `awComponent (p+1, q)` agrees with the bottom face of
+`awComponent (p, q+1)`, up to the canonical arithmetic cast. -/
 private lemma awComponent_top_face_eq_bottom_face (X : BisimplicialObject C) (p q : ℕ) :
     awComponent X (p + 1) q ≫
         (X.map (SimplexCategory.δ (Fin.last (p + 1))).op).app (Opposite.op ⦋q⦌) =
@@ -341,10 +316,7 @@ private lemma sum_bij_back {α : Type*} [AddCommMonoid α] {j : ℕ} (x : Fin (j
     omega
   · intros; simpa using hfg _
 
-/-- The Alexander-Whitney chain map `F₂(X) ⟶ F₁(X)`.
-
-At degree `n`, maps `X_{n,n}` into `⨁_{p+q=n} X_{p,q}` by copairing the
-`awComponent` maps with the coproduct inclusions `ιTotal`. -/
+/-- The Alexander-Whitney chain map `F₂(X) ⟶ F₁(X)`. -/
 noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     F₂.obj X ⟶ F₁.obj X where
   f n := by
@@ -358,20 +330,20 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     intro i j h
     simp only [id]
     rw [ComplexShape.down_Rel] at h; subst h
-    -- Expand the total differential on the left.
+    -- Expand the total differential on the left into its `D₁ + D₂` pieces.
     simp only [Preadditive.sum_comp, Category.assoc]
     change ∑ x : Fin (j + 2), _ ≫ _ ≫ _ ≫
       (HomologicalComplex₂.total (doubleComplex X) (ComplexShape.down ℕ)).d (j + 1) j = _
     rw [HomologicalComplex₂.total_d]
     simp only [Preadditive.comp_add, Finset.sum_add_distrib,
       HomologicalComplex₂.ι_D₁, HomologicalComplex₂.ι_D₂]
-    -- Expand the diagonal differential on the right.
+    -- Expand the diagonal differential on the right as the alternating face sum.
     simp only [Preadditive.comp_sum]
     simp only [F₂, Functor.comp_obj, diag_obj_obj, alternatingFaceMapComplex_obj_d,
       AlternatingFaceMapComplex.objD, SimplicialObject.δ, diag_obj_map]
     simp only [Preadditive.sum_comp, Preadditive.zsmul_comp, Category.assoc]
-    -- Rewrite each diagonal face through `awComponent`; `conv` avoids matching issues
-    -- from the `eqToHom` witnesses.
+    -- Rewrite each diagonal face through `awComponent`.
+    -- `conv` is used here because the target term sits under nested sums and casts.
     conv_rhs =>
       enter [2, x, 2, x_1, 2]
       rw [reassoc_of% diag_δ_comp_eqToHom_awComponent X j (↑x) (j - ↑x)
@@ -379,8 +351,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     simp only [smul_dite, dite_comp]
     simp_rw [Finset.sum_dite]
     rw [Finset.sum_add_distrib]
-    -- A direct branchwise split leaves one extra top `d₁` face and one extra bottom
-    -- `d₂` face on the left. Peel those boundary terms first.
+    -- Separate off the two boundary faces so the remaining sums have matching index ranges.
     conv_lhs => rw [Fin.sum_univ_succ]
     rw [HomologicalComplex₂.d₁_eq_zero _ _ _ _ _ (by simp), comp_zero, comp_zero, zero_add]
     conv_lhs => enter [2]; rw [Fin.sum_univ_castSucc]
@@ -395,7 +366,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       rw [HomologicalComplex₂.d₂_eq _ _ _
             (show (ComplexShape.down ℕ).Rel (j + 1 - ↑i.castSucc) (j - ↑i.castSucc) by
               simp; omega) _ (by simp; omega)]
-    -- Normalize the total-complex signs `ε₁ = 1` and `ε₂ = (-1)^p`.
+    -- Replace the total-complex signs by their explicit formulas.
     simp_rw [show ∀ p q : ℕ,
               ((ComplexShape.down ℕ).ε₁ (.down ℕ) (.down ℕ) (p, q) : ℤˣ) = 1
               from fun _ _ => rfl,
@@ -404,7 +375,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
               ((ComplexShape.down ℕ).ε₂ (.down ℕ) (.down ℕ) (p, q) : ℤˣ) = (-1 : ℤˣ)^p
               from fun _ _ => rfl]
     simp only [Fin.val_castSucc]
-    -- Rewrite the d₂ index into `(n+1, n)` form before expanding the differential.
+    -- Rewrite the `d₂` index into successor form before unfolding the differential.
     conv_lhs =>
       enter [2, 2, x]
       rw [(HomologicalComplex.eqToHom_comp_d _
@@ -416,7 +387,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       enter [2, 2, x]
       simp only [Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X,
         alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD, SimplicialObject.δ]
-    -- For the d₁ branch, expose the `.f` component before distributing `.app` over the sum.
+    -- Expose the `.f` component so `NatTrans.app` distributes over the sum.
     conv_lhs =>
       enter [1, 2, x]
       simp only [Fin.val_succ, doubleComplex, Functor.mapHomologicalComplex_obj_d,
@@ -425,11 +396,11 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     conv_lhs =>
       enter [1, 2, x]
       rw [NatTrans.app_sum, Finset.sum_congr rfl (fun x _ => NatTrans.app_zsmul _ _ _)]
-    -- Distribute compositions and scalars so both sides are double sums of compositions.
+    -- Distribute composition and scalar multiplication to put both sides into the same shape.
     simp only [Units.smul_def, Preadditive.comp_sum, Preadditive.sum_comp,
       Preadditive.zsmul_comp, Preadditive.comp_zsmul, Category.assoc,
       Finset.smul_sum, smul_smul]
-    -- Peel the remaining boundary faces so the interior index ranges match the RHS.
+    -- Peel the remaining boundary faces so the interior ranges line up.
     conv_lhs =>
       enter [1, 2, x]
       rw [Fin.sum_univ_castSucc]
@@ -437,11 +408,10 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       enter [2, 2, x]
       rw [Fin.sum_univ_succ]
     simp only [Finset.sum_add_distrib]
-    -- Name the four LHS branches and the two RHS branches, then regroup so the two
-    -- boundary terms sit together.
+    -- Name the summands and regroup them so the boundary terms can be cancelled together.
     name_parts ?A0 + ?B0 + (?C0 + ?D0) = ?E0 + ?F0
     rw [show A0 + B0 + (C0 + D0) = (A0 + D0) + (B0 + C0) from by abel]
-    -- Match the interior sums by reindexing, then cancel the two boundary terms.
+    -- Reindex the interior sums and then cancel the boundary pair.
     have hAE : A0 = E0 := by
       refine Finset.sum_congr rfl (fun x _ => ?_)
       refine sum_bij_front (x := x) ?_
@@ -500,22 +470,10 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
       congr 1
       simp only [eqToHom_refl, Category.id_comp]
     rw [hAE, hDF, hBC, add_zero]
-/-! ### Eilenberg-Zilber / shuffle map
+/-! ### Shuffle map
 
-The EZ map `F₁(X) ⟶ F₂(X)` sends the total complex to the diagonal chain complex.
-
-On the `(p,q)`-summand of the total complex at degree `n = p + q`, it maps
-`X_{p,q} → X_{n,n}` via a signed sum over `(p,q)`-shuffles:
-```
-  EZ_{p,q} = ∑_{μ : Shuffle p q} sign(μ) ·
-    ((X.obj (op ⦋p⦌)).map (μ.sndHom).op ≫ (X.map (μ.fstHom).op).app (op ⦋p+q⦌))
-```
-i.e., apply `sndHom` horizontally (`X_{p,q} → X_{p,p+q}`) then `fstHom` vertically
-(`X_{p,p+q} → X_{p+q,p+q}`).
-
-The full map at degree `n` is defined by giving a map out of each summand of the
-coproduct `⨁_{p+q=n} X_{p,q}`, using `totalDesc`.
--/
+The shuffle map `F₁(X) ⟶ F₂(X)` is defined on each bidegree `(p, q)` by the signed sum over
+`(p, q)`-shuffles, and then assembled with `totalDesc`. -/
 
 /-- First projection of a shuffle as a `SimplexCategory` morphism `⦋p+q⦌ ⟶ ⦋p⦌`. -/
 def shuffleFstHom {p q : ℕ} (μ : Shuffle p q) : (⦋p + q⦌ : SimplexCategory) ⟶ ⦋p⦌ :=
@@ -525,8 +483,7 @@ def shuffleFstHom {p q : ℕ} (μ : Shuffle p q) : (⦋p + q⦌ : SimplexCategor
 def shuffleSndHom {p q : ℕ} (μ : Shuffle p q) : (⦋p + q⦌ : SimplexCategory) ⟶ ⦋q⦌ :=
   SimplexCategory.Hom.mk (OrderHom.snd.comp μ.1)
 
-/-- Component `X_{p,q} ⟶ X_{p+q,p+q}` of the Eilenberg-Zilber map: the signed sum
-over all `(p,q)`-shuffles, applying degeneracy maps in both simplicial directions. -/
+/-- The `(p, q)` component of the shuffle map. -/
 noncomputable def ezComponent (X : BisimplicialObject C) (p q : ℕ) :
     (X.obj (Opposite.op ⦋p⦌)).obj (Opposite.op ⦋q⦌) ⟶
     (X.obj (Opposite.op ⦋p + q⦌)).obj (Opposite.op ⦋p + q⦌) :=
@@ -534,50 +491,11 @@ noncomputable def ezComponent (X : BisimplicialObject C) (p q : ℕ) :
     ((X.obj (Opposite.op ⦋p⦌)).map (shuffleSndHom μ).op ≫
       (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋p + q⦌))
 
-/-! ### Leibniz rule for the shuffle map
+/-! ### Boundary formula for the shuffle components
 
-The chain map condition for the shuffle map reduces to showing that
-`ezComponent p q ≫ d_diag(p+q)` splits into a "vertical" sum (matching `d₁`)
-and a "horizontal" sum (matching `d₂`).
-
-The diagonal face map `(diag.obj X).δ k` applies `δ k` in both simplicial
-directions simultaneously:
-  `(diag.obj X).δ k = (X.map (δ k).op).app _ ≫ (X.obj _).map (δ k).op`
-
-The Leibniz rule says that composing the shuffle sum with the alternating
-face map differential on the diagonal decomposes as:
-  `ezComponent(p,q) ≫ objD(diag X, p+q) = verticalPart + horizontalPart`
-where the vertical part involves face maps in the first simplicial direction
-composed with `ezComponent(p-1, q)`, and the horizontal part involves face
-maps in the second direction composed with `ezComponent(p, q-1)`.
-
-#### Proof strategy
-
-Unlike the SSet Eilenberg-Zilber proof (`crossProduct_boundary_naturality` in
-`EilenbergZilber.lean`), there is no naturality reduction available here.
-The SSet proof factors through universal simplices `Δ[p] ⊗ Δ[q]` and uses
-naturality of the cross product to reduce to `universalSimplexCrossProduct_boundary`.
-In the bisimplicial setting, `ezComponent` is already defined abstractly for any
-bisimplicial object in a preadditive category, so the proof must be directly
-combinatorial.
-
-The proof follows the pattern of `universalSimplexCrossProduct_boundary`:
-
-1. **Expand `ezComponent`**: Unfold as `∑ μ, μ.sign • (sndHom ≫ fstHom)` and
-   distribute through `d` via `Preadditive.sum_comp`, `Preadditive.zsmul_comp`.
-
-2. **Expand the diagonal differential**: The differential is an alternating sum
-   of `(diag.obj X).δ k`, each of which decomposes as `δ_vert k ≫ δ_horiz k`.
-   Distribute via `Preadditive.comp_sum`, `Preadditive.comp_zsmul`.
-
-3. **Apply simplicial identities**: Rewrite compositions `shuffleFstHom(μ) ≫ δ k`
-   and `shuffleSndHom(μ) ≫ δ k` using the simplicial identity `δ ≫ σ` relations.
-   This is the core combinatorial step.
-
-4. **Swap sums and reindex**: Interchange `∑ μ ∑ k` to `∑ k ∑ μ` and recognize
-   that the inner sum over shuffles reconstitutes `ezComponent` at lower degree,
-   yielding the vertical + horizontal decomposition.
--/
+The chain map condition for `shuffleMap` is reduced to a componentwise identity for
+`ezComponent`: composing with the diagonal differential splits into the expected vertical and
+horizontal boundary terms. -/
 
 /-- Left insertion face factorization (fst component):
 `δ_{insertLeftIndex} ≫ eqToHom ≫ fstHom(insertLeftStep ν j) = fstHom(ν) ≫ δ(j)`. -/
@@ -721,20 +639,11 @@ lemma sndHom_swapDiagonalSteps_comp_δ {p q n : ℕ}
       (Fin.succAbove_ne r ⟨i, by simp only [SimplexCategory.len_mk] at hi; omega⟩)))
 
 omit [HasFiniteCoproducts C] in
-/-- **Leibniz rule for the shuffle map.**
+/-- Boundary formula for `ezComponent`.
 
-The shuffle map component `ezComponent(p, q)`, composed with the alternating
-face map differential on the diagonal, decomposes into:
-- a "vertical" sum: face maps in the first simplicial direction composed with
-  `ezComponent(p-1, q)` (zero when `p = 0`)
-- a "horizontal" sum: face maps in the second simplicial direction composed with
-  `ezComponent(p, q-1)` (zero when `q = 0`), carrying the sign `(-1)^p`
-
-This is the core combinatorial identity underlying the chain map condition
-for the Eilenberg-Zilber map.
-
-The differential `((alternatingFaceMapComplex C).obj (diag.obj X)).d (p+q) j` is
-used instead of `objD` to avoid definitional index mismatches. -/
+Composing `ezComponent X p q` with the diagonal differential splits into the vertical boundary
+term coming from the first simplicial direction and the horizontal boundary term coming from the
+second. The differential is written as `.d` rather than `objD` to avoid index-cast noise. -/
 lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
     (h : (ComplexShape.down ℕ).Rel (p + q) j) :
     ezComponent X p q ≫
@@ -760,22 +669,21 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             eqToHom (by
               have : j + 1 = p + (q' + 1) := by rwa [ComplexShape.down_Rel] at h
               simp [show p + q' = j from by omega]))) := by
-  -- Step 1: Expand ezComponent as ∑ μ, sign • (sndHom ≫ fstHom) and distribute through d.
+  -- Expand `ezComponent` and distribute composition over the shuffle sum.
   simp only [ezComponent, Preadditive.sum_comp, Preadditive.zsmul_comp]
-  -- Step 2: Shift .d (p+q) j ↦ eqToHom _ ≫ .d (j+1) j so alternatingFaceMapComplex_obj_d
-  -- fires, then expand the differential as ∑ (-1)^k • δ k and distribute.
+  -- Rewrite `.d (p+q) j` into successor form so `alternatingFaceMapComplex_obj_d` applies,
+  -- then expand the differential as an alternating face sum.
   have hrel : (ComplexShape.down ℕ).Rel (j + 1) j := by simp [ComplexShape.down_Rel]
   simp_rw [(HomologicalComplex.eqToHom_comp_d _ h hrel).symm,
     alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD,
     Category.assoc, Preadditive.comp_sum, Preadditive.comp_zsmul]
-  -- Step 3: Expand (diag.obj X).δ k into vertical ≫ horizontal face maps.
+  -- Expand each diagonal face into its vertical and horizontal parts.
   simp only [SimplicialObject.δ, diag_obj_map]
-  -- Step 4: Use naturality of X.map (shuffleFstHom x).op to commute fstHom past δ_vert.
+  -- Commute the shuffle maps past the diagonal faces by naturality.
   simp_rw [← (X.map (SimplexCategory.δ _).op).naturality]
-  -- Absorb eqToHom and commute fstHom past horizontal δ via naturality of X.map(fstHom).
   simp_rw [← Category.assoc
     ((X.map (shuffleFstHom _).op).app (Opposite.op ⦋p + q⦌))]
-  -- Name the diagonal eqToHom proof, then factor it into vertical ≫ horizontal.
+  -- Split the resulting cast into its vertical and horizontal pieces.
   generalize_proofs _ _ heq
   have hpq : Opposite.op ⦋p + q⦌ = Opposite.op (⦋j + 1⦌ : SimplexCategory) := by
     exact congrArg Opposite.op (congrArg SimplexCategory.mk
@@ -790,27 +698,25 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
   simp_rw [show eqToHom heq = eqToHom heq_vert ≫ eqToHom heq_horiz from by
     rw [show heq = heq_vert.trans heq_horiz from proof_irrel _ _, eqToHom_trans],
     Category.assoc]
-  -- Fold horizontal: eqToHom heq_horiz = X_⦋j+1⦌.map(eqToHom hpq).
+  -- Rewrite the horizontal cast as a functorial map.
   simp_rw [show eqToHom heq_horiz = (X.obj (Opposite.op ⦋j + 1⦌)).map (eqToHom hpq) from
     (eqToHom_map (X.obj (Opposite.op ⦋j + 1⦌)) hpq).symm]
-  -- Fold X_⦋j+1⦌.map(eqToHom hpq) ≫ X_⦋j+1⦌.map(δ k).op into X_⦋j+1⦌.map(eqToHom hpq ≫ (δ k).op).
   simp_rw [← Category.assoc ((X.obj (Opposite.op ⦋j + 1⦌)).map (eqToHom hpq)),
     ← Functor.map_comp]
-  -- Fold vertical: eqToHom heq_vert = (X.map (eqToHom hpq)).app _.
+  -- Rewrite the vertical cast as a naturality square.
   simp_rw [show eqToHom heq_vert = (X.map (eqToHom hpq)).app (Opposite.op ⦋p + q⦌) from by
     rw [eqToHom_map, eqToHom_app]]
-  -- Fold fstHom.app ≫ (X.map (eqToHom hpq)).app into (fstHom ≫ X.map(eqToHom hpq)).app.
   simp_rw [← Category.assoc ((X.map (shuffleFstHom _).op).app (Opposite.op ⦋p + q⦌))]
   simp_rw [← NatTrans.comp_app, ← Functor.map_comp]
   simp_rw [← Category.assoc ((X.map ((shuffleFstHom _).op ≫ eqToHom hpq)).app _),
     ← (X.map ((shuffleFstHom _).op ≫ eqToHom hpq)).naturality, Category.assoc]
-  -- Fold adjacent horizontal maps and adjacent vertical maps.
+  -- Merge adjacent horizontal and vertical maps.
   simp_rw [← Category.assoc ((X.obj (Opposite.op ⦋p⦌)).map (shuffleSndHom _).op),
     ← Functor.map_comp,
     ← NatTrans.comp_app, ← Functor.map_comp]
-  -- Step 5: Collapse double sum ∑ μ, sign(μ) • ∑ k, (-1)^k • f into ∑ μ, ∑ k, (sign * (-1)^k) • f.
+  -- Put the coefficients into a single scalar on each summand.
   simp_rw [Finset.smul_sum, smul_smul]
-  -- Step 6: Split inner sum into diagonal + non-diagonal vertices.
+  -- Split the face sum into diagonal and non-diagonal vertices.
   have hj : p + q = j + 1 := by rw [ComplexShape.down_Rel] at h; omega
   let castIdx : Fin (j + 2) → Index (p + q) := fun r => r.cast (by omega)
   let isDiag := fun (μ : Shuffle p q) (r : Fin (j + 2)) =>
@@ -821,10 +727,10 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
     enter [2, x]
     rw [show ∑ r, _ = _ from
       (Finset.sum_filter_add_sum_filter_not Finset.univ (isDiag x) _).symm]
-  -- Step 7: Distribute ∑ μ over the diagonal + non-diagonal split.
+  -- Distribute the outer sum over this decomposition.
   simp_rw [Finset.sum_add_distrib]
-  -- Step 8: Cancel the diagonal sum via sign-reversing involution.
-  -- Helper to extract isDiagonalVertex from sigma finset membership.
+  -- Cancel the diagonal part by the standard sign-reversing involution.
+  -- Helper to recover `isDiagonalVertex` from membership in the sigma-type filter.
   have diag_of_mem {x : Σ _ : Shuffle p q, Fin (j + 2)}
       (hx : x ∈ (Finset.univ : Finset (Shuffle p q)).sigma
         fun μ => Finset.filter (isDiag μ) Finset.univ) :
@@ -844,15 +750,12 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         dsimp only
         have hsnd := sndHom_swapDiagonalSteps_comp_δ x.1 x.2 hj.symm hr
         have hfst := fstHom_swapDiagonalSteps_comp_δ x.1 x.2 hj.symm hr
-        -- Lift equalities to op: (δ ≫ eqToHom ≫ f(swap)).op = (δ ≫ eqToHom ≫ f(μ)).op
-        -- then expand with op_comp to get
-        -- f(swap).op ≫ eqToHom.op ≫ δ.op = f(μ).op ≫ eqToHom.op ≫ δ.op
+        -- Pass to opposites so the shuffle identities match the maps appearing in the summand.
         have hsnd_op := congrArg Quiver.Hom.op hsnd
         have hfst_op := congrArg Quiver.Hom.op hfst
         simp only [op_comp] at hsnd_op hfst_op
         simp only [eqToHom_op, Category.assoc] at hsnd_op hfst_op
-        -- The eqToHom proof terms differ syntactically but are equal by proof_irrel.
-        -- Use generalize_proofs to unify them, then rewrite.
+        -- The cast proofs differ syntactically, so `generalize_proofs` is used to align them.
         generalize_proofs _ _ _ _ _ _ _ _ _ _ hsndP _ _ hfstP _ at hsnd_op hfst_op ⊢
         simp only [Category.assoc] at hsnd_op hfst_op ⊢
         rw [hsnd_op.symm, hfst_op.symm])
@@ -868,7 +771,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         have hr := diag_of_mem hx
         exact Sigma.ext
           (Shuffle.swapDiagonalSteps_involutive x.1 (castIdx x.2) hr) (by simp))
-  · -- Step 9: Split non-diagonal vertices into left-type + right-type.
+  · -- Split the non-diagonal part into left-type and right-type vertices.
     let isLeftType := fun (μ : Shuffle p q) (r : Fin (j + 2)) =>
       Shuffle.isLeftStep μ ⟨min r.val (p + q - 1), by omega⟩
     haveI isLeftType_dec : ∀ μ, DecidablePred (isLeftType μ) :=
@@ -879,35 +782,33 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         (Finset.univ.filter (fun r => ¬isDiag x r)) (isLeftType x) _).symm]
     simp_rw [Finset.sum_add_distrib]
     congr 1
-    · -- Step 10: Left faces — match with vertical differential
+    · -- Left-type vertices produce the vertical differential.
       rcases p with _ | p'
-      · -- p = 0: LHS is 0, RHS sum is empty (no left steps in Shuffle 0 q).
+      · -- If `p = 0`, there are no left steps.
         symm
         apply Finset.sum_eq_zero
         intro μ _
         apply Finset.sum_eq_zero
         intro r hr
         simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hr
-        -- isLeftType requires isLeftStep, but Shuffle 0 q has no left steps:
-        -- the first component of μ is always in Fin 1, so it can't strictly increase.
+        -- `Shuffle 0 q` has no left steps because the first coordinate is forced to be `0`.
         exfalso
         have hlt := hr.2
         simp only [isLeftType, Shuffle.isLeftStep] at hlt
         exact absurd hlt (by omega)
-      · -- p = p' + 1: bijection via insertLeftStep
+      · -- For `p + 1`, reindex by `insertLeftStep`.
         simp only []
         rw [← Fintype.sum_prod_type']
         rw [Finset.sum_sigma']
-        -- set_option maxHeartbeats 400000 in
         apply Finset.sum_nbij
           (fun x => ⟨Shuffle.insertLeftStep x.2 x.1,
             (Shuffle.insertLeftIndex x.2 x.1).cast (by omega)⟩)
-        · -- hi : image lands in the non-diagonal left-type filter
+        · -- The image lies in the non-diagonal left-type part.
           intro ⟨j, ν⟩ _
           simp only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and]
           exact ⟨Shuffle.insertLeftStep_not_diagonal ν j,
                  Shuffle.insertLeftStep_isLeftType ν j⟩
-        · -- hinj : the map is injective
+        · -- Injectivity.
           intro ⟨j₁, ν₁⟩ _ ⟨j₂, ν₂⟩ _ h
           rw [Sigma.mk.inj_iff] at h
           obtain ⟨hμ, hr⟩ := h
@@ -916,21 +817,19 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             exact Fin.ext (by simpa using congrArg (fun x => x.val) heq)
           obtain ⟨hj, hν⟩ := Shuffle.insertLeftStep_injective j₁ j₂ ν₁ ν₂ hμ hr'
           exact Prod.ext hj hν
-        · -- hsurj : the map is surjective
+        · -- Surjectivity.
           intro ⟨μ, r⟩ hmem
           simp only [Finset.mem_coe, Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter,
             true_and] at hmem
           obtain ⟨hnd, hlt⟩ := hmem
           rcases q with _ | q'
-          · -- q = 0: construct the preimage directly. The unique Shuffle p' 0
-            -- maps to the unique Shuffle (p'+1) 0 under insertLeftStep at any face.
+          · -- If `q = 0`, there is only the default shuffle.
             have hj' : p' + 1 = j + 1 := by omega
             refine ⟨(⟨r.val, by omega⟩, default), Finset.mem_univ _, ?_⟩
             apply Sigma.ext
             · exact Subsingleton.elim _ _
             · apply heq_of_eq; apply Fin.ext
               simp only [Shuffle.insertLeftIndex, Fin.val_cast]
-              -- For Shuffle p' 0, snd ∈ Fin 1 so snd = 0, and coordSum gives fst = index.
               have hfst : ∀ (r₁ : Fin (p' + 0 + 1)),
                   ((default : Shuffle p' 0).1 r₁).1.val = r₁.val := by
                 intro r₁
@@ -955,13 +854,13 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
                 (Shuffle.insertRightStep ν k) ⟨min r.val ((p' + 1) + (q' + 1) - 1), by omega⟩ := rfl
               rw [this] at hlt
               convert hlt using 2; congr 1
-        · -- Summand equality
+        · -- Compare the summands after rewriting the inserted shuffle maps.
           intro ⟨jj, ν⟩ _
           dsimp only
           have hsign := Shuffle.sign_insertLeftStep ν jj
           congr 1
           · simp only [Fin.val_cast]; linarith
-          · -- Rewrite RHS composed morphisms using the insertLeftStep face factorizations.
+          ·
             have hfst_op := congrArg Quiver.Hom.op
               (fstHom_insertLeftStep_comp_δ ν jj hj.symm)
             have hsnd_op := congrArg Quiver.Hom.op
@@ -980,17 +879,16 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             rw [NatTrans.congr _ hpq', NatTrans.congr _ hpq']
             simp only [eqToHom_map, eqToHom_trans, eqToHom_trans_assoc, Category.assoc,
               eqToHom_refl, Category.id_comp]
-    · -- Step 11: Right faces — match with horizontal differential
+    · -- Right-type vertices produce the horizontal differential.
       rcases q with _ | q'
-      · -- q = 0: LHS is 0, RHS sum is empty (no right-type vertices in Shuffle p 0).
+      · -- If `q = 0`, there are no right-type vertices.
         symm
         apply Finset.sum_eq_zero
         intro μ _
         apply Finset.sum_eq_zero
         intro r hr
         simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hr
-        -- For Shuffle p 0, every step is a left step (snd ∈ Fin 1 so snd = 0,
-        -- coordSum gives fst = index, hence fst strictly increases).
+        -- In `Shuffle p 0`, every step is left, so the right-type part is empty.
         exfalso
         have hnotleft := hr.2
         simp only [isLeftType, Shuffle.isLeftStep] at hnotleft
@@ -1003,28 +901,27 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
         simp only [Fin.ext_iff, Fin.val_zero] at hs1 hs2
         simp only [Fin.val_succ, Fin.val_castSucc] at hcs1 hcs2
         omega
-      · -- q = q' + 1: bijection via insertRightStep
+      · -- For `q + 1`, reindex by `insertRightStep`.
         simp only []
         rw [← Fintype.sum_prod_type']
         rw [Finset.sum_sigma']
         apply Finset.sum_nbij
           (fun x => ⟨Shuffle.insertRightStep x.2 x.1,
             (Shuffle.insertRightIndex x.2 x.1).cast (by omega)⟩)
-        · -- hi : image lands in the non-diagonal non-left-type filter
+        · -- The image lands in the non-diagonal right-type part.
           intro ⟨k, ν⟩ _
           simp only [Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter, true_and]
           constructor
-          · -- non-diagonal: for p = 0, fst is constant 0 so isLeftStep is always false
-            -- and isDiagonalVertex requires isLeftStep to change, hence also false.
+          · -- For `p = 0`, diagonality is impossible because the first coordinate is constant.
             rcases p with _ | p'
             · intro hdiag
               simp only [isDiag, Shuffle.isDiagonalVertex] at hdiag
               split_ifs at hdiag with h1 h2
               all_goals simp only [Shuffle.isLeftStep] at hdiag; all_goals omega
             · exact Shuffle.insertRightStep_not_diagonal ν k
-          · -- non-left-type (i.e. right-type)
+          · -- This is exactly the right-type condition.
             exact Shuffle.insertRightStep_not_isLeftType ν k
-        · -- hinj : the map is injective
+        · -- Injectivity.
           intro ⟨k₁, ν₁⟩ _ ⟨k₂, ν₂⟩ _ h
           rw [Sigma.mk.inj_iff] at h
           obtain ⟨hμ, hr⟩ := h
@@ -1033,13 +930,13 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             exact Fin.ext (by simpa using congrArg (fun x => x.val) heq)
           obtain ⟨hk, hν⟩ := Shuffle.insertRightStep_injective k₁ k₂ ν₁ ν₂ hμ hr'
           exact Prod.ext hk hν
-        · -- hsurj : the map is surjective
+        · -- Surjectivity.
           intro ⟨μ, r⟩ hmem
           simp only [Finset.mem_coe, Finset.mem_sigma, Finset.mem_univ, Finset.mem_filter,
             true_and] at hmem
           obtain ⟨hnd, hnotleft⟩ := hmem
           rcases p with _ | p'
-          · -- p = 0: the unique Shuffle 0 q' maps to the unique Shuffle 0 (q'+1).
+          · -- If `p = 0`, there is only the default shuffle.
             have hj' : q' + 1 = j + 1 := by omega
             refine ⟨(⟨r.val, by omega⟩, default), Finset.mem_univ _, ?_⟩
             apply Sigma.ext
@@ -1069,13 +966,13 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
               apply Sigma.ext hμ_eq.symm
               apply heq_of_eq; apply Fin.ext
               simpa [Fin.val_cast] using hr_eq
-        · -- Summand equality
+        · -- Compare the summands after rewriting the inserted shuffle maps.
           intro ⟨kk, ν⟩ _
           dsimp only
           have hsign := Shuffle.sign_insertRightStep ν kk
           congr 1
           · simp only [Fin.val_cast]; linarith
-          · -- Rewrite RHS composed morphisms using the insertRightStep face factorizations.
+          ·
             have hfst_op := congrArg Quiver.Hom.op
               (fstHom_insertRightStep_comp_δ ν kk hj.symm)
             have hsnd_op := congrArg Quiver.Hom.op
@@ -1086,8 +983,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             rw [hsnd_op, hfst_op]
             simp only [Functor.map_comp, NatTrans.comp_app, Category.assoc]
             simp only [eqToHom_map, eqToHom_app]
-            -- Both sides share the prefix X_⦋p⦌.map(δ kk).op ≫ X_⦋p⦌.map(sndHom ν).op;
-            -- the tails differ only by eqToHom placement around (X.map(fstHom ν).op).app.
+            -- The only difference is the placement of the final arithmetic cast.
             congr 1; congr 1
             generalize_proofs h1 h2
             have hpq' := congrArg Opposite.op
@@ -1096,10 +992,7 @@ lemma ezComponent_boundary (X : BisimplicialObject C) (p q j : ℕ)
             simp only [eqToHom_map, eqToHom_trans, Category.assoc]
 
 
-/-- The Eilenberg-Zilber (shuffle) chain map `F₁(X) ⟶ F₂(X)`.
-
-At degree `n`, maps `⨁_{p+q=n} X_{p,q}` into `X_{n,n}` by giving the `ezComponent`
-on each summand, assembled via `totalDesc`. -/
+/-- The shuffle chain map `F₁(X) ⟶ F₂(X)`. -/
 noncomputable def shuffleMap (X : BisimplicialObject C) :
     F₁.obj X ⟶ F₂.obj X where
   f n := HomologicalComplex₂.totalDesc (doubleComplex X) (fun p q h => by
@@ -1107,14 +1000,13 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
     exact ezComponent X p q ≫ eqToHom (by subst h; rfl))
   comm' := by
     intro i j h
-    -- Reduce to per-summand equality: two maps out of ⨁_{p+q=i} X_{p,q} agree
-    -- iff they agree after precomposing with each coproduct inclusion ιTotal.
+    -- Reduce to equality after precomposing with each coproduct inclusion.
     apply HomologicalComplex₂.total.hom_ext
     intro p q hp
-    -- Eliminate i in favor of p + q.
+    -- Replace `i` by `p + q`.
     simp only [ComplexShape.π_def] at hp; subst hp
-    -- Simplify ιTotal ≫ totalDesc to ezComponent on the LHS;
-    -- decompose total.d into D₁ + D₂ and simplify ιTotal ≫ D₁/D₂ to d₁/d₂ on the RHS.
+    -- Identify the left side with `ezComponent`, and the right side with the two total-complex
+    -- differential pieces `d₁` and `d₂`.
     simp only [Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X,
       Functor.comp_obj, diag_obj_obj, HomologicalComplex₂.totalFunctor_obj, ComplexShape.π_def,
       HomologicalComplex₂.ι_totalDesc_assoc, Category.assoc,
@@ -1124,16 +1016,16 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
       HomologicalComplex₂.ι_D₁_assoc, HomologicalComplex₂.ι_D₂_assoc,
       Functor.mapHomologicalComplex_obj_X, alternatingFaceMapComplex_obj_X]
     rw [ezComponent_boundary X p q j h]
-    -- Split into vertical = d₁ and horizontal = d₂.
+    -- The boundary formula now matches the `d₁` and `d₂` contributions separately.
     apply congrArg₂ HAdd.hAdd
-    ---- Vertical part: match p with ... = d₁ ≫ totalDesc ----
+    ---- Vertical part ----
     · rcases p with _ | p
-      · -- p = 0: vertical part is 0, d₁ vanishes (no predecessor of 0).
+      · -- If `p = 0`, the vertical differential vanishes.
         simp only
         rw [HomologicalComplex₂.d₁_eq_zero]
         · simp
         · intro hrel; simp [ComplexShape.down_Rel] at hrel
-      · -- p = p + 1: expand d₁ via d₁_eq, simplify ε₁ = 1.
+      · -- Otherwise expand `d₁` and simplify the sign `ε₁ = 1`.
         simp only [alternatingFaceMapComplex_obj_X, diag_obj_obj, Int.reduceNeg]
         rw [HomologicalComplex₂.d₁_eq (doubleComplex X) (ComplexShape.down ℕ)
           (show (ComplexShape.down ℕ).Rel (p + 1) p from by simp [ComplexShape.down_Rel])
@@ -1150,14 +1042,14 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
           alternatingFaceMapComplex_map_f]
         conv_rhs => rw [NatTrans.app_sum,
           Finset.sum_congr rfl (fun x _ => NatTrans.app_zsmul _ _ _)]
-    ---- Horizontal part: match q with ... = d₂ ≫ totalDesc ----
+    ---- Horizontal part ----
     · rcases q with _ | q
-      · -- q = 0: horizontal part is 0, d₂ vanishes (no predecessor of 0).
+      · -- If `q = 0`, the horizontal differential vanishes.
         simp only
         rw [HomologicalComplex₂.d₂_eq_zero]
         · simp
         · intro hrel; simp [ComplexShape.down_Rel] at hrel
-      · -- q = q + 1: expand d₂ via d₂_eq, simplify ε₂ = (-1)^p.
+      · -- Otherwise expand `d₂` and simplify the sign `ε₂ = (-1)^p`.
         simp only [alternatingFaceMapComplex_obj_X, diag_obj_obj, Int.reduceNeg]
         rw [HomologicalComplex₂.d₂_eq (doubleComplex X) (ComplexShape.down ℕ)
           p (show (ComplexShape.down ℕ).Rel (q + 1) q from by simp [ComplexShape.down_Rel])
@@ -1173,8 +1065,7 @@ noncomputable def shuffleMap (X : BisimplicialObject C) :
             alternatingFaceMapComplex_obj_d, AlternatingFaceMapComplex.objD, SimplicialObject.δ]
         · simp only [HomologicalComplex₂.ι_totalDesc]
 
-/-- Base case `n = 0` of `∇AW = 1 + d(H)`: on `X_{0,0}` only the `p = q = 0` shuffle
-contributes and the front/back faces are identities, so `∇AW` is already the identity. -/
+/-- In degree `0`, the composite `alexanderWhitney ≫ shuffleMap` is the identity. -/
 lemma awShuffle_f_zero (X : BisimplicialObject C) :
     (alexanderWhitney X ≫ shuffleMap X).f 0 =
       (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f 0 := by
