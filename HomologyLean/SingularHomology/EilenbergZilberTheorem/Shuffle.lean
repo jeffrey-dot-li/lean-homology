@@ -75,9 +75,6 @@ import Mathlib.Tactic
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Order.Fin.Basic
 
-
-import Mathlib.Tactic.GeneralizeProofs
-
 noncomputable section
 
 namespace HomologyLean.SingularHomology

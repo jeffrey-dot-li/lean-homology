@@ -1,6 +1,6 @@
-import HomologyLean.SingularHomology.Bisimplicial
-import HomologyLean.SingularHomology.BisimplicialNormalizationComparison
-import HomologyLean.SingularHomology.BisimplicialDerivedOp
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.Bisimplicial
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.BisimplicialNormalizationComparison
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.BisimplicialDerivedOp
 
 /-!
 # Normalized Eilenberg–Zilber for bisimplicial objects

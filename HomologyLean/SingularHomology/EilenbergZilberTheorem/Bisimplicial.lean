@@ -2,7 +2,7 @@ import Mathlib.AlgebraicTopology.AlternatingFaceMapComplex
 import Mathlib.Algebra.Homology.Homotopy
 import Mathlib.Algebra.Homology.TotalComplex
 import Mathlib.CategoryTheory.Preadditive.FunctorCategory
-import HomologyLean.SingularHomology.Shuffle
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.Shuffle
 import HomologyLean.Tactic.NameParts
 import Mathlib.CategoryTheory.Abelian.FunctorCategory
 import Mathlib.AlgebraicTopology.MooreComplex

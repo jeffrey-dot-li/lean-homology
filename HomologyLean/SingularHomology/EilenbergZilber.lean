@@ -19,7 +19,7 @@ import Mathlib.CategoryTheory.Monoidal.Limits.Preserves
 import Mathlib.CategoryTheory.Monoidal.Mon_
 import Mathlib.CategoryTheory.Monoidal.Types.Coyoneda
 import Mathlib.GroupTheory.Perm.Sign
-import HomologyLean.SingularHomology.Shuffle
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.Shuffle
 import HomologyLean.SingularHomology.Representable
 import Mathlib.Algebra.Homology.Monoidal
 import Mathlib.AlgebraicTopology.SimplicialSet.Monoidal

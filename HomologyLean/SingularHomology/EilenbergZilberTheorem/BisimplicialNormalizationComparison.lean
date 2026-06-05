@@ -1,4 +1,4 @@
-import HomologyLean.SingularHomology.Bisimplicial
+import HomologyLean.SingularHomology.EilenbergZilberTheorem.Bisimplicial
 import Mathlib.Algebra.Homology.BifunctorHomotopy
 import Mathlib.AlgebraicTopology.DoldKan.HomotopyEquivalence
 
