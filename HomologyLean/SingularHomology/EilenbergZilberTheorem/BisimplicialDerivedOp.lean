@@ -11,9 +11,9 @@ This file builds the **tiny, local derived-operator API** needed to formalize Ei
 the identity `∂Φ + Φ∂ = ∇f − i` modulo norms). It is the input to
 `homotopyNormalizedAlexanderWhitneyShuffle` in `BisimplicialNormalized.lean`.
 
-We deliberately **do not** use the explicit closed-form homotopy (`emHomotopy` in `Bisimplicial.lean`);
-the literature only ever proves the contraction identity via the recursion + derived operators, so
-we follow EM directly.
+We deliberately **do not** use the explicit closed-form homotopy
+(`emHomotopy` in `Bisimplicial.lean`); the literature only ever proves the contraction identity via
+the recursion + derived operators, so we follow EM directly.
 
 ## Design
 
@@ -139,7 +139,7 @@ lemma realize_add {s q : ℕ} (X : BisimplicialObject C) (M N : DerivedOp s q) :
 
 lemma realize_neg {s q : ℕ} (X : BisimplicialObject C) (M : DerivedOp s q) :
     (-M).realize X = -(M.realize X) := by
-  simp [DerivedOp.realize, Finsupp.sum_neg_index, neg_smul, Finset.sum_neg_distrib]
+  simp [DerivedOp.realize, Finsupp.sum_neg_index, neg_smul]
 
 lemma realize_sub {s q : ℕ} (X : BisimplicialObject C) (M N : DerivedOp s q) :
     (M - N).realize X = M.realize X - N.realize X := by
@@ -202,7 +202,8 @@ private lemma DerivedOp.single_comp_single {s q r : ℕ} (l₂ : OpLetter q r) (
 `M₂`). The functoriality fact that drives the operator-level induction. Proved by reducing to the
 single-single case (`OpLetter.realize_comp`) via bilinearity of `comp` and additivity of
 `realize`. -/
-lemma realize_comp {s q r : ℕ} (X : BisimplicialObject C) (M₂ : DerivedOp q r) (M₁ : DerivedOp s q) :
+lemma realize_comp {s q r : ℕ} (X : BisimplicialObject C) (M₂ : DerivedOp q r)
+    (M₁ : DerivedOp s q) :
     (M₂.comp M₁).realize X = M₁.realize X ≫ M₂.realize X := by
   induction M₁ using Finsupp.induction with
   | zero => simp [DerivedOp.comp]
@@ -224,7 +225,7 @@ lemma realize_comp {s q r : ℕ} (X : BisimplicialObject C) (M₂ : DerivedOp q 
     DerivedOp.realize X (Finsupp.single ⟨𝟙 _, 𝟙 _⟩ 1 : DerivedOp q q) = 𝟙 ((F₂.obj X).X q) := by
   rw [realize_single]
   unfold OpLetter.realize
-  simp [op_id, Functor.map_id, NatTrans.id_app, Category.id_comp, one_smul]
+  simp [op_id, Functor.map_id, one_smul]
 
 /-! ### Distinguished operators: degeneracy `D₀`, faces, boundaries -/
 
@@ -349,8 +350,10 @@ lemma primeHom_comp {s q r : ℕ} (g : (⦋r⦌ : SimplexCategory) ⟶ ⦋q⦌)
     congr 1
     congr 1
     apply Fin.ext
-    simp only [Fin.val_mk]
-    omega
+    set t : ℕ := ↑((SimplexCategory.Hom.toOrderHom g) ⟨(j : ℕ) - 1, h1⟩)
+    have ht : t < q + 1 := by simpa [t] using hbq
+    have hmin : min (t + 1) (q + 1) = t + 1 := Nat.min_eq_left (Nat.succ_le_of_lt ht)
+    simpa [t, hmin] using (Nat.lt_succ_iff.mp ht)
 
 /-- Letter-level multiplicativity of `prime`: `(l₂ ∘ l₁)' = l₂' ∘ l₁'`. -/
 lemma OpLetter.prime_comp {s q r : ℕ} (l₂ : OpLetter q r) (l₁ : OpLetter s q) :
@@ -387,12 +390,11 @@ lemma primeHom_δ {q : ℕ} (i : Fin (q + 2)) :
   simp only [primeHom, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.coe_mk,
     SimplexCategory.len_mk]
   dsimp [SimplexCategory.δ, Fin.succAboveOrderEmb]
-  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_succ, Fin.coe_pred]
+  simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc, Fin.val_succ]
   have hj := j.isLt
   simp only [SimplexCategory.len_mk] at hj
   split_ifs <;>
-    (try simp_all only [Fin.le_def, Fin.lt_def, Fin.ext_iff, Fin.val_zero, Fin.val_castSucc,
-      Fin.val_succ, Fin.val_mk]) <;> omega
+    (try simp_all only [Fin.val_castSucc, Fin.val_succ]) <;> omega
 
 /-- **`prime` shifts faces**: `prime(δ_i) = δ_{i+1}` (prepending the `0`-th vertex pushes the
 omitted vertex up by one). -/
@@ -416,8 +418,9 @@ lemma primeHom_σ {q : ℕ} (i : Fin (q + 1)) :
   simp only [Fin.lt_def, Fin.val_castSucc, Fin.val_succ]
   split_ifs <;> simp_all only [Fin.val_pred, Fin.coe_castPred] <;> omega
 
-/-- **`prime` shifts degeneracies**: `prime(σ_i) = σ_{i+1}` (`D_i = (D_{i-1})'`). The operator-level
-input to EM (2.12): a diagonal degeneracy `D_i` for `i ≥ 1` is the `prime` of the lower `D_{i-1}`. -/
+/-- **`prime` shifts degeneracies**: `prime(σ_i) = σ_{i+1}` (`D_i = (D_{i-1})'`).
+The operator-level input to EM (2.12): a diagonal degeneracy `D_i` for `i ≥ 1` is the `prime` of
+the lower `D_{i-1}`. -/
 lemma prime_degenOp (q : ℕ) (i : Fin (q + 1)) :
     (degenOp q i).prime = degenOp (q + 1) i.succ := by
   simp only [degenOp, DerivedOp.prime, Finsupp.mapDomain_single, OpLetter.prime, primeHom_σ]
@@ -1186,8 +1189,7 @@ private lemma factor_through_σ {n : ℕ} {Δ' : SimplexCategory} (a : Fin (n + 
   apply OrderHom.ext
   funext x
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
-    SimplexCategory.σ, SimplexCategory.δ, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk,
-    OrderHom.coe_mk]
+    SimplexCategory.σ, SimplexCategory.δ, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk]
   change _ = (SimplexCategory.Hom.toOrderHom f) (a.castSucc.succAbove (a.predAbove x))
   by_cases hx : x = a.castSucc
   · subst hx
@@ -1202,7 +1204,7 @@ private lemma sigma_not_mono {n : ℕ} (a : Fin (n + 1)) : ¬ Mono (SimplexCateg
   intro hinj
   have key : a.castSucc = a.succ := by
     apply hinj
-    show a.predAbove a.castSucc = a.predAbove a.succ
+    change a.predAbove a.castSucc = a.predAbove a.succ
     rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
   exact absurd key (ne_of_lt Fin.castSucc_lt_succ)
 
@@ -1266,12 +1268,12 @@ lemma ezComponent_inner_degeneracy_comp_PInfty (X : BisimplicialObject C)
           = (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ ≫ SimplexCategory.σ i)) a.succ := by
     simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
       shuffleSndHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.snd_coe]
-    have e1 : (μ.1 a.castSucc).2 = i.castSucc := Fin.ext (by rw [Fin.coe_castSucc]; omega)
+    have e1 : (μ.1 a.castSucc).2 = i.castSucc := Fin.ext (by rw [Fin.val_castSucc]; omega)
     have e2 : (μ.1 a.succ).2 = i.succ := Fin.ext (by rw [Fin.val_succ]; omega)
-    show (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.castSucc).2
-       = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.succ).2
+    change (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.castSucc).2
+        = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.succ).2
     rw [e1, e2]
-    show i.predAbove i.castSucc = i.predAbove i.succ
+    change i.predAbove i.castSucc = i.predAbove i.succ
     rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
   have hcomp : X _⦋p⦌.map (SimplexCategory.σ i).op ≫
       (X _⦋p⦌.map (shuffleSndHom μ).op ≫
@@ -1284,7 +1286,8 @@ lemma ezComponent_inner_degeneracy_comp_PInfty (X : BisimplicialObject C)
 
 /-- **EZ–degeneracy kill, outer (horizontal) direction (the per-summand combinatorial core).**
 An `(a+1, q)`-shuffle component of a chain that is *degenerate in the outer simplicial direction*
-(in the image of the outer degeneracy `s_i = (X.map (σ i).op).app ⦋q⦌ : X_{a,q} → X_{a+1,q}`) is sent
+(in the image of the outer degeneracy `s_i = (X.map (σ i).op).app ⦋q⦌ : X_{a,q} → X_{a+1,q}`)
+is sent
 by the Eilenberg–Zilber component to a *diagonally* degenerate chain, hence annihilated by `PInfty`.
 
 EM Lemma I.5.3 content: `∇ ∘ (s_i ⊗ 1) = s_? ∘ ∇'` lands in a diagonal degeneracy. -/
@@ -1300,12 +1303,12 @@ lemma ezComponent_outer_degeneracy_comp_PInfty (X : BisimplicialObject C)
           = (SimplexCategory.Hom.toOrderHom (shuffleFstHom μ ≫ SimplexCategory.σ i)) b.succ := by
     simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
       shuffleFstHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.fst_coe]
-    have e1 : (μ.1 b.castSucc).1 = i.castSucc := Fin.ext (by rw [Fin.coe_castSucc]; omega)
+    have e1 : (μ.1 b.castSucc).1 = i.castSucc := Fin.ext (by rw [Fin.val_castSucc]; omega)
     have e2 : (μ.1 b.succ).1 = i.succ := Fin.ext (by rw [Fin.val_succ]; omega)
-    show (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.castSucc).1
-       = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.succ).1
+    change (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.castSucc).1
+        = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.succ).1
     rw [e1, e2]
-    show i.predAbove i.castSucc = i.predAbove i.succ
+    change i.predAbove i.castSucc = i.predAbove i.succ
     rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
   have hv : (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ)) b.castSucc
           = (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ)) b.succ := by
@@ -1738,7 +1741,8 @@ noncomputable def homotopyAWShuffleNormalized (X : BisimplicialObject C) :
   zero := phiHomNorm_zero X
   comm := by
     intro i
-    -- `𝟙 N₂` factors through `F₂`: `(𝟙 N₂).f i = ι₂.f i ≫ ρ₂.f i` (`inclusionN₂_comp_retractionN₂`).
+    -- `𝟙 N₂` factors through `F₂`:
+    -- `(𝟙 N₂).f i = ι₂.f i ≫ ρ₂.f i` (`inclusionN₂_comp_retractionN₂`).
     have hid : (𝟙 (N₂.obj X) : (N₂.obj X) ⟶ (N₂.obj X)).f i
         = (inclusionN₂ X).f i ≫ (retractionN₂ X).f i := by
       rw [← HomologicalComplex.comp_f, inclusionN₂_comp_retractionN₂]
@@ -1747,4 +1751,8 @@ noncomputable def homotopyAWShuffleNormalized (X : BisimplicialObject C) :
       HomologicalComplex.comp_f, HomologicalComplex.comp_f, ← phi_comm_retraction X i]
     -- Both sides are now `ι₂ ≫ (…) ≫ ρ₂`; distribute the sum and kill the `𝟙` term.
     simp only [Preadditive.comp_add, Preadditive.add_comp,
-    HomologicalComplex.id_f, Category.id_comp]
+      HomologicalComplex.id_f, Category.id_comp]
+
+end BisimplicialObject
+
+end CategoryTheory
