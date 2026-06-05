@@ -763,6 +763,8 @@ noncomputable def eilenbergZilber (X : BisimplicialObject C) :
   (bridge₁ X).symm.trans <| (eilenbergZilberNormalized X).trans <|
     homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex (A := C) (Y := diag.obj X)
 
+#print axioms eilenbergZilber
+
 end BisimplicialObject
 
 end CategoryTheory

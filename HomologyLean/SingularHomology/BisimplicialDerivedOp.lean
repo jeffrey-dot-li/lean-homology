@@ -590,9 +590,10 @@ private lemma face_one_comp_D0 (q : ℕ) :
   simp only [OpLetter.comp]
   congr 1 <;> exact SimplexCategory.δ_comp_σ_succ
 
-/-- Simplicial identity `∂ D₀ = D₀ ∂'` (operator level). EM's line 179 writes this as
-`∂ D₀ = 1 − D₀ ∂'`, but that quantity is `∂' D₀`; with `∂ = F₀ − ∂'` the bottom two faces
-`F₀ D₀ = F₁ D₀ = 1` cancel, leaving `∂ D₀ = D₀ ∂'`. -/
+/-- Simplicial identity `∂ D₀ = D₀ ∂'` at the operator level.
+
+Writing `∂ = F₀ - ∂'`, the terms `F₀ D₀` and `F₁ D₀` both equal the identity, so the remaining
+faces assemble to `D₀ ∂'`. -/
 lemma boundary_comp_D0 (q : ℕ) :
     (boundaryOp (q + 1)).comp (D0op (q + 1)) =
       (D0op q).comp (truncBoundaryOp q) := by
@@ -620,19 +621,15 @@ lemma boundary_comp_D0 (q : ℕ) :
   rw [pow_succ, pow_succ]
   ring
 
-/-! ### "Maps norms into norms" via `PInfty` (project strategy, plan lines 106–116)
+/-! ### Killing norms with `PInfty`
 
-A *norm* (for the homotopy `Φ`) is a **diagonal** degenerate term, i.e. an element of `D(K×L)`,
-the degeneracy subcomplex defining `K×_N L = (K×L)_N` (EM md line 75). EM's "maps norms into norms /
-equal modulo norms" is realized by postcomposing with `retractionN₂ = PInftyToNormalizedMooreComplex
-(diag X)`, which kills exactly these.
+For the homotopy identity, the relevant norms are the **diagonal** degenerate terms in `D(K×L)`.
+They are detected by postcomposing with
+`retractionN₂ = PInftyToNormalizedMooreComplex (diag X)`, which kills diagonal degeneracies of the
+diagonal simplicial object.
 
-**No fork** (resolved against the paper): EM places `Φ` *in `K×_N L`* (md lines 81/83), and every
-norm in the `∂Φ+Φ∂` argument is a `D(K×L)` diagonal degeneracy (md lines 157/161/167) — precisely
-what `retractionN₂` kills. The single-direction norms `a⊗Db`, `Da⊗b` (md line 75) belong to the
-*other* side `K_N⊗L_N` of the equivalence and only concern `f`/`∇` mapping norms into norms (md
-lines 122–126), **not** the `Φ` identity. The kill mechanism below is therefore sufficient; the
-earlier "bi-normalization" worry conflated the two notions. -/
+The lemmas in this section package that kill mechanism in the forms used later by the EM
+induction. -/
 
 /-- The realization of a **diagonal letter** `⟨θ, θ⟩` is the diagonal map `(diag X).map θ.op`
 (`realize_faceOp` generalized off the face case): the horizontal/vertical legs reassemble by
@@ -643,15 +640,11 @@ lemma realize_diagLetter (X : BisimplicialObject C) {s q : ℕ}
   rw [realize_single, one_smul, OpLetter.realize, diag_obj_map]
   exact (X.map θ.op).naturality θ.op
 
-/-- **EM's "norm" killed by `retractionN₂`.** A *diagonal* degeneracy `⟨θ, θ⟩` with `θ` non-mono
-dies after `≫ retractionN₂`: its realization is `(diag X).map θ.op`, killed by
-`degeneracy_comp_PInfty` (Moore-inclusion mono-cancel, Pattern 1).
+/-- A diagonal degeneracy `⟨θ, θ⟩` with `θ` non-monic is killed by `retractionN₂`.
 
-NB: this is the **diagonal**-degeneracy form, which is what `retractionN₂ = PInfty(diag X)` can
-kill. (A single-direction degeneracy `⟨𝟙, θ⟩` need *not* be diagonally degenerate, but — see the
-section note — those are not the norms the `Φ` identity needs.) `θ` non-mono ⟹ `θ` factors through
-some `σ_j`, so `(diag X).map θ.op` is a degeneracy of `diag X`, killed by `degeneracy_comp_PInfty`
-(Moore-inclusion mono-cancel, Pattern 1). -/
+Its realization is the diagonal map `(diag X).map θ.op`, and a non-monic `θ` is a simplicial
+degeneracy, so `degeneracy_comp_PInfty` applies after factoring `PInfty` through the Moore
+inclusion. -/
 lemma realize_diagLetter_comp_retractionN₂_eq_zero_of_not_mono {s q : ℕ} (X : BisimplicialObject C)
     (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) :
     DerivedOp.realize X (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1) ≫ (retractionN₂ X).f q = 0 := by
@@ -665,12 +658,11 @@ lemma realize_diagLetter_comp_retractionN₂_eq_zero_of_not_mono {s q : ℕ} (X 
     rw [inclusionOfMooreComplexMap_f]; infer_instance
   exact zero_of_comp_mono _ h
 
-/-- **Generalized norm-kill: a diagonal degeneracy on the *left* (last-applied) kills anything.**
-If a derived operator factors as `⟨θ, θ⟩ ∘ N` with `θ` non-mono, then `realize (⟨θ,θ⟩.comp N) ≫
-retractionN₂ = 0`. By `realize_comp` the degeneracy `realize ⟨θ,θ⟩` lands adjacent to `retractionN₂`
-(`realize (M₂.comp N) = realize N ≫ realize M₂`), so the base diagonal kill applies after
-`realize N`. This is the form the EM induction consumes: norm terms like `D₀Φ = ⟨σ₀,σ₀⟩ ∘ Φ` and
-`Φ'D_i = δ^i D_{i-1}` are diagonal degeneracies post-composed with arbitrary operators. -/
+/-- A diagonal degeneracy on the output side kills any composite after `retractionN₂`.
+
+If `M = ⟨θ, θ⟩ ∘ N` with `θ` non-monic, then `realize M ≫ retractionN₂ = 0`. This is the form
+used later, where the norm term is expressed as a diagonal degeneracy postcomposed with an
+arbitrary operator. -/
 lemma realize_comp_diagLetter_not_mono_comp_retractionN₂ {r s q : ℕ} (X : BisimplicialObject C)
     (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) (N : DerivedOp r s) :
     DerivedOp.realize X (DerivedOp.comp (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1) N) ≫
@@ -680,14 +672,9 @@ lemma realize_comp_diagLetter_not_mono_comp_retractionN₂ {r s q : ℕ} (X : Bi
 
 /-! ### The Eilenberg–Mac Lane homotopy `h = ∇f` and the recursion (2.13) -/
 
-/- EM's operator `h = ∇f : (K×L) → (K×L)` (our `alexanderWhitney ≫ shuffleMap`)
-as a universal (`X`-independent) derived operator, obtained from the AW/shuffle representations
-(the `awComponent ≫ ezComponent` Pattern-5 merge).
-
-**Concreteness is needed only through `realize_hOp` and the low-degree values (EM (2.11)).** The
-homotopy-identity induction (2.3) treats `hOp` *opaquely*, consuming only the universal
-`prime`/`comp` laws and `prime_frontal`; it never unfolds `hOp`'s letters. (Mirrors EM, who
-define `h := ∇f` and only ever use its definition and properties; see `realize_hOp`.) -/
+/- `hOp` is the formal derived operator representing `h = ∇f`. Later arguments use only its
+realization and its formal interaction with `prime`, `comp`, and frontality, not the explicit
+description of its letters. -/
 /-- A single summand of `h = ∇f`: split `q = p + (q - p)`, apply the AW front/back
 faces, then apply one `(p, q-p)` shuffle. The two `eqToHom`s transport across
 `p + (q-p) = q`. -/
@@ -743,7 +730,6 @@ private lemma hLetter_realize_of_add_eq (X : BisimplicialObject C) (p r q : ℕ)
   simp only [OpLetter.realize, awComponent, eqToHom_refl, Category.id_comp, Category.comp_id]
   simpa only [Category.assoc] using (awShuffleLetter_core X p r μ).symm
 
--- TODO: Combine awShuffleLetter_core, hLetter_realize_of_add_eq, hLetter_realize
 /-- Realization of one `hLetter` summand is the corresponding `awComponent ≫ ezComponent` shuffle
 summand. This is the Pattern-5 merge of the AW front/back faces with the shuffle degeneracies. -/
 lemma hLetter_realize (X : BisimplicialObject C) (q : ℕ) (p : Fin (q + 1))
@@ -882,10 +868,10 @@ lemma dNext_phiHomRaw (X : BisimplicialObject C) (n : ℕ) :
 (`realize_single_id`). -/
 noncomputable def idOp (q : ℕ) : DerivedOp q q := Finsupp.single ⟨𝟙 _, 𝟙 _⟩ 1
 
-/-! #### Abstract properties of `h = ∇f` consumed by the EM induction (treat `hOp` opaquely)
+/-! #### Abstract properties of `h = ∇f` used by the EM induction
 
-EM (markdown lines 155, 167, 192, 161) only ever uses `h` through derived-operator properties,
-never its explicit letters. We isolate them here as the (currently `sorry`'d) inputs to (5b). -/
+From this point on, the induction uses `hOp` only through formal operator identities, not by
+unfolding its explicit summands. -/
 
 /-- The represented simplicial type `Δ[s] : b ↦ (⦋b⦌ ⟶ ⦋s⦌)` (the `SimplexCategory` Yoneda). -/
 private def ysimp (s : ℕ) : SimplexCategoryᵒᵖ ⥤ Type := yoneda.obj (⦋s⦌ : SimplexCategory)
@@ -996,20 +982,18 @@ lemma lastFace_comp_hPrime (q : ℕ) :
     (lastFaceOp q).comp ((hOp q).prime) = (hOp q).comp (lastFaceOp q) :=
   lastFace_comp_prime (hOp q)
 
-/-- **Base case (EM line 169, `q = 0`).** `h₀ = i` modulo norms: `∇f` is the identity in degree 0
-(`AW`/`∇` are inverse there). -/
+/-- Base degree: `hOp 0` agrees with the identity after postcomposing with `retractionN₂`. -/
 lemma hOp_zero_comp_retraction (X : BisimplicialObject C) :
     DerivedOp.realize X (hOp 0) ≫ (retractionN₂ X).f 0 =
       DerivedOp.realize X (idOp 0) ≫ (retractionN₂ X).f 0 := by
   rw [realize_hOp, idOp, realize_single_id, awShuffle_f_zero, HomologicalComplex.id_f]
 
-/-! #### Exact-identity backbone for the EM induction (5b)
+/-! #### Exact-identity backbone for the EM induction
 
-The induction is run as an **exact** `DerivedOp` equation `IsNorm (Φ∂ + ∂Φ + i − h)`, where `IsNorm`
-is a *structural* norm class (diagonal-degeneracy and EM (2.12) `h`-degeneracy generators, closed
-under `+`/`neg`). Being structural, it is **provably closed under `prime`** (`IsNorm.prime`), so the
-*exact* IH primes cleanly — sidestepping the (non-existent) `realize(M') ≫ retr ↔ realize(M) ≫ retr`
-bridge. Norms are killed only at the very end via `IsNorm.kill`. -/
+The induction is organized at the formal `DerivedOp` level. We encode the error term
+`Φ∂ + ∂Φ + i - h` as a structural norm class `IsNorm`, prove that this class is closed under
+`prime`, and only at the end convert structural norms into vanishing statements after
+postcomposing with `retractionN₂`. -/
 
 /-- Right composition `· .comp N` bundled additively (general `compRightD0`). -/
 private noncomputable def compRightHom {s q r : ℕ} (M₂ : DerivedOp q r) :
@@ -1094,10 +1078,10 @@ lemma DerivedOp.primeIter_comp {s q r : ℕ} (k : ℕ) (M₂ : DerivedOp q r) (M
       rw [DerivedOp.primeIter_succ, ih, prime_comp, DerivedOp.primeIter_succ,
         DerivedOp.primeIter_succ]
 
-/-- A `DerivedOp` is a **norm** (EM, for the diagonal `K×_N L`), defined *structurally* so that
-closure under `prime` is manifest (no `realize`-bridge needed). Generators: diagonal degeneracies
-`⟨θ,θ⟩∘N` (`¬Mono θ`), closed under `+`/`neg`. (`C`-free; killed under `retractionN₂` via
-`IsNorm.kill`.) -/
+/-- Structural norm class for diagonal degeneracies, closed under `+` and `neg`.
+
+The point of this definition is that closure under `prime` is formal, so the induction can be run
+before realizing operators on a bisimplicial object. -/
 inductive IsNorm : {s q : ℕ} → DerivedOp s q → Prop where
   | zero {s q : ℕ} : IsNorm (0 : DerivedOp s q)
   | add {s q : ℕ} {M N : DerivedOp s q} : IsNorm M → IsNorm N → IsNorm (M + N)
@@ -1379,21 +1363,13 @@ private lemma QInfty_outer_ezComponent_PInfty (X : BisimplicialObject C) (p q : 
     rw [NatTrans.comp_app, NatTrans.comp_app, Category.assoc, Category.assoc]
     rw [SimplicialObject.σ, hkill, comp_zero, comp_zero]
 
-/-- **EM Lemma I.5.3, complement form (the genuine Dold–Kan combinatorial content).** The
-*degenerate* part of `F₁` — the image of the complementary projector `𝟙 − retractionN₁ ≫ inclusionN₁`
-(a chain degenerate in some bisimplicial direction) — is sent by `∇ = shuffleMap` to a chain that is
-degenerate in the diagonal, hence annihilated by `PInfty`.
+/-- The degenerate part of `F₁` is sent by `shuffleMap` to a diagonal degeneracy, hence is killed by
+`PInfty`.
 
-This is the **dual** of the already-proven normalized-side statement
-`higherFacesVanish_inclusionN₁_shuffleMap` (`BisimplicialNormalized.lean`): that one shows `∇` of a
-bi-normalized chain has no degenerate diagonal component; this one shows `∇` of a degenerate chain is
-*entirely* degenerate.
-
-Expected proof (Route A, degeneracy-based): `ext n` + `HomologicalComplex₂.total.hom_ext` reduces to
-each bidegree `(p, q)`; on the summand the complement `𝟙 − PInfty^out_p ⊗ PInfty^in_q` decomposes
-(via `1 − ab = (1 − a) + a(1 − b)` and the Mathlib `QInfty` degeneracy decomposition) into the inner-
-and outer-degenerate parts, killed by `ezComponent_inner_degeneracy_comp_PInfty` and
-`ezComponent_outer_degeneracy_comp_PInfty` respectively. -/
+Concretely, after decomposing the complementary projector
+`𝟙 - retractionN₁ ≫ inclusionN₁` bidegreewise, the resulting inner- and outer-degenerate pieces are
+annihilated by `ezComponent_inner_degeneracy_comp_PInfty` and
+`ezComponent_outer_degeneracy_comp_PInfty`. -/
 lemma degenerate_shuffleMap_comp_PInfty (X : BisimplicialObject C) :
     (𝟙 (F₁.obj X) - retractionN₁ X ≫ inclusionN₁ X) ≫ shuffleMap X ≫
         (PInfty : F₂.obj X ⟶ F₂.obj X) = 0 := by
@@ -1451,11 +1427,10 @@ lemma degenerate_shuffleMap_comp_PInfty (X : BisimplicialObject C) :
   erw [Category.id_comp]
   rw [QInfty_outer_ezComponent_PInfty, sub_zero]
 
-/-- **Dold–Kan round-trip absorption, `PInfty` form.** The `PInfty`-idempotent round-trip
-`retractionN₁ ≫ inclusionN₁` on `F₁` is absorbed under `shuffleMap … ≫ PInfty` on the diagonal `F₂`:
-the degenerate-`F₁` correction `(1 − retractionN₁ ≫ inclusionN₁)` is sent by `∇` to a degenerate
-element of the diagonal, which `PInfty` annihilates. Pure `Preadditive` plumbing over the genuine
-content `degenerate_shuffleMap_comp_PInfty`. -/
+/-- The round trip `retractionN₁ ≫ inclusionN₁` is absorbed under `shuffleMap ≫ PInfty`.
+
+The correction term `1 - retractionN₁ ≫ inclusionN₁` lands in the degenerate part of the diagonal,
+which `PInfty` kills. -/
 @[reassoc]
 lemma retractionN₁_inclusionN₁_shuffleMap_PInfty (X : BisimplicialObject C) :
     retractionN₁ X ≫ inclusionN₁ X ≫ shuffleMap X ≫ (PInfty : F₂.obj X ⟶ F₂.obj X)
@@ -1465,8 +1440,7 @@ lemma retractionN₁_inclusionN₁_shuffleMap_PInfty (X : BisimplicialObject C) 
   rw [← Category.assoc]
   exact key.symm
 
-/-- **`∇`-norm, `retractionN₂` form** (the (6b) `PInfty` absorption, repackaged with the diagonal
-retraction by cancelling the split-mono `inclusionN₂`). -/
+/-- The corresponding absorption identity after replacing `PInfty` by `retractionN₂`. -/
 @[reassoc]
 lemma retractionN₁_inclusionN₁_shuffleMap_retractionN₂ (X : BisimplicialObject C) :
     retractionN₁ X ≫ inclusionN₁ X ≫ shuffleMap X ≫ retractionN₂ X
@@ -1513,10 +1487,7 @@ lemma IsNorm.kill {s q : ℕ} {M : DerivedOp s q} (h : IsNorm M) (X : Bisimplici
   | neg _ ihM => rw [realize_neg, Preadditive.neg_comp, ihM, neg_zero]
   | diagDegen θ hθ N => exact realize_comp_diagLetter_not_mono_comp_retractionN₂ X θ hθ N
 
-/-- **The norm class is closed under `prime`** — structural: `prime` maps each generator to a
-generator (`⟨θ,θ⟩∘N ↦ ⟨primeHom θ,primeHom θ⟩∘N'` via
-`prime_single_diag`+`primeHom_not_mono`; the `h' Dᵢ` generator with `k` primes ↦ the one
-with `k+1`). This is what lets the *exact* IH be primed in `phi_op_isNorm`. -/
+/-- The structural norm class is closed under `prime`. -/
 lemma IsNorm.prime {s q : ℕ} {M : DerivedOp s q} (h : IsNorm M) : IsNorm M.prime := by
   induction h with
   | zero => rw [prime_zero]; exact IsNorm.zero
@@ -1611,22 +1582,16 @@ private lemma sigma_zero_not_mono : ¬ Mono (SimplexCategory.σ (0 : Fin 1)) := 
       (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ (0 : Fin 1))) (1 : Fin 2) from rfl)
   norm_num at h01
 
-/-- **Base case (EM `q = 1`, degree 1)**, md 169–171: the degree-1 homotopy identity, as a norm.
-Needs EM (2.11)'s explicit degree-1 value of `h` (item 4) — an `hOp` low-degree input. -/
+/-- Base case for the exact induction: the degree-1 error term is a norm. -/
 lemma phi_op_isNorm_zero :
     IsNorm ((phiOp 0).comp (boundaryOp 0) + (boundaryOp 1).comp (phiOp 1) + idOp 1 - hOp 1) := by
   rw [phi_op_zero_eq_diagDegen, D0op]
   exact IsNorm.diagDegen (SimplexCategory.σ (0 : Fin 1)) sigma_zero_not_mono (faceOp 0 1)
 
-/-- **The EM homotopy operator `Φ∂ + ∂Φ + i − h` satisfies the `prime`-recursion exactly** (no norm
-remainder), md 177–194. The whole "modulo norms" content of the homotopy identity collapses into the
-base degree (`phi_op_isNorm_zero`); the inductive step is pure operator algebra.
+/-- The error term `Φ∂ + ∂Φ + i - h` satisfies the same `prime` recursion as `Φ`.
 
-Cancellations: write `∂ = F₀ − ∂'` (`boundaryOp_eq`), `Φ_{·+1} = −Φ' + h'D₀` (`phiOp`). Then
-* `Φ'F₀` (from `Φ∂`) cancels `−Φ'F₀` (from `∂Φ`, via `lastFace_comp_prime` `F₀Φ' = ΦF₀`), and likewise
-  the `h'D₀F₀` terms cancel;
-* `h'D₀∂'`, `∂'h'D₀`, and the surviving `h'` cancel using the primed chain-map law `∂'h' = h'∂'`
-  (`boundaryOp_comp_hOp`), `∂'D₀ = i − D₀∂'` (`boundary_comp_D0` + `F₀D₀ = i`), and the right unit. -/
+After rewriting `∂ = F₀ - ∂'` and `Φ = -Φ' + h' D₀`, the remaining identity is a formal operator
+calculation using `lastFace_comp_prime`, `boundaryOp_comp_hOp`, and `boundary_comp_D0`. -/
 lemma phi_op_succ_eq (q : ℕ) :
     (phiOp (q + 1)).comp (boundaryOp (q + 1)) + (boundaryOp (q + 1 + 1)).comp (phiOp (q + 1 + 1)) +
         idOp (q + 1 + 1) - hOp (q + 1 + 1) =
@@ -1639,7 +1604,7 @@ lemma phi_op_succ_eq (q : ℕ) :
     DerivedOp.add_comp, DerivedOp.comp_add_right]
   rw [lastFace_comp_prime, lastFace_comp_hPrime_comp_D0]
   conv_rhs => simp only [phiOp]
-  -- md 179: `∂'₂·h''D₀ = h' − h'D₀·∂'` (the only non-cancelling content)
+  -- Rewrite the surviving `∂' h' D₀` term as `h' - h' D₀ ∂'`; all other terms cancel formally.
   have stepA : (truncBoundaryOp (q + 1 + 1)).comp ((hOp (q + 1 + 1)).prime)
       = (hOp (q + 1)).prime.comp (truncBoundaryOp (q + 1 + 1)) := by
     have h2 := congrArg DerivedOp.prime (boundaryOp_comp_hOp (q + 1))
@@ -1659,9 +1624,7 @@ lemma phi_op_succ_eq (q : ℕ) :
   simp only [DerivedOp.add_comp, DerivedOp.neg_comp]
   abel
 
-/-- **(5b) exact-identity form**: `Φ∂ + ∂Φ + i − h` is a norm, for every degree `q+1`. By
-`induction` the inductive step is just `phi_op_succ_eq` + `IsNorm.prime` on the IH (the homotopy
-identity holds *exactly* up the `prime` tower); all norm content is in `phi_op_isNorm_zero`. -/
+/-- The error term `Φ∂ + ∂Φ + i - h` is a norm in every degree. -/
 lemma phi_op_isNorm (q : ℕ) :
     IsNorm ((phiOp q).comp (boundaryOp q) + (boundaryOp (q + 1)).comp (phiOp (q + 1)) +
       idOp (q + 1) - hOp (q + 1)) := by
@@ -1669,17 +1632,10 @@ lemma phi_op_isNorm (q : ℕ) :
   | zero => exact phi_op_isNorm_zero
   | succ q ih => rw [phi_op_succ_eq q]; exact ih.prime
 
-/-- **(5b) The EM induction, operator level, modulo norms**, at degree `q+1` (markdown 177–194):
-`Φ∂ + ∂Φ + i ≡ h` (i.e. EM's `∂Φ + Φ∂ = h − i`; matches `Homotopy.comm` for
-`Homotopy (AW≫∇) (𝟙)`). Proved by induction on `q`, replaying EM's computation:
-`∂ = F₀ − ∂'` (`boundaryOp_eq`); `∂Φ = −∂'Φ' + h'∂D₀` with `∂D₀ = D₀∂'` (`boundary_comp_D0`);
-`Φ∂' = −Φ'∂' + h'D₀∂'` (recursion `phiOp`); `F₀Φ = −F₀Φ' + h` (`lastFace_comp_hPrime_comp_D0`);
-combine via `∂ = F₀ − ∂'`, priming the IH with `prime_comp`/`prime_add`.
+/-- Operator-level form of the EM homotopy identity, modulo norms.
 
-Norm kill (no fork — see item 2): all norm terms are `D(K×L)` diagonal degeneracies.
-`D₀Φ`, `Φ'D_i = δ^i D_{i-1}` die by `realize_comp_diagLetter_not_mono_comp_retractionN₂` (diagonal
-degeneracy on the left); `h'D₀`-composites die by `hOp_prime_comp_D0_comp_comp_retractionN₂`
-(EM (2.12)). -/
+This is the realized statement corresponding to `Φ∂ + ∂Φ + i ≡ h`, obtained by killing the
+structural norm term from `phi_op_isNorm` with `retractionN₂`. -/
 lemma phi_comm_op (X : BisimplicialObject C) (q : ℕ) :
     (DerivedOp.realize X ((phiOp q).comp (boundaryOp q)) +
         DerivedOp.realize X ((boundaryOp (q + 1)).comp (phiOp (q + 1))) +
@@ -1689,9 +1645,7 @@ lemma phi_comm_op (X : BisimplicialObject C) (q : ℕ) :
   rw [realize_sub, realize_add, realize_add, Preadditive.sub_comp] at h
   exact sub_eq_zero.mp h
 
-/-- **EM's homotopy identity `∂Φ + Φ∂ = ∇f − i` modulo norms**, in `dNext`/`prevD` form and
-postcomposed with `retractionN₂` (the "modulo norms"). This is the inductive heart of EM Thm 2.1a
-(markdown lines 169–194). -/
+/-- EM's homotopy identity `∂Φ + Φ∂ = ∇f - i`, after postcomposing with `retractionN₂`. -/
 lemma phi_comm_retraction (X : BisimplicialObject C) (n : ℕ) :
     (dNext n (phiHomRaw X) + prevD n (phiHomRaw X) +
         (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f n) ≫ (retractionN₂ X).f n =
@@ -1794,5 +1748,3 @@ noncomputable def homotopyAWShuffleNormalized (X : BisimplicialObject C) :
     -- Both sides are now `ι₂ ≫ (…) ≫ ρ₂`; distribute the sum and kill the `𝟙` term.
     simp only [Preadditive.comp_add, Preadditive.add_comp,
     HomologicalComplex.id_f, Category.id_comp]
-
-#print axioms homotopyAWShuffleNormalized
