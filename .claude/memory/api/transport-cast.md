@@ -77,6 +77,32 @@ lemma δ_cast_simplexProdMap ... := by
 (SimplexCategory morphisms). By separating them, each layer can be proved with its
 natural technique: `generalize` for transport, categorical lemmas for composition.
 
+## Pattern: push a degree cast through `Finsupp.single` / a structure constructor
+
+When a `▸` over a degree equality `e : p + r = n` wraps a `Finsupp.single` of a
+record-valued index (e.g. `BiOpLetter`), and `generalize` is blocked by
+successor-indexed defs inside (e.g. `SimplexCategory.σ j : ⦋q+1⦌ ⟶ ⦋q⦌`), extract
+**one transport-only helper per layer**, each proved by `subst e; rfl`:
+
+```lean
+-- single layer: cast commutes with `Finsupp.single`
+private lemma cast_single (e : p + r = n) (l : BiOpLetter m m n n) (c : ℤ) :
+    (e ▸ Finsupp.single l c : BiDerivedOp m m (p+r) (p+r))
+      = Finsupp.single (e ▸ l) c := by subst e; rfl
+-- constructor layer: cast distributes over a struct's fields
+private lemma cast_diag (e : p + r = n) (f g : (⦋n⦌:SimplexCategory) ⟶ ⦋m⦌) :
+    (e ▸ (⟨f, g⟩ : BiOpLetter m m n n)) = ⟨e ▸ f, e ▸ g⟩ := by subst e; rfl
+-- predicate layer: a property (e.g. ¬Mono) transports
+private lemma not_mono_cast (e : n = n') (θ : (⦋n⦌:SimplexCategory) ⟶ ⦋m⦌)
+    (h : ¬ Mono θ) : ¬ Mono (e ▸ θ : (⦋n'⦌:SimplexCategory) ⟶ ⦋m⦌) := by subst e; exact h
+```
+
+Then `rw [hdeg, cast_single, cast_diag]` exposes `⟨e ▸ f, e ▸ g⟩`, and you apply the
+target lemma with `θ := e ▸ f` (use `e.symm` for `not_mono_cast` since the morphism's
+*domain* index is the one rewritten). **Gotcha**: those `rw`s often leave the degree
+equality (`p + r = n`) as deferred `case h.e` motive side-goals — close them with
+`all_goals first | exact hp | exact <main_lemma> …`.
+
 ## Related Mathlib lemmas
 
 | Lemma | Signature | Use |

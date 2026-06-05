@@ -230,6 +230,10 @@ lemma realize_comp {s q r : ℕ} (X : BisimplicialObject C) (M₂ : DerivedOp q 
 noncomputable def D0op (q : ℕ) : DerivedOp q (q + 1) :=
   Finsupp.single ⟨SimplexCategory.σ 0, SimplexCategory.σ 0⟩ 1
 
+/-- The `i`-th diagonal degeneracy operator `Dᵢ = sᵢ × sᵢ : (K×L)_q → (K×L)_{q+1}`. -/
+noncomputable def degenOp (q : ℕ) (i : Fin (q + 1)) : DerivedOp q (q + 1) :=
+  Finsupp.single ⟨SimplexCategory.σ i, SimplexCategory.σ i⟩ 1
+
 /-- The `i`-th face operator `F_i = δ_i × δ_i : (K×L)_{q+1} → (K×L)_q`. -/
 noncomputable def faceOp (q : ℕ) (i : Fin (q + 2)) : DerivedOp (q + 1) q :=
   Finsupp.single ⟨SimplexCategory.δ i, SimplexCategory.δ i⟩ 1
@@ -394,6 +398,28 @@ lemma prime_faceOp (q : ℕ) (i : Fin (q + 2)) :
     (faceOp q i).prime = faceOp (q + 1) i.succ := by
   simp only [faceOp, DerivedOp.prime, Finsupp.mapDomain_single, OpLetter.prime, primeHom_δ]
 
+/-- `primeHom` shifts the degeneracy map index: `prime(σ_i) = σ_{i+1}` (prepending the `0`-th vertex
+pushes the doubled vertex up by one). The degeneracy analog of `primeHom_δ`. -/
+lemma primeHom_σ {q : ℕ} (i : Fin (q + 1)) :
+    primeHom (SimplexCategory.σ i) = SimplexCategory.σ i.succ := by
+  apply SimplexCategory.Hom.ext
+  apply OrderHom.ext
+  funext j
+  apply Fin.ext
+  simp only [primeHom, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.coe_mk,
+    SimplexCategory.len_mk]
+  dsimp [SimplexCategory.σ, Fin.predAbove]
+  have hj := j.isLt
+  simp only [SimplexCategory.len_mk] at hj
+  simp only [Fin.lt_def, Fin.val_castSucc, Fin.val_succ]
+  split_ifs <;> simp_all only [Fin.val_pred, Fin.coe_castPred] <;> omega
+
+/-- **`prime` shifts degeneracies**: `prime(σ_i) = σ_{i+1}` (`D_i = (D_{i-1})'`). The operator-level
+input to EM (2.12): a diagonal degeneracy `D_i` for `i ≥ 1` is the `prime` of the lower `D_{i-1}`. -/
+lemma prime_degenOp (q : ℕ) (i : Fin (q + 1)) :
+    (degenOp q i).prime = degenOp (q + 1) i.succ := by
+  simp only [degenOp, DerivedOp.prime, Finsupp.mapDomain_single, OpLetter.prime, primeHom_σ]
+
 /-- `prime` bundled as an additive hom, so it distributes over `Finset.sum` (`map_sum`) and
 `zsmul` (`map_zsmul`). -/
 private noncomputable def primeAddHom {s q : ℕ} :
@@ -445,7 +471,8 @@ lemma primeHom_comp_degenZero {s q : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ 
     -- `θ 0 = 0` (frontality) closes `0 = ↑(θ 0)`.
     apply Fin.ext
     simp only [IsFrontalHom] at hθ
-    simp
+    simp only [SimplexCategory.len_mk, SimplexCategory.comp_toOrderHom, OrderHom.comp_coe,
+      Function.comp_apply]
     exact (congrArg Fin.val hθ).symm
   · -- `j = k.succ`: `primeHom θ` gives `θ(k) + 1`, then `σ 0` (always `0 < θ(k)+1`) drops back to
     -- `θ(k) = min (θ k) s`, matching `θ (σ 0 (k.succ)) = θ k`.
@@ -651,28 +678,103 @@ lemma realize_comp_diagLetter_not_mono_comp_retractionN₂ {r s q : ℕ} (X : Bi
 
 /-! ### The Eilenberg–Mac Lane homotopy `h = ∇f` and the recursion (2.13) -/
 
-/-- EM's operator `h = ∇f : (K×L) → (K×L)` (our `alexanderWhitney ≫ shuffleMap`) as a universal
-(`X`-independent) derived operator, obtained from the AW/shuffle representations (the `awComponent ≫
-ezComponent` Pattern-5 merge).
+/- EM's operator `h = ∇f : (K×L) → (K×L)` (our `alexanderWhitney ≫ shuffleMap`)
+as a universal (`X`-independent) derived operator, obtained from the AW/shuffle representations
+(the `awComponent ≫ ezComponent` Pattern-5 merge).
 
 **Concreteness is needed only through `realize_hOp` and the low-degree values (EM (2.11)).** The
-homotopy-identity induction (2.3) treats `hOp` *opaquely*, consuming only the universal `prime`/`comp`
-laws and `prime_frontal`; it never unfolds `hOp`'s letters. (Mirrors EM, who define `h := ∇f` and
-only ever use its definition and properties — see `realize_hOp` discussion.) -/
-noncomputable def hOp (q : ℕ) : DerivedOp q q := sorry
+homotopy-identity induction (2.3) treats `hOp` *opaquely*, consuming only the universal
+`prime`/`comp` laws and `prime_frontal`; it never unfolds `hOp`'s letters. (Mirrors EM, who
+define `h := ∇f` and only ever use its definition and properties; see `realize_hOp`.) -/
+/-- A single summand of `h = ∇f`: split `q = p + (q - p)`, apply the AW front/back
+faces, then apply one `(p, q-p)` shuffle. The two `eqToHom`s transport across
+`p + (q-p) = q`. -/
+noncomputable def hLetter (q : ℕ) (p : Fin (q + 1)) (μ : Shuffle (p : ℕ) (q - p)) :
+    OpLetter q q where
+  fst :=
+    eqToHom (congrArg SimplexCategory.mk (by omega : q = (p : ℕ) + (q - p))) ≫
+      shuffleFstHom μ ≫ ι_front (p : ℕ) (q - p) ≫
+        eqToHom (congrArg SimplexCategory.mk (by omega : (p : ℕ) + (q - p) = q))
+  snd :=
+    eqToHom (congrArg SimplexCategory.mk (by omega : q = (p : ℕ) + (q - p))) ≫
+      shuffleSndHom μ ≫ ι_back (p : ℕ) (q - p) ≫
+        eqToHom (congrArg SimplexCategory.mk (by omega : (p : ℕ) + (q - p) = q))
+
+/-- `h = ∇f` as a derived operator: sum over the Alexander-Whitney split and then over
+shuffles. -/
+noncomputable def hOp (q : ℕ) : DerivedOp q q :=
+  ∑ p : Fin (q + 1), ∑ μ : Shuffle (p : ℕ) (q - p),
+    Finsupp.single (hLetter q p μ) μ.sign
+
+omit [Abelian C] in
+private lemma awShuffleLetter_core (X : BisimplicialObject C) (p r : ℕ) (μ : Shuffle p r) :
+    (X.map (ι_front p r).op).app (Opposite.op ⦋p + r⦌) ≫
+        (X.obj (Opposite.op ⦋p⦌)).map (ι_back p r).op ≫
+          (X.obj (Opposite.op ⦋p⦌)).map (shuffleSndHom μ).op ≫
+            (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋p + r⦌) =
+      (X.obj (Opposite.op ⦋p + r⦌)).map (shuffleSndHom μ ≫ ι_back p r).op ≫
+        (X.map (shuffleFstHom μ ≫ ι_front p r).op).app (Opposite.op ⦋p + r⦌) := by
+  simp only [op_comp, Functor.map_comp, Category.assoc]
+  slice_lhs 2 3 => rw [← Functor.map_comp, ← op_comp]
+  slice_lhs 1 2 =>
+    rw [← (X.map (ι_front p r).op).naturality (shuffleSndHom μ ≫ ι_back p r).op]
+  simp only [op_comp, Functor.map_comp, Category.assoc]
+  slice_lhs 3 4 => rw [← NatTrans.comp_app]
+
+private lemma hLetter_realize_of_add_eq (X : BisimplicialObject C) (p r q : ℕ)
+    (h : p + r = q) (μ : Shuffle p r) :
+    (OpLetter.mk
+      (eqToHom (congrArg SimplexCategory.mk h.symm) ≫ shuffleFstHom μ ≫ ι_front p r ≫
+        eqToHom (congrArg SimplexCategory.mk h))
+      (eqToHom (congrArg SimplexCategory.mk h.symm) ≫ shuffleSndHom μ ≫ ι_back p r ≫
+        eqToHom (congrArg SimplexCategory.mk h))).realize X =
+      eqToHom (by
+        simp only [F₂, Functor.comp_obj, alternatingFaceMapComplex_obj_X, diag_obj_obj]
+        rw [← h]) ≫
+        awComponent X p r ≫
+          ((X.obj (Opposite.op ⦋p⦌)).map (shuffleSndHom μ).op ≫
+            (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋p + r⦌)) ≫
+          eqToHom (by
+            simp only [F₂, Functor.comp_obj, alternatingFaceMapComplex_obj_X, diag_obj_obj]
+            rw [← h]) := by
+  subst q
+  simp only [OpLetter.realize, awComponent, eqToHom_refl, Category.id_comp, Category.comp_id]
+  simpa only [Category.assoc] using (awShuffleLetter_core X p r μ).symm
+
+-- TODO: Combine awShuffleLetter_core, hLetter_realize_of_add_eq, hLetter_realize
+/-- Realization of one `hLetter` summand is the corresponding `awComponent ≫ ezComponent` shuffle
+summand. This is the Pattern-5 merge of the AW front/back faces with the shuffle degeneracies. -/
+lemma hLetter_realize (X : BisimplicialObject C) (q : ℕ) (p : Fin (q + 1))
+    (μ : Shuffle (p : ℕ) (q - p)) :
+    (hLetter q p μ).realize X =
+      eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) ≫
+        awComponent X p (q - p) ≫
+          ((X.obj (Opposite.op ⦋(p : ℕ)⦌)).map (shuffleSndHom μ).op ≫
+            (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋(p : ℕ) + (q - p)⦌)) ≫
+          eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) := by
+  have hpq : (p : ℕ) + (q - p) = q :=
+    Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)
+  simpa [hLetter, hpq] using hLetter_realize_of_add_eq X (p : ℕ) (q - p) q hpq μ
 
 /-- `hOp` realizes to the composite `alexanderWhitney ≫ shuffleMap = ∇f` on `F₂.obj X`. -/
 lemma realize_hOp (X : BisimplicialObject C) (q : ℕ) :
     (hOp q).realize X = (alexanderWhitney X ≫ shuffleMap X).f q := by
-  sorry
+  have hrealize :
+      (hOp q).realize X =
+        ∑ p : Fin (q + 1), ∑ μ : Shuffle (p : ℕ) (q - p),
+          μ.sign • (hLetter q p μ).realize X := by
+    change realizeAddMonoidHom X (hOp q) = _
+    rw [hOp, map_sum]
+    refine Finset.sum_congr rfl fun p _ => ?_
+    rw [map_sum]
+    refine Finset.sum_congr rfl fun μ _ => ?_
+    simp [realizeAddMonoidHom, realize_single]
+  rw [hrealize, HomologicalComplex.comp_f]
+  simp only [alexanderWhitney, shuffleMap, id_eq, Preadditive.sum_comp, Category.assoc,
+    HomologicalComplex₂.ι_totalDesc]
+  simp only [hLetter_realize, ezComponent, Preadditive.comp_sum, Preadditive.sum_comp,
+    Preadditive.comp_zsmul, Preadditive.zsmul_comp, Category.assoc]
 
-/-- `h = ∇f` is **first-variable** frontal only (EM, line 213: in `f` the 0-th face `F₀` is always
-in the second factor, so the `β`/horizontal maps are frontal; the vertical maps are *not*). Used
-only for the optional annihilation property `fΦ = 0` (2.4) — **not** needed for the homotopy
-identity (2.3), where the relevant frontality comes from `prime_frontal` on the primed operators
-`h'`, `Φ'`. -/
-lemma hOp_frontalFst (q : ℕ) : (hOp q).FrontalFst := by
-  sorry
 
 /-- **The Eilenberg–Mac Lane homotopy `Φ`** as a derived operator, defined by EM's recursion (2.13):
 `Φ₀ = 0` and `Φ_{q} = − Φ'_{q-1} + h'_{q} D₀` for `q > 0`. Here `Φ_q : (K×L)_q → (K×L)_{q+1}`. -/
@@ -794,18 +896,12 @@ lemma lastFace_comp_hPrime (q : ℕ) :
     (lastFaceOp q).comp ((hOp q).prime) = (hOp q).comp (lastFaceOp q) :=
   lastFace_comp_prime (hOp q)
 
-/-- **`F₀ h' D₀ = h` (EM line 192).** `F₀ h' D₀ = (h F₀) D₀ = h (F₀ D₀) = h`, using
-`lastFace_comp_hPrime` and `F₀ D₀ = i` (`δ_0 ≫ σ_0 = 𝟙`). -/
-lemma lastFace_comp_hPrime_comp_D0 (q : ℕ) :
-    (lastFaceOp (q + 1)).comp (((hOp (q + 1)).prime).comp (D0op (q + 1))) = hOp (q + 1) := by
-  sorry
-
 /-- **Base case (EM line 169, `q = 0`).** `h₀ = i` modulo norms: `∇f` is the identity in degree 0
 (`AW`/`∇` are inverse there). -/
 lemma hOp_zero_comp_retraction (X : BisimplicialObject C) :
     DerivedOp.realize X (hOp 0) ≫ (retractionN₂ X).f 0 =
       DerivedOp.realize X (idOp 0) ≫ (retractionN₂ X).f 0 := by
-  sorry
+  rw [realize_hOp, idOp, realize_single_id, awShuffle_f_zero, HomologicalComplex.id_f]
 
 /-! #### Exact-identity backbone for the EM induction (5b)
 
@@ -888,6 +984,27 @@ noncomputable def DerivedOp.primeIter {s q : ℕ} :
 @[simp] lemma DerivedOp.primeIter_succ {s q : ℕ} (k : ℕ) (M : DerivedOp s q) :
     DerivedOp.primeIter (k + 1) M = (DerivedOp.primeIter k M).prime := rfl
 
+/-- `primeIter` distributes over `comp` (iterated `prime_comp`): `(M₂ ∘ M₁)⁽ᵏ⁾ = M₂⁽ᵏ⁾ ∘ M₁⁽ᵏ⁾`. -/
+lemma DerivedOp.primeIter_comp {s q r : ℕ} (k : ℕ) (M₂ : DerivedOp q r) (M₁ : DerivedOp s q) :
+    DerivedOp.primeIter k (M₂.comp M₁)
+      = (DerivedOp.primeIter k M₂).comp (DerivedOp.primeIter k M₁) := by
+  induction k with
+  | zero => rfl
+  | succ k ih =>
+      rw [DerivedOp.primeIter_succ, ih, prime_comp, DerivedOp.primeIter_succ,
+        DerivedOp.primeIter_succ]
+
+/-- A `DerivedOp` is a **norm** (EM, for the diagonal `K×_N L`), defined *structurally* so that
+closure under `prime` is manifest (no `realize`-bridge needed). Generators: diagonal degeneracies
+`⟨θ,θ⟩∘N` (`¬Mono θ`), closed under `+`/`neg`. (`C`-free; killed under `retractionN₂` via
+`IsNorm.kill`.) -/
+inductive IsNorm : {s q : ℕ} → DerivedOp s q → Prop where
+  | zero {s q : ℕ} : IsNorm (0 : DerivedOp s q)
+  | add {s q : ℕ} {M N : DerivedOp s q} : IsNorm M → IsNorm N → IsNorm (M + N)
+  | neg {s q : ℕ} {M : DerivedOp s q} : IsNorm M → IsNorm (-M)
+  | diagDegen {r s q : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) (N : DerivedOp r s) :
+      IsNorm (DerivedOp.comp (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1) N)
+
 /-- `prime` of a diagonal letter `⟨θ,θ⟩` is the diagonal of `primeHom θ`. -/
 lemma prime_single_diag {s q : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) :
     DerivedOp.prime (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1)
@@ -953,6 +1070,13 @@ lemma comp_idOp {s q : ℕ} (M : DerivedOp s q) : M.comp (idOp s) = M := by
       congr 1
       simp only [OpLetter.comp, Category.comp_id]
 
+/-- **`F₀ h' D₀ = h` (EM line 192).** `F₀ h' D₀ = (h F₀) D₀ = h (F₀ D₀) = h`, using
+`lastFace_comp_hPrime` and `F₀ D₀ = i` (`δ_0 ≫ σ_0 = 𝟙`). -/
+lemma lastFace_comp_hPrime_comp_D0 (q : ℕ) :
+    (lastFaceOp (q + 1)).comp (((hOp (q + 1)).prime).comp (D0op (q + 1))) = hOp (q + 1) := by
+  rw [← DerivedOp.comp_assoc, lastFace_comp_hPrime, DerivedOp.comp_assoc, lastFace_comp_D0,
+    comp_idOp]
+
 /-! #### EM (2.12): `f` and `∇` preserve norms ⟹ `h = ∇f` preserves norms
 
 EM (2.12) is a *composition* fact: `f = AW` and `∇ = shuffleMap` each carry the (diagonal)
@@ -966,15 +1090,280 @@ genuine Dold–Kan combinatorial inputs (Phase-4-level); the composite `h`-state
 * **`f`-half:** `alexanderWhitney_diagDegen_comp_retractionN₁` — a diagonal degeneracy `⟨θ,θ⟩`
   followed by `AW` lands in the degenerate part of `F₁`, killed by `retractionN₁`. -/
 
+/-- If a simplex operator `f : ⦋n+1⦌ ⟶ Δ'` identifies the adjacent pair `a.castSucc, a.succ`
+(i.e. it is "constant across the `a`-th step"), then it factors through the codegeneracy `σ a`:
+`f = σ a ≫ (δ a.castSucc ≫ f)`. The section `δ a.castSucc` undoes `σ a` away from the collapsed
+pair (`Fin.succAbove_predAbove`), and on the pair the hypothesis `hf` patches it. -/
+private lemma factor_through_σ {n : ℕ} {Δ' : SimplexCategory} (a : Fin (n + 1))
+    (f : (⦋n + 1⦌ : SimplexCategory) ⟶ Δ')
+    (hf : f.toOrderHom a.castSucc = f.toOrderHom a.succ) :
+    f = SimplexCategory.σ a ≫ SimplexCategory.δ a.castSucc ≫ f := by
+  apply SimplexCategory.Hom.ext
+  apply OrderHom.ext
+  funext x
+  simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+    SimplexCategory.σ, SimplexCategory.δ, SimplexCategory.mkHom, SimplexCategory.Hom.toOrderHom_mk,
+    OrderHom.coe_mk]
+  change _ = (SimplexCategory.Hom.toOrderHom f) (a.castSucc.succAbove (a.predAbove x))
+  by_cases hx : x = a.castSucc
+  · subst hx
+    rw [Fin.predAbove_castSucc_self, Fin.succAbove_castSucc_self]
+    exact hf
+  · rw [Fin.succAbove_predAbove hx]
+
+/-- A codegeneracy `σ a` is never a monomorphism (it identifies the adjacent pair `a.castSucc`,
+`a.succ`). -/
+private lemma sigma_not_mono {n : ℕ} (a : Fin (n + 1)) : ¬ Mono (SimplexCategory.σ a) := by
+  rw [SimplexCategory.mono_iff_injective]
+  intro hinj
+  have key : a.castSucc = a.succ := by
+    apply hinj
+    show a.predAbove a.castSucc = a.predAbove a.succ
+    rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
+  exact absurd key (ne_of_lt Fin.castSucc_lt_succ)
+
+/-- **Shared per-summand kill (degeneracy ⟹ diagonal degeneracy).** A single Eilenberg–Zilber
+summand `(X_⦋s⦌).map v.op ≫ (X.map h.op)_⦋n+1⦌`, in which the horizontal leg `h` and the vertical
+leg `v` are *both constant across the `a`-th step* (`a.castSucc ↦ a.succ`), factors through the
+diagonal codegeneracy `(diag X).map (σ a).op` and is therefore annihilated by `PInfty`. This is the
+direction-agnostic core: the inner kill feeds it `v = sndHom ≫ σ_i` (constant by `exists_snd_step`),
+the outer kill feeds it `h = fstHom ≫ σ_i`. -/
+private lemma summand_kill {N s t : ℕ} (X : BisimplicialObject C)
+    (h : (⦋N⦌ : SimplexCategory) ⟶ ⦋s⦌) (v : (⦋N⦌ : SimplexCategory) ⟶ ⦋t⦌)
+    (a : Fin N)
+    (hh : (SimplexCategory.Hom.toOrderHom h) a.castSucc = (SimplexCategory.Hom.toOrderHom h) a.succ)
+    (hv : (SimplexCategory.Hom.toOrderHom v) a.castSucc =
+      (SimplexCategory.Hom.toOrderHom v) a.succ) :
+    (X.obj (Opposite.op ⦋s⦌)).map v.op ≫ (X.map h.op).app (Opposite.op ⦋N⦌) ≫
+      (PInfty : F₂.obj X ⟶ F₂.obj X).f N = 0 := by
+  obtain ⟨n, rfl⟩ : ∃ n, N = n + 1 := ⟨N - 1, by
+    have : 0 < N := Nat.pos_of_ne_zero (by rintro rfl; exact a.elim0); omega⟩
+  have hfh := factor_through_σ a h hh
+  have hfv := factor_through_σ a v hv
+  set h' : (⦋n⦌ : SimplexCategory) ⟶ ⦋s⦌ := SimplexCategory.δ a.castSucc ≫ h with hh'_def
+  set v' : (⦋n⦌ : SimplexCategory) ⟶ ⦋t⦌ := SimplexCategory.δ a.castSucc ≫ v with hv'_def
+  have hvop : v.op = v'.op ≫ (SimplexCategory.σ a).op := by rw [hfv, op_comp]
+  have hhop : h.op = h'.op ≫ (SimplexCategory.σ a).op := by rw [hfh, op_comp]
+  -- the diagonal-degeneracy tail is killed by `PInfty`
+  have hbr : (X.obj (Opposite.op ⦋n⦌)).map (SimplexCategory.σ a).op ≫
+      (X.map (SimplexCategory.σ a).op).app (Opposite.op ⦋n + 1⦌)
+      = (diag.obj X).map (SimplexCategory.σ a).op := by
+    rw [(X.map (SimplexCategory.σ a).op).naturality, ← diag_obj_map]
+  have hkill : (X.obj (Opposite.op ⦋n⦌)).map (SimplexCategory.σ a).op ≫
+      (X.map (SimplexCategory.σ a).op).app (Opposite.op ⦋n + 1⦌) ≫
+      (PInfty : F₂.obj X ⟶ F₂.obj X).f (n + 1) = 0 := by
+    rw [← Category.assoc, hbr]
+    exact degeneracy_comp_PInfty (diag.obj X) (n + 1) (SimplexCategory.σ a) (sigma_not_mono a)
+  rw [hvop, hhop, Functor.map_comp, Functor.map_comp, NatTrans.comp_app]
+  simp only [Category.assoc]
+  rw [(X.map h'.op).naturality_assoc, hkill]
+  simp
+
+/-- **EZ–degeneracy kill, inner (vertical) direction (the per-summand combinatorial core).**
+A `(p, m+1)`-shuffle component of a chain that is *degenerate in the inner simplicial direction*
+(in the image of the inner degeneracy `s_i = (X_⦋p⦌).map (σ i).op : X_{p,m} → X_{p,m+1}`) is sent by
+the Eilenberg–Zilber component to a *diagonally* degenerate chain, hence annihilated by `PInfty`.
+
+EM Lemma I.5.3 content: `∇ ∘ (1 ⊗ s_i) = s_? ∘ ∇'` lands in a diagonal degeneracy. -/
+lemma ezComponent_inner_degeneracy_comp_PInfty (X : BisimplicialObject C)
+    (p m : ℕ) (i : Fin (m + 1)) :
+    (X.obj (Opposite.op ⦋p⦌)).map (SimplexCategory.σ i).op ≫ ezComponent X p (m + 1) ≫
+        (PInfty : F₂.obj X ⟶ F₂.obj X).f (p + (m + 1)) = 0 := by
+  rw [ezComponent, Preadditive.sum_comp, Preadditive.comp_sum]
+  apply Finset.sum_eq_zero
+  intro μ _
+  obtain ⟨a, ha1, ha2, ha3⟩ := Shuffle.exists_snd_step μ i.val (by have := i.isLt; omega)
+  have hh : (SimplexCategory.Hom.toOrderHom (shuffleFstHom μ)) a.castSucc
+          = (SimplexCategory.Hom.toOrderHom (shuffleFstHom μ)) a.succ := by
+    simp only [shuffleFstHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.comp_coe,
+      Function.comp_apply, OrderHom.fst_coe]
+    exact ha3
+  have hv : (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ ≫ SimplexCategory.σ i)) a.castSucc
+          = (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ ≫ SimplexCategory.σ i)) a.succ := by
+    simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+      shuffleSndHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.snd_coe]
+    have e1 : (μ.1 a.castSucc).2 = i.castSucc := Fin.ext (by rw [Fin.coe_castSucc]; omega)
+    have e2 : (μ.1 a.succ).2 = i.succ := Fin.ext (by rw [Fin.val_succ]; omega)
+    show (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.castSucc).2
+       = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 a.succ).2
+    rw [e1, e2]
+    show i.predAbove i.castSucc = i.predAbove i.succ
+    rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
+  have hcomp : X _⦋p⦌.map (SimplexCategory.σ i).op ≫
+      (X _⦋p⦌.map (shuffleSndHom μ).op ≫
+        (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋p + (m + 1)⦌)) ≫
+      (PInfty : F₂.obj X ⟶ F₂.obj X).f (p + (m + 1)) = 0 := by
+    simp only [Category.assoc]
+    rw [← Category.assoc (X _⦋p⦌.map (SimplexCategory.σ i).op), ← Functor.map_comp, ← op_comp]
+    exact summand_kill X (shuffleFstHom μ) (shuffleSndHom μ ≫ SimplexCategory.σ i) a hh hv
+  rw [Preadditive.zsmul_comp, Preadditive.comp_zsmul, hcomp, smul_zero]
+
+/-- **EZ–degeneracy kill, outer (horizontal) direction (the per-summand combinatorial core).**
+An `(a+1, q)`-shuffle component of a chain that is *degenerate in the outer simplicial direction*
+(in the image of the outer degeneracy `s_i = (X.map (σ i).op).app ⦋q⦌ : X_{a,q} → X_{a+1,q}`) is sent
+by the Eilenberg–Zilber component to a *diagonally* degenerate chain, hence annihilated by `PInfty`.
+
+EM Lemma I.5.3 content: `∇ ∘ (s_i ⊗ 1) = s_? ∘ ∇'` lands in a diagonal degeneracy. -/
+lemma ezComponent_outer_degeneracy_comp_PInfty (X : BisimplicialObject C)
+    (a q : ℕ) (i : Fin (a + 1)) :
+    (X.map (SimplexCategory.σ i).op).app (Opposite.op ⦋q⦌) ≫ ezComponent X (a + 1) q ≫
+        (PInfty : F₂.obj X ⟶ F₂.obj X).f (a + 1 + q) = 0 := by
+  rw [ezComponent, Preadditive.sum_comp, Preadditive.comp_sum]
+  apply Finset.sum_eq_zero
+  intro μ _
+  obtain ⟨b, hb1, hb2, hb3⟩ := Shuffle.exists_fst_step μ i.val (by have := i.isLt; omega)
+  have hh : (SimplexCategory.Hom.toOrderHom (shuffleFstHom μ ≫ SimplexCategory.σ i)) b.castSucc
+          = (SimplexCategory.Hom.toOrderHom (shuffleFstHom μ ≫ SimplexCategory.σ i)) b.succ := by
+    simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
+      shuffleFstHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.fst_coe]
+    have e1 : (μ.1 b.castSucc).1 = i.castSucc := Fin.ext (by rw [Fin.coe_castSucc]; omega)
+    have e2 : (μ.1 b.succ).1 = i.succ := Fin.ext (by rw [Fin.val_succ]; omega)
+    show (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.castSucc).1
+       = (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ i)) (μ.1 b.succ).1
+    rw [e1, e2]
+    show i.predAbove i.castSucc = i.predAbove i.succ
+    rw [Fin.predAbove_castSucc_self, Fin.predAbove_succ_self]
+  have hv : (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ)) b.castSucc
+          = (SimplexCategory.Hom.toOrderHom (shuffleSndHom μ)) b.succ := by
+    simp only [shuffleSndHom, SimplexCategory.Hom.toOrderHom_mk, OrderHom.comp_coe,
+      Function.comp_apply, OrderHom.snd_coe]
+    exact hb3
+  have hcomp : (X.map (SimplexCategory.σ i).op).app (Opposite.op ⦋q⦌) ≫
+      (X _⦋a + 1⦌.map (shuffleSndHom μ).op ≫
+        (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋a + 1 + q⦌)) ≫
+      (PInfty : F₂.obj X ⟶ F₂.obj X).f (a + 1 + q) = 0 := by
+    have happ : (X.map (SimplexCategory.σ i).op).app (Opposite.op ⦋a + 1 + q⦌) ≫
+        (X.map (shuffleFstHom μ).op).app (Opposite.op ⦋a + 1 + q⦌)
+        = (X.map (shuffleFstHom μ ≫ SimplexCategory.σ i).op).app (Opposite.op ⦋a + 1 + q⦌) := by
+      rw [← NatTrans.comp_app, ← Functor.map_comp, ← op_comp]
+    simp only [Category.assoc]
+    rw [← (X.map (SimplexCategory.σ i).op).naturality_assoc,
+      ← Category.assoc ((X.map (SimplexCategory.σ i).op).app (Opposite.op ⦋a + 1 + q⦌)), happ]
+    exact summand_kill X (shuffleFstHom μ ≫ SimplexCategory.σ i) (shuffleSndHom μ) b hh hv
+  rw [Preadditive.zsmul_comp, Preadditive.comp_zsmul, hcomp, smul_zero]
+
+/-- **Inner `QInfty`-degeneracy kill.** The inner (vertical) `QInfty` projector at degree `q`,
+precomposed with the Eilenberg–Zilber component and the diagonal `PInfty`, vanishes. Each summand of
+the Mathlib `decomposition_Q` ends in an inner degeneracy `(X_⦋p⦌).σ`, killed by
+`ezComponent_inner_degeneracy_comp_PInfty`. -/
+private lemma QInfty_inner_ezComponent_PInfty (X : BisimplicialObject C) (p q : ℕ) :
+    (QInfty (X := X.obj (Opposite.op ⦋p⦌))).f q ≫ ezComponent X p q ≫
+        (PInfty : F₂.obj X ⟶ F₂.obj X).f (p + q) = 0 := by
+  cases q with
+  | zero => rw [QInfty_f_0, zero_comp]
+  | succ m =>
+    rw [QInfty_f, decomposition_Q m (m + 1), Preadditive.sum_comp]
+    apply Finset.sum_eq_zero
+    intro i _
+    have hkill : (X.obj (Opposite.op ⦋p⦌)).map (SimplexCategory.σ (Fin.rev i)).op ≫
+        ezComponent X p (m + 1) ≫ (PInfty : F₂.obj X ⟶ F₂.obj X).f (p + (m + 1)) = 0 :=
+      ezComponent_inner_degeneracy_comp_PInfty X p m (Fin.rev i)
+    simp only [SimplicialObject.σ, Category.assoc, hkill, comp_zero]
+
+/-- **Outer `QInfty`-degeneracy kill.** The outer (horizontal) `QInfty` projector at degree `p`
+(evaluated at inner degree `q`), precomposed with the Eilenberg–Zilber component and the diagonal
+`PInfty`, vanishes. Each summand of the Mathlib `decomposition_Q` ends in an outer degeneracy
+`(X.map (σ _).op).app ⦋q⦌`, killed by `ezComponent_outer_degeneracy_comp_PInfty`. -/
+private lemma QInfty_outer_ezComponent_PInfty (X : BisimplicialObject C) (p q : ℕ) :
+    ((QInfty (X := X)).f p).app (Opposite.op ⦋q⦌) ≫ ezComponent X p q ≫
+        (PInfty : F₂.obj X ⟶ F₂.obj X).f (p + q) = 0 := by
+  cases p with
+  | zero => rw [QInfty_f_0]; simp
+  | succ a =>
+    rw [QInfty_f, decomposition_Q a (a + 1), NatTrans.app_sum, Preadditive.sum_comp]
+    apply Finset.sum_eq_zero
+    intro i _
+    have hkill : (X.map (SimplexCategory.σ (Fin.rev i)).op).app (Opposite.op ⦋q⦌) ≫
+        ezComponent X (a + 1) q ≫ (PInfty : F₂.obj X ⟶ F₂.obj X).f (a + 1 + q) = 0 :=
+      ezComponent_outer_degeneracy_comp_PInfty X a q (Fin.rev i)
+    rw [NatTrans.comp_app, NatTrans.comp_app, Category.assoc, Category.assoc]
+    rw [SimplicialObject.σ, hkill, comp_zero, comp_zero]
+
+/-- **EM Lemma I.5.3, complement form (the genuine Dold–Kan combinatorial content).** The
+*degenerate* part of `F₁` — the image of the complementary projector `𝟙 − retractionN₁ ≫ inclusionN₁`
+(a chain degenerate in some bisimplicial direction) — is sent by `∇ = shuffleMap` to a chain that is
+degenerate in the diagonal, hence annihilated by `PInfty`.
+
+This is the **dual** of the already-proven normalized-side statement
+`higherFacesVanish_inclusionN₁_shuffleMap` (`BisimplicialNormalized.lean`): that one shows `∇` of a
+bi-normalized chain has no degenerate diagonal component; this one shows `∇` of a degenerate chain is
+*entirely* degenerate.
+
+Expected proof (Route A, degeneracy-based): `ext n` + `HomologicalComplex₂.total.hom_ext` reduces to
+each bidegree `(p, q)`; on the summand the complement `𝟙 − PInfty^out_p ⊗ PInfty^in_q` decomposes
+(via `1 − ab = (1 − a) + a(1 − b)` and the Mathlib `QInfty` degeneracy decomposition) into the inner-
+and outer-degenerate parts, killed by `ezComponent_inner_degeneracy_comp_PInfty` and
+`ezComponent_outer_degeneracy_comp_PInfty` respectively. -/
+lemma degenerate_shuffleMap_comp_PInfty (X : BisimplicialObject C) :
+    (𝟙 (F₁.obj X) - retractionN₁ X ≫ inclusionN₁ X) ≫ shuffleMap X ≫
+        (PInfty : F₂.obj X ⟶ F₂.obj X) = 0 := by
+  ext n
+  rw [HomologicalComplex.comp_f, HomologicalComplex.zero_f]
+  apply HomologicalComplex₂.total.hom_ext
+  intro p q hpq
+  simp only [ComplexShape.π_def] at hpq
+  subst hpq
+  rw [comp_zero]
+  set ι := HomologicalComplex₂.ιTotal (doubleComplex X) (ComplexShape.down ℕ) p q (p + q)
+    (by simp [ComplexShape.π_def]) with hι
+  have hr : ι ≫ (retractionN₁ X ≫ inclusionN₁ X).f (p + q)
+      = (((PInfty (X := X)).f p).app (Opposite.op ⦋q⦌) ≫
+          (PInfty (X := X.obj (Opposite.op ⦋p⦌))).f q) ≫ ι := by
+    rw [hι, retractionN₁, inclusionN₁, ← Functor.map_comp, HomologicalComplex₂.totalFunctor_map,
+      HomologicalComplex₂.ιTotal_map]
+    congr 1
+    simp only [HomologicalComplex.comp_f, Functor.mapHomologicalComplex_map_f,
+      NatTrans.mapHomologicalComplex_app_f, mooreRetraction, mooreInclusion]
+    slice_lhs 2 3 => rw [← HomologicalComplex.comp_f, ← Functor.map_comp,
+      ← HomologicalComplex.comp_f, PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap]
+    rw [← HomologicalComplex.comp_f, ← HomologicalComplex.comp_f,
+      ← alternatingFaceMapComplex_map_f, ← HomologicalComplex.comp_f]
+    congr 1
+    rw [← Category.assoc]
+    erw [← PInftyToNormalizedMooreComplex_naturality]
+    rw [Category.assoc, PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap]
+    rfl
+  have he : ι ≫ (𝟙 (F₁.obj X) - retractionN₁ X ≫ inclusionN₁ X).f (p + q)
+      = (𝟙 _ - (((PInfty (X := X)).f p).app (Opposite.op ⦋q⦌) ≫
+          (PInfty (X := X.obj (Opposite.op ⦋p⦌))).f q)) ≫ ι := by
+    rw [HomologicalComplex.sub_f_apply, Preadditive.comp_sub, Preadditive.sub_comp, hr]
+    simp
+  rw [← Category.assoc, he, Category.assoc]
+  -- (𝟙 - Pout ≫ Pin) ≫ (ι ≫ (∇ ≫ PInfty).f) = 0
+  rw [HomologicalComplex.comp_f]
+  dsimp only [shuffleMap]
+  rw [HomologicalComplex₂.ι_totalDesc_assoc]
+  simp only [eqToHom_refl, Category.comp_id]
+  have hPin : (PInfty (X := X.obj (Opposite.op ⦋p⦌))).f q
+      = 𝟙 _ - (QInfty (X := X.obj (Opposite.op ⦋p⦌))).f q := by
+    rw [eq_sub_iff_add_eq]
+    exact PInfty_f_add_QInfty_f (X := X.obj (Opposite.op ⦋p⦌)) q
+  have hPout : ((PInfty (X := X)).f p).app (Opposite.op ⦋q⦌)
+      = 𝟙 _ - ((QInfty (X := X)).f p).app (Opposite.op ⦋q⦌) := by
+    have key := congrArg (fun f => NatTrans.app f (Opposite.op ⦋q⦌))
+      (PInfty_f_add_QInfty_f (X := X) p)
+    rw [eq_sub_iff_add_eq]; exact key
+  rw [Preadditive.sub_comp]
+  erw [Category.id_comp]
+  rw [sub_eq_zero, Category.assoc, hPin, Preadditive.sub_comp]
+  erw [Category.id_comp]
+  rw [QInfty_inner_ezComponent_PInfty, sub_zero, hPout, Preadditive.sub_comp]
+  erw [Category.id_comp]
+  rw [QInfty_outer_ezComponent_PInfty, sub_zero]
+
 /-- **Dold–Kan round-trip absorption, `PInfty` form.** The `PInfty`-idempotent round-trip
 `retractionN₁ ≫ inclusionN₁` on `F₁` is absorbed under `shuffleMap … ≫ PInfty` on the diagonal `F₂`:
 the degenerate-`F₁` correction `(1 − retractionN₁ ≫ inclusionN₁)` is sent by `∇` to a degenerate
-element of the diagonal, which `PInfty` annihilates. -/
+element of the diagonal, which `PInfty` annihilates. Pure `Preadditive` plumbing over the genuine
+content `degenerate_shuffleMap_comp_PInfty`. -/
 @[reassoc]
 lemma retractionN₁_inclusionN₁_shuffleMap_PInfty (X : BisimplicialObject C) :
     retractionN₁ X ≫ inclusionN₁ X ≫ shuffleMap X ≫ (PInfty : F₂.obj X ⟶ F₂.obj X)
       = shuffleMap X ≫ PInfty := by
-  sorry
+  have key := degenerate_shuffleMap_comp_PInfty X
+  rw [Preadditive.sub_comp, Category.id_comp, sub_eq_zero] at key
+  rw [← Category.assoc]
+  exact key.symm
 
 /-- **`∇`-norm, `retractionN₂` form** (the (6b) `PInfty` absorption, repackaged with the diagonal
 retraction by cancelling the split-mono `inclusionN₂`). -/
@@ -1003,8 +1392,7 @@ lemma alexanderWhitney_diagDegen_comp_retractionN₁ {s q : ℕ} (X : Bisimplici
 /-- **`h = ∇f` preserves norms — for free.** A diagonal degeneracy `⟨θ,θ⟩` (`θ` non-mono) followed
 by `hOp` dies under `retractionN₂`. Assembled from the `f`-half
 (`alexanderWhitney_diagDegen_comp_retractionN₁`) and the `∇`-half (6b,
-`retractionN₁_inclusionN₁_shuffleMap_retractionN₂`) via `realize_hOp` (`h = AW ≫ ∇`). This is the
-`k = 0` base of `hPrimeIter_diagDegen_comp_retractionN₂`. -/
+`retractionN₁_inclusionN₁_shuffleMap_retractionN₂`) via `realize_hOp` (`h = AW ≫ ∇`). -/
 lemma hOp_diagDegen_comp_retractionN₂ {s q : ℕ} (X : BisimplicialObject C)
     (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) :
     DerivedOp.realize X ((hOp q).comp (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1)) ≫
@@ -1020,42 +1408,104 @@ lemma hOp_diagDegen_comp_retractionN₂ {s q : ℕ} (X : BisimplicialObject C)
   slice_lhs 1 3 => rw [alexanderWhitney_diagDegen_comp_retractionN₁ X θ hθ]
   simp only [Limits.zero_comp]
 
-/-- **EM (2.12), general form** — the single abstract `hOp` input feeding the norm class: `h` with
-any number of primes, applied after a diagonal degeneracy `⟨θ,θ⟩` (`¬Mono θ`), lands in the diagonal
-Moore-degenerate part and so dies under `retractionN₂`. (`prime`-stable: `prime` bumps `k` and shifts
-`θ ↦ primeHom θ`, still a diagonal degeneracy.) -/
-lemma hPrimeIter_diagDegen_comp_retractionN₂ {m r s : ℕ} (X : BisimplicialObject C) (k : ℕ)
-    (θ : (⦋m + k⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) (N : DerivedOp r s) :
-    DerivedOp.realize X
-        (((DerivedOp.primeIter k (hOp m)).comp
-          (Finsupp.single (⟨θ, θ⟩ : OpLetter s (m + k)) 1)).comp N) ≫
-      (retractionN₂ X).f (m + k) = 0 := by
-  induction k with
-  | zero =>
-      -- `primeIter 0 (hOp m) = hOp m`, so this is the `k = 0` base `hOp_diagDegen_comp_retractionN₂`
-      -- pushed past the trailing `N` via `realize_comp` (which absorbs the leading `realize N`).
-      have key : ((DerivedOp.primeIter 0 (hOp m)).comp
-          (Finsupp.single (⟨θ, θ⟩ : OpLetter s (m + 0)) 1)).realize X ≫
-            (retractionN₂ X).f (m + 0) = 0 :=
-        hOp_diagDegen_comp_retractionN₂ X θ hθ
-      rw [realize_comp, Category.assoc, key, Limits.comp_zero]
-  | succ k ih =>
-      sorry
+/-- **`h = ∇f` kills *any* norm** — the `IsNorm`-generalized form of `hOp_diagDegen_comp_retractionN₂`.
+For any `M` in the diagonal degenerate subcomplex (`IsNorm M`), `h` followed by the diagonal
+retraction `ρ₂` vanishes. Structural induction over `IsNorm`: the linear cases are
+`realize`-linearity; `diagDegen` peels the leading degeneracy via `comp_assoc` and reduces to the
+single-letter `hOp_diagDegen_comp_retractionN₂`. -/
+lemma hOp_diagDegen_comp_retractionN₂' {s q : ℕ} (X : BisimplicialObject C)
+    (M : DerivedOp s q) (hM : IsNorm M) :
+    DerivedOp.realize X ((hOp q).comp M) ≫ (retractionN₂ X).f q = 0 := by
+  induction hM with
+  | zero => simp [DerivedOp.comp, realize_zero]
+  | add _ _ ihM ihN =>
+      rw [DerivedOp.comp_add_right, realize_add, Preadditive.add_comp, ihM, ihN, add_zero]
+  | neg _ ihM =>
+      rw [DerivedOp.comp_neg, realize_neg, Preadditive.neg_comp, ihM, neg_zero]
+  | diagDegen θ hθ N =>
+      rw [← DerivedOp.comp_assoc, realize_comp, Category.assoc,
+        hOp_diagDegen_comp_retractionN₂ X θ hθ, Limits.comp_zero]
 
-/-- A `DerivedOp` is a **norm** (EM, for the diagonal `K×_N L`), defined *structurally* so that
-closure under `prime` is manifest (no `realize`-bridge needed). Generators: diagonal degeneracies
-`⟨θ,θ⟩∘N` (`¬Mono θ`) and EM (2.12) `h`-degeneracies `(h-with-`k`-primes)∘⟨θ,θ⟩∘N`, closed under
-`+`/`neg`. (`C`-free; killed under `retractionN₂` via `IsNorm.kill`.) -/
-inductive IsNorm : {s q : ℕ} → DerivedOp s q → Prop where
-  | zero {s q : ℕ} : IsNorm (0 : DerivedOp s q)
-  | add {s q : ℕ} {M N : DerivedOp s q} : IsNorm M → IsNorm N → IsNorm (M + N)
-  | neg {s q : ℕ} {M : DerivedOp s q} : IsNorm M → IsNorm (-M)
-  | diagDegen {r s q : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ) (N : DerivedOp r s) :
-      IsNorm (DerivedOp.comp (Finsupp.single (⟨θ, θ⟩ : OpLetter s q) 1) N)
-  | hPrimeDiag {m r s : ℕ} (k : ℕ) (θ : (⦋m + k⦌ : SimplexCategory) ⟶ ⦋s⦌) (hθ : ¬ Mono θ)
-      (N : DerivedOp r s) :
-      IsNorm (((DerivedOp.primeIter k (hOp m)).comp
-        (Finsupp.single (⟨θ, θ⟩ : OpLetter s (m + k)) 1)).comp N)
+/- ⚠️ DELETE-LATER (superseded by the bi-graded `BiIsNorm` route, see the §"Bi-graded
+   (tensor-side) derived operators" section + its integration TODO near `end BisimplicialObject`).
+
+   The following lemmas are the **analytic décalage descent** — paper-INDEPENDENT, not in EM. The
+   `IsNorm.hPrimeDegen` generator and its kill lemma `hPrimeIter_hPrimeDegen_comp_retractionN₂` have
+   already been removed (`phi_op_isNorm` collapses to pure `diagDegen`), so this whole chain is now
+   **unused** and only retained pending the bi-graded `BiIsNorm` cleanup.
+
+   • Tier A — dead / fully superseded, nothing depends on them:
+       `realize_prime_comp_lastFace`, `alexanderWhitney_prime_comp_retractionN₁`,
+       `realize_prime_hOp_mod_norm`, `frontal_lastFace_PInfty_kill` (the lone open `sorry` on this
+       route), `prime_preserves_PInfty_kill`, `prime_preserves_retractionN₂_kill`.
+   • KEEP: `lastFace_comp_prime` / `lastFace_comp_hPrime{,_comp_D0}` (exact-induction backbone),
+       `hOp_diagDegen_comp_retractionN₂` (+ its `f`-half `alexanderWhitney_diagDegen_comp_retractionN₁`,
+       still consumed), `IsNorm`/`IsNorm.prime`/`IsNorm.kill`, `DerivedOp.primeIter`, `prime_degenOp`. -/
+
+/-- **Realized `F₀`-naturality of `prime`** (the realize-level `realize_prime` characterization).
+The realization of EM's Lemma I.3.3 operator identity `lastFace_comp_prime` (`F₀ M' = M F₀`): the
+primed operator `M'` intertwines the bottom face `F₀ = realize (lastFaceOp _)` with `M`. Together
+with frontality of `M'` (`prime_frontal`: `M'` fixes the bottom vertex `0`), this **characterizes**
+`realize X M.prime` — it is the unique frontal lift of `realize X M` along `F₀`.
+
+Provable in one step: `← realize_comp` on both sides, then `lastFace_comp_prime`. -/
+lemma realize_prime_comp_lastFace {s q : ℕ} (X : BisimplicialObject C) (M : DerivedOp s q) :
+    DerivedOp.realize X M.prime ≫ DerivedOp.realize X (lastFaceOp q)
+      = DerivedOp.realize X (lastFaceOp s) ≫ DerivedOp.realize X M := by
+  simp only [← realize_comp, lastFace_comp_prime]
+
+/-- **`f = AW` commutes with priming, modulo the `F₁` Moore retraction** (the realize-level
+*décalage of `f`*). EM (md 122–126, 213): `f` maps norms to norms *uniformly in dimension*, with
+the bottom face `F₀` always landing in the second tensor factor; so the derived operator obtained
+by priming the diagonal input agrees with `f` one dimension up once the degenerate part of `F₁` is
+projected away. Here `f = alexanderWhitney` and `ρ₁ = retractionN₁` (first-factor normalization).
+
+This is the `f`-half of "`h` commutes with prime mod norms"; combined with the (level-uniform)
+`∇`-half `retractionN₁_inclusionN₁_shuffleMap_retractionN₂` it yields `realize_prime_hOp_mod_norm`.
+-/
+lemma alexanderWhitney_prime_comp_retractionN₁ (X : BisimplicialObject C) (q : ℕ) :
+    DerivedOp.realize X ((hOp q).prime) ≫ (alexanderWhitney X).f (q + 1) ≫ (retractionN₁ X).f (q + 1)
+      = DerivedOp.realize X (hOp (q + 1)) ≫ (alexanderWhitney X).f (q + 1)
+          ≫ (retractionN₁ X).f (q + 1) := by
+  sorry
+
+
+
+
+-- /-- **`prime` preserves the `PInfty`-kill**, in `PInfty` form. If `realize X M` lands in the
+-- `PInfty`-degenerate part (`≫ PInfty = 0`), then so does `realize X M.prime`.
+
+-- Pure plumbing over the décalage-descent primitive `frontal_lastFace_PInfty_kill`, instantiated at
+-- `N = M.prime`: `M.prime` is frontal (`prime_frontal`) and its bottom face recovers `realize X M`
+-- (`realize_prime_comp_lastFace`). -/
+-- lemma prime_preserves_PInfty_kill {s q : ℕ} (X : BisimplicialObject C) (M : DerivedOp s q)
+--     (h : DerivedOp.realize X M ≫ (PInfty : F₂.obj X ⟶ F₂.obj X).f q = 0) :
+--     DerivedOp.realize X M.prime ≫ (PInfty : F₂.obj X ⟶ F₂.obj X).f (q + 1) = 0 :=
+--   frontal_lastFace_PInfty_kill X M M.prime (prime_frontal M)
+--     (realize_prime_comp_lastFace X M) h
+
+-- /-- **One-directional `prime`–norm bridge** — the analytic EM (2.12) primitive (now unused; its
+-- former consumer `hPrimeIter_hPrimeDegen_comp_retractionN₂` was removed with `IsNorm.hPrimeDegen`).
+-- If a derived operator's realization dies under `retractionN₂` (its image is diagonally
+-- Moore-degenerate), then so does its `prime`'s.
+
+-- **Reduced** to `prime_preserves_PInfty_kill` by the `retractionN₂` ↔ `PInfty` dictionary: `ρ₂ ≫ ι₂ =
+-- PInfty` (`PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap`) and `ι₂` is a (Moore)
+-- mono, so `· ≫ ρ₂ = 0 ↔ · ≫ PInfty = 0`. -/
+-- lemma prime_preserves_retractionN₂_kill {s q : ℕ} (X : BisimplicialObject C) (M : DerivedOp s q)
+--     (h : DerivedOp.realize X M ≫ (retractionN₂ X).f q = 0) :
+--     DerivedOp.realize X M.prime ≫ (retractionN₂ X).f (q + 1) = 0 := by
+--   have hfac : ∀ n, (retractionN₂ X).f n ≫ (inclusionN₂ X).f n
+--       = (PInfty : F₂.obj X ⟶ F₂.obj X).f n := fun n => by
+--     rw [inclusionN₂, retractionN₂, ← HomologicalComplex.comp_f,
+--       PInftyToNormalizedMooreComplex_comp_inclusionOfMooreComplexMap]
+--   haveI : Mono ((inclusionN₂ X).f (q + 1)) := by
+--     rw [inclusionN₂, inclusionOfMooreComplexMap_f]; infer_instance
+--   have hP : DerivedOp.realize X M ≫ (PInfty : F₂.obj X ⟶ F₂.obj X).f q = 0 := by
+--     rw [← hfac q, ← Category.assoc, h, Limits.zero_comp]
+--   have hP' := prime_preserves_PInfty_kill X M hP
+--   refine zero_of_comp_mono ((inclusionN₂ X).f (q + 1)) ?_
+--   rw [Category.assoc, hfac (q + 1)]; exact hP'
 
 /-- A `subtraction` convenience: `IsNorm M → IsNorm N → IsNorm (M - N)`. -/
 lemma IsNorm.sub {s q : ℕ} {M N : DerivedOp s q} (hM : IsNorm M) (hN : IsNorm N) :
@@ -1069,7 +1519,6 @@ lemma IsNorm.comp_right {s s' q : ℕ} {M : DerivedOp s q} (hM : IsNorm M) (N : 
   | add _ _ ihM ihN => rw [DerivedOp.add_comp]; exact (ihM N).add (ihN N)
   | neg _ ihM => rw [DerivedOp.neg_comp]; exact (ihM N).neg
   | diagDegen θ hθ N₀ => rw [DerivedOp.comp_assoc]; exact IsNorm.diagDegen θ hθ _
-  | hPrimeDiag k θ hθ N₀ => rw [DerivedOp.comp_assoc]; exact IsNorm.hPrimeDiag k θ hθ _
 
 /-- **Every norm dies under `retractionN₂`** (for every `X`). Structural induction: linear cases are
 `realize`-linearity; the two generators are the (2)-diagonal kill and EM (2.12). -/
@@ -1080,12 +1529,11 @@ lemma IsNorm.kill {s q : ℕ} {M : DerivedOp s q} (h : IsNorm M) (X : Bisimplici
   | add _ _ ihM ihN => rw [realize_add, Preadditive.add_comp, ihM, ihN, add_zero]
   | neg _ ihM => rw [realize_neg, Preadditive.neg_comp, ihM, neg_zero]
   | diagDegen θ hθ N => exact realize_comp_diagLetter_not_mono_comp_retractionN₂ X θ hθ N
-  | hPrimeDiag k θ hθ N => exact hPrimeIter_diagDegen_comp_retractionN₂ X k θ hθ N
 
-/-- **The norm class is closed under `prime`** — now *structural*: `prime` maps each generator to a
-generator (`⟨θ,θ⟩∘N ↦ ⟨primeHom θ,primeHom θ⟩∘N'` via `prime_single_diag`+`primeHom_not_mono`;
-the `h`-degeneracy with `k` primes ↦ the one with `k+1`). This is what lets the *exact* IH be primed
-in `phi_op_isNorm`. -/
+/-- **The norm class is closed under `prime`** — structural: `prime` maps each generator to a
+generator (`⟨θ,θ⟩∘N ↦ ⟨primeHom θ,primeHom θ⟩∘N'` via
+`prime_single_diag`+`primeHom_not_mono`; the `h' Dᵢ` generator with `k` primes ↦ the one
+with `k+1`). This is what lets the *exact* IH be primed in `phi_op_isNorm`. -/
 lemma IsNorm.prime {s q : ℕ} {M : DerivedOp s q} (h : IsNorm M) : IsNorm M.prime := by
   induction h with
   | zero => rw [prime_zero]; exact IsNorm.zero
@@ -1094,15 +1542,98 @@ lemma IsNorm.prime {s q : ℕ} {M : DerivedOp s q} (h : IsNorm M) : IsNorm M.pri
   | diagDegen θ hθ N =>
       rw [prime_comp, prime_single_diag]
       exact IsNorm.diagDegen (primeHom θ) (primeHom_not_mono hθ) N.prime
-  | hPrimeDiag k θ hθ N =>
-      rw [prime_comp, prime_comp, prime_single_diag]
-      exact IsNorm.hPrimeDiag (k + 1) (primeHom θ) (primeHom_not_mono hθ) N.prime
+
+private lemma simplex_one_hom_ext {f g : (⦋1⦌ : SimplexCategory) ⟶ ⦋1⦌}
+    (h : ∀ j, SimplexCategory.Hom.toOrderHom f j = SimplexCategory.Hom.toOrderHom g j) :
+    f = g := by
+  apply SimplexCategory.Hom.ext
+  apply OrderHom.ext
+  funext j
+  exact h j
+
+private lemma hLetter_one_zero :
+    hLetter 1 0 (default : Shuffle 0 1) =
+      ⟨SimplexCategory.σ 0 ≫ SimplexCategory.δ 1, 𝟙 _⟩ := by
+  simp only [hLetter, Nat.reduceAdd, Fin.isValue, Fin.coe_ofNat_eq_mod, Nat.zero_mod, Nat.sub_zero,
+    eqToHom_refl, shuffleFstHom, SimplexCategory.len_mk, ι_front, SimplexCategory.mkHom,
+    Fin.val_eq_zero, Fin.zero_eta, Category.comp_id, Category.id_comp, shuffleSndHom, ι_back,
+    zero_add, Fin.eta, OpLetter.mk.injEq]
+  constructor
+  · apply simplex_one_hom_ext
+    intro j
+    fin_cases j <;> rfl
+  · apply simplex_one_hom_ext
+    intro j
+    fin_cases j <;> rfl
+
+private lemma hLetter_one_one :
+    hLetter 1 1 (default : Shuffle 1 0) =
+      ⟨𝟙 _, SimplexCategory.σ 0 ≫ SimplexCategory.δ 0⟩ := by
+  simp only [hLetter, Nat.reduceAdd, Fin.isValue, Fin.coe_ofNat_eq_mod, Nat.reduceMod,
+    Nat.add_one_sub_one, Nat.add_zero, eqToHom_refl, shuffleFstHom, SimplexCategory.len_mk, ι_front,
+    SimplexCategory.mkHom, Fin.eta, Category.comp_id, Category.id_comp, shuffleSndHom, ι_back,
+    Nat.mod_succ, Fin.val_eq_zero, add_zero, Fin.mk_one, OpLetter.mk.injEq]
+  constructor
+  · apply simplex_one_hom_ext
+    intro j
+    fin_cases j <;> rfl
+  · apply simplex_one_hom_ext
+    intro j
+    fin_cases j <;> rfl
+
+private lemma phi_op_zero_eq_diagDegen :
+    (phiOp 0).comp (boundaryOp 0) + (boundaryOp 1).comp (phiOp 1) + idOp 1 - hOp 1 =
+      (D0op 0).comp (faceOp 0 1) := by
+  simp only [Nat.reduceAdd, phiOp, DerivedOp.zero_comp, prime_zero, neg_zero, zero_add, Fin.isValue]
+  rw [boundaryOp_eq 1, DerivedOp.sub_comp, lastFace_comp_hPrime_comp_D0 0]
+  abel_nf
+  simp [truncBoundaryOp, hOp, D0op, faceOp, idOp, hLetter_one_zero, hLetter_one_one,
+    DerivedOp.prime, OpLetter.prime, DerivedOp.add_comp, DerivedOp.comp_add_right,
+    DerivedOp.neg_comp,
+    DerivedOp.single_comp_single, Finsupp.mapDomain_add, Finsupp.mapDomain_single,
+    Shuffle.sign_default_zero_left,
+    Shuffle.sign_default_zero_right, OpLetter.comp, primeHom_comp, primeHom_δ, primeHom_σ,
+    primeHom_id, Category.assoc]
+  have hδ₁σ₀ :
+      SimplexCategory.δ (1 : Fin 3) ≫ SimplexCategory.σ (0 : Fin 2) = 𝟙 ⦋1⦌ := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  have hδ₂σ₀ :
+      SimplexCategory.δ (2 : Fin 3) ≫ SimplexCategory.σ (0 : Fin 2) =
+        SimplexCategory.σ (0 : Fin 1) ≫ SimplexCategory.δ (1 : Fin 2) := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  have hδ₁σ₁σ₀δ₁ :
+      SimplexCategory.δ (1 : Fin 3) ≫ SimplexCategory.σ (1 : Fin 2) ≫
+          SimplexCategory.σ (0 : Fin 1) ≫ SimplexCategory.δ (1 : Fin 2) =
+        SimplexCategory.σ (0 : Fin 1) ≫ SimplexCategory.δ (1 : Fin 2) := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  have hδ₂σ₁σ₀δ₁ :
+      SimplexCategory.δ (2 : Fin 3) ≫ SimplexCategory.σ (1 : Fin 2) ≫
+          SimplexCategory.σ (0 : Fin 1) ≫ SimplexCategory.δ (1 : Fin 2) =
+        SimplexCategory.σ (0 : Fin 1) ≫ SimplexCategory.δ (1 : Fin 2) := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  have hδ₁σ₁ :
+      SimplexCategory.δ (1 : Fin 3) ≫ SimplexCategory.σ (1 : Fin 2) = 𝟙 ⦋1⦌ := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  have hδ₂σ₁ :
+      SimplexCategory.δ (2 : Fin 3) ≫ SimplexCategory.σ (1 : Fin 2) = 𝟙 ⦋1⦌ := by
+    apply simplex_one_hom_ext; intro j; fin_cases j <;> rfl
+  simp [hδ₁σ₀, hδ₂σ₀, hδ₁σ₁σ₀δ₁, hδ₂σ₁σ₀δ₁, hδ₁σ₁, hδ₂σ₁]
+  abel
+
+private lemma sigma_zero_not_mono : ¬ Mono (SimplexCategory.σ (0 : Fin 1)) := by
+  rw [SimplexCategory.mono_iff_injective]
+  intro h
+  have h01 := h (show
+    (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ (0 : Fin 1))) (0 : Fin 2) =
+      (SimplexCategory.Hom.toOrderHom (SimplexCategory.σ (0 : Fin 1))) (1 : Fin 2) from rfl)
+  norm_num at h01
 
 /-- **Base case (EM `q = 1`, degree 1)**, md 169–171: the degree-1 homotopy identity, as a norm.
 Needs EM (2.11)'s explicit degree-1 value of `h` (item 4) — an `hOp` low-degree input. -/
 lemma phi_op_isNorm_zero :
     IsNorm ((phiOp 0).comp (boundaryOp 0) + (boundaryOp 1).comp (phiOp 1) + idOp 1 - hOp 1) := by
-  sorry
+  rw [phi_op_zero_eq_diagDegen, D0op]
+  exact IsNorm.diagDegen (SimplexCategory.σ (0 : Fin 1)) sigma_zero_not_mono (faceOp 0 1)
 
 /-- **The EM homotopy operator `Φ∂ + ∂Φ + i − h` satisfies the `prime`-recursion exactly** (no norm
 remainder), md 177–194. The whole "modulo norms" content of the homotopy identity collapses into the
@@ -1281,6 +1812,827 @@ noncomputable def homotopyAWShuffleNormalized (X : BisimplicialObject C) :
     simp only [Preadditive.comp_add, Preadditive.add_comp, Category.assoc,
       HomologicalComplex.id_f, Category.id_comp]
 
+#print axioms homotopyAWShuffleNormalized
+
+/-! ### Bi-graded (tensor-side) derived operators — EM-faithful `prime` route
+
+Following EM `pdfs/mcl2_sections_1_2.md:135`–`147`: a natural operator `M : K_p ⊗ L_s → K_q ⊗ L_r`
+on the **tensor product** `K ⊗ L` (modelled by our total complex `F₁`), written uniquely (EM
+(2.10), md 141) as a `ℤ`-combination of `β*a_p ⊗ γ*b_s` with *independent* monotone legs
+`β : [p] → [q]`, `γ : [r] → [s]`. The derived operator `M ↦ M'` (EM (2.10), md 143–145)
+`δ⁰`-shifts both legs.
+
+This **generalizes** the diagonal `OpLetter`/`DerivedOp`, which is the special case `p = s`,
+`q = r`: EM's `K × L` is the diagonal bidegree of `K ⊗ L`. The point of the tensor layer is EM's
+*structural* proof that `f` and `∇` map norms into norms (md 122–133), hence so does `h = ∇f`
+(md 155), yielding EM (2.12) (`h' Dᵢ ∈ D(K × L)`, md 161) **with no analytic décalage descent** —
+replacing `frontal_lastFace_PInfty_kill` / `prime_preserves_*_kill` and the
+`alexanderWhitney_diagDegen_comp_retractionN₁` sorry. -/
+
+/-- A **bi-graded letter** (EM (2.10) summand, `md 141`): a pair of independent `SimplexCategory`
+legs for a natural operator `X_{p,s} ⟶ X_{q,r}` on the tensor side. `fst` is the `K`-leg (outer
+simplicial variable), `snd` the `L`-leg (inner). The diagonal `OpLetter s q` is `BiOpLetter s s q q`. -/
+structure BiOpLetter (p s q r : ℕ) where
+  /-- `K`-side (outer) leg, inducing `X_{p,·} → X_{q,·}` contravariantly. -/
+  fst : (⦋q⦌ : SimplexCategory) ⟶ ⦋p⦌
+  /-- `L`-side (inner) leg, inducing `X_{·,s} → X_{·,r}` contravariantly. -/
+  snd : (⦋r⦌ : SimplexCategory) ⟶ ⦋s⦌
+
+noncomputable instance (p s q r : ℕ) : DecidableEq (BiOpLetter p s q r) := Classical.decEq _
+
+/-- A bi-graded EM operator `K_p ⊗ L_s → K_q ⊗ L_r` (EM (2.10), `md 137`–`141`): a finite
+`ℤ`-linear combination of bi-graded letters. -/
+abbrev BiDerivedOp (p s q r : ℕ) := BiOpLetter p s q r →₀ ℤ
+
+/-- Realize a single bi-graded letter as a hom between bidegree summands `X_{p,s} ⟶ X_{q,r}` of the
+double complex (EM (2.10), `md 141`). The diagonal `OpLetter.realize` is the case `p = s`, `q = r`. -/
+noncomputable def BiOpLetter.realizeComponent {p s q r : ℕ} (X : BisimplicialObject C)
+    (l : BiOpLetter p s q r) :
+    (X.obj (Opposite.op ⦋p⦌)).obj (Opposite.op ⦋s⦌) ⟶
+      (X.obj (Opposite.op ⦋q⦌)).obj (Opposite.op ⦋r⦌) :=
+  (X.obj (Opposite.op ⦋p⦌)).map l.snd.op ≫ (X.map l.fst.op).app (Opposite.op ⦋r⦌)
+
+/-- The derived operator on a bi-graded letter (EM (2.10), `md 143`–`145`): `δ⁰`-shift both legs.
+Reuses the diagonal `primeHom`, since priming acts one leg at a time. -/
+def BiOpLetter.prime {p s q r : ℕ} (l : BiOpLetter p s q r) :
+    BiOpLetter (p + 1) (s + 1) (q + 1) (r + 1) :=
+  ⟨primeHom l.fst, primeHom l.snd⟩
+
+/-- EM's **bi-graded derived operator** `M ↦ M'` (EM (2.10), `md 143`–`145`): prime every letter. -/
+noncomputable def BiDerivedOp.prime {p s q r : ℕ} (M : BiDerivedOp p s q r) :
+    BiDerivedOp (p + 1) (s + 1) (q + 1) (r + 1) :=
+  Finsupp.mapDomain BiOpLetter.prime M
+
+/-- The `k`-fold bigraded derived operator `M ↦ M⁽ᵏ⁾` (EM `md 143`–`145`, iterated). The tensor-side
+analogue of `DerivedOp.primeIter`, used to carry EM's `(MN)' = M'N'` (`md 206`) up the tower. -/
+noncomputable def BiDerivedOp.primeIter {p s q r : ℕ} :
+    (k : ℕ) → BiDerivedOp p s q r → BiDerivedOp (p + k) (s + k) (q + k) (r + k)
+  | 0, M => M
+  | k + 1, M => (BiDerivedOp.primeIter k M).prime
+
+@[simp] lemma BiDerivedOp.primeIter_succ {p s q r : ℕ} (k : ℕ) (M : BiDerivedOp p s q r) :
+    BiDerivedOp.primeIter (k + 1) M = (BiDerivedOp.primeIter k M).prime := rfl
+
+/-- Composition of bi-graded letters (apply `l₁` then `l₂`); legs compose independently
+(EM I.3 derived-operator algebra, used for `f' ∇' = (f∇)'` at `md 206`). -/
+def BiOpLetter.comp {p s p' s' q r : ℕ} (l₂ : BiOpLetter p' s' q r) (l₁ : BiOpLetter p s p' s') :
+    BiOpLetter p s q r :=
+  ⟨l₂.fst ≫ l₁.fst, l₂.snd ≫ l₁.snd⟩
+
+/-- `ℤ`-bilinear composition of bi-graded operators (apply `M₁` then `M₂`). -/
+noncomputable def BiDerivedOp.comp {p s p' s' q r : ℕ} (M₂ : BiDerivedOp p' s' q r)
+    (M₁ : BiDerivedOp p s p' s') : BiDerivedOp p s q r :=
+  M₁.sum fun l₁ c₁ => M₂.sum fun l₂ c₂ => Finsupp.single (l₂.comp l₁) (c₁ * c₂)
+
+/-! #### Norms on the tensor side `D(K ⊗ L)`
+
+EM's degenerate subcomplex `D(K ⊗ L)` (the "norms", `md 122`, `md 157`) is generated by operators
+with a **leading degeneracy in either factor** (a non-monotone-injective leg). This is the
+*one-sided* structure that the diagonal `IsNorm` (leading *diagonal* degeneracy `⟨θ,θ⟩`) cannot
+express — and exactly why the tensor layer is needed. -/
+
+/-- A bi-graded operator is a **tensor norm** (`∈ D(K ⊗ L)`, EM `md 122`/`md 157`) if it is built
+from letters with a leading degeneracy in the `K`-leg (`degenFst`) or `L`-leg (`degenSnd`), closed
+under `+`/`neg`. Structural, so closure under `prime` is manifest (`BiIsNorm.prime`). -/
+inductive BiIsNorm : {p s q r : ℕ} → BiDerivedOp p s q r → Prop where
+  | zero {p s q r : ℕ} : BiIsNorm (0 : BiDerivedOp p s q r)
+  | add {p s q r : ℕ} {M N : BiDerivedOp p s q r} : BiIsNorm M → BiIsNorm N → BiIsNorm (M + N)
+  | neg {p s q r : ℕ} {M : BiDerivedOp p s q r} : BiIsNorm M → BiIsNorm (-M)
+  | degenFst {p s p' s' q r : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋p'⦌) (hθ : ¬ Mono θ)
+      (φ : (⦋r⦌ : SimplexCategory) ⟶ ⦋s'⦌) (N : BiDerivedOp p s p' s') :
+      BiIsNorm (BiDerivedOp.comp (Finsupp.single (⟨θ, φ⟩ : BiOpLetter p' s' q r) 1) N)
+  | degenSnd {p s p' s' q r : ℕ} (θ : (⦋q⦌ : SimplexCategory) ⟶ ⦋p'⦌)
+      (φ : (⦋r⦌ : SimplexCategory) ⟶ ⦋s'⦌) (hφ : ¬ Mono φ) (N : BiDerivedOp p s p' s') :
+      BiIsNorm (BiDerivedOp.comp (Finsupp.single (⟨θ, φ⟩ : BiOpLetter p' s' q r) 1) N)
+
+/-- Multiplicativity of priming on the tensor side: `(M₂ M₁)' = M₂' M₁'` (EM I.3, `md 206`:
+`h' ∇' = (h∇)'`). The tensor-side analogue of `prime_comp`. -/
+lemma BiOpLetter.prime_comp {p s p' s' q r : ℕ} (l₂ : BiOpLetter p' s' q r)
+    (l₁ : BiOpLetter p s p' s') : (l₂.comp l₁).prime = l₂.prime.comp l₁.prime := by
+  simp only [BiOpLetter.prime, BiOpLetter.comp, primeHom_comp]
+
+private lemma BiDerivedOp.comp_add_right {p s p' s' q r : ℕ} (M₂ : BiDerivedOp p' s' q r)
+    (M N : BiDerivedOp p s p' s') : M₂.comp (M + N) = M₂.comp M + M₂.comp N := by
+  simp only [BiDerivedOp.comp]
+  rw [Finsupp.sum_add_index']
+  · intro a; simp
+  · intro a b₁ b₂; simp only [add_mul, Finsupp.single_add]; rw [Finsupp.sum_add]
+
+private lemma BiDerivedOp.add_comp {p s p' s' q r : ℕ} (M N : BiDerivedOp p' s' q r)
+    (K : BiDerivedOp p s p' s') : (M + N).comp K = M.comp K + N.comp K := by
+  simp only [BiDerivedOp.comp]
+  rw [← Finsupp.sum_add]
+  apply Finsupp.sum_congr
+  intro l₁ _
+  rw [Finsupp.sum_add_index']
+  · intro a; simp
+  · intro a b₁ b₂; simp only [mul_add, Finsupp.single_add]
+
+private lemma BiDerivedOp.comp_single_right {p s p' s' q r : ℕ} (M₂ : BiDerivedOp p' s' q r)
+    (l₁ : BiOpLetter p s p' s') (c : ℤ) :
+    M₂.comp (Finsupp.single l₁ c) = M₂.sum fun l₂ c₂ => Finsupp.single (l₂.comp l₁) (c * c₂) := by
+  rw [BiDerivedOp.comp, Finsupp.sum_single_index (by simp)]
+
+private lemma BiDerivedOp.single_comp_single {p s p' s' q r : ℕ} (l₂ : BiOpLetter p' s' q r)
+    (l₁ : BiOpLetter p s p' s') (c₂ c₁ : ℤ) :
+    BiDerivedOp.comp (Finsupp.single l₂ c₂) (Finsupp.single l₁ c₁) =
+      Finsupp.single (l₂.comp l₁) (c₁ * c₂) := by
+  rw [BiDerivedOp.comp_single_right, Finsupp.sum_single_index (by simp)]
+
+private lemma BiDerivedOp.prime_add {p s q r : ℕ} (M N : BiDerivedOp p s q r) :
+    (M + N).prime = M.prime + N.prime := by
+  simp [BiDerivedOp.prime, Finsupp.mapDomain_add]
+
+@[simp] private lemma BiDerivedOp.comp_zero_right {p s p' s' q r : ℕ}
+    (M₂ : BiDerivedOp p' s' q r) : M₂.comp (0 : BiDerivedOp p s p' s') = 0 := by
+  simp [BiDerivedOp.comp]
+
+@[simp] private lemma BiDerivedOp.zero_comp_left {p s p' s' q r : ℕ}
+    (M₁ : BiDerivedOp p s p' s') : (0 : BiDerivedOp p' s' q r).comp M₁ = 0 := by
+  simp [BiDerivedOp.comp]
+
+/-- Associativity of bi-graded letter composition (legs compose associatively). -/
+lemma BiOpLetter.comp_assoc {p s p' s' p'' s'' q r : ℕ} (l₃ : BiOpLetter p'' s'' q r)
+    (l₂ : BiOpLetter p' s' p'' s'') (l₁ : BiOpLetter p s p' s') :
+    (l₃.comp l₂).comp l₁ = l₃.comp (l₂.comp l₁) := by
+  simp only [BiOpLetter.comp, Category.assoc]
+
+/-- Associativity of bi-graded operator composition. Reduced to `BiOpLetter.comp_assoc` by
+trilinearity (`Finsupp.induction` on each argument). -/
+lemma BiDerivedOp.comp_assoc {p s p' s' p'' s'' q r : ℕ} (M₃ : BiDerivedOp p'' s'' q r)
+    (M₂ : BiDerivedOp p' s' p'' s'') (M₁ : BiDerivedOp p s p' s') :
+    (M₃.comp M₂).comp M₁ = M₃.comp (M₂.comp M₁) := by
+  induction M₁ using Finsupp.induction with
+  | zero => simp
+  | single_add l₁ c₁ f _ _ ih =>
+    rw [BiDerivedOp.comp_add_right, BiDerivedOp.comp_add_right, BiDerivedOp.comp_add_right, ih]
+    congr 1
+    clear ih
+    induction M₂ using Finsupp.induction with
+    | zero => simp
+    | single_add l₂ c₂ g _ _ ih₂ =>
+      rw [BiDerivedOp.add_comp, BiDerivedOp.comp_add_right, BiDerivedOp.add_comp,
+        BiDerivedOp.comp_add_right, ih₂]
+      congr 1
+      clear ih₂
+      induction M₃ using Finsupp.induction with
+      | zero => simp
+      | single_add l₃ c₃ h _ _ ih₃ =>
+        rw [BiDerivedOp.add_comp, BiDerivedOp.add_comp, BiDerivedOp.add_comp, ih₃]
+        congr 1
+        simp only [BiDerivedOp.single_comp_single, BiOpLetter.comp_assoc]
+        ring_nf
+
+/-- `comp` distributes over a finite sum in its left argument. -/
+lemma BiDerivedOp.sum_comp {ι : Type*} {p s p' s' q r : ℕ} (t : Finset ι)
+    (F : ι → BiDerivedOp p' s' q r) (K : BiDerivedOp p s p' s') :
+    (∑ i ∈ t, F i).comp K = ∑ i ∈ t, (F i).comp K := by
+  classical
+  induction t using Finset.induction with
+  | empty => simp
+  | @insert a t ha ih => rw [Finset.sum_insert ha, Finset.sum_insert ha, BiDerivedOp.add_comp, ih]
+
+/-- `prime` distributes over a finite sum. -/
+lemma BiDerivedOp.prime_sum {ι : Type*} {p s q r : ℕ} (t : Finset ι)
+    (F : ι → BiDerivedOp p s q r) :
+    (∑ i ∈ t, F i).prime = ∑ i ∈ t, (F i).prime := by
+  classical
+  induction t using Finset.induction with
+  | empty => simp [BiDerivedOp.prime]
+  | @insert a t ha ih => rw [Finset.sum_insert ha, Finset.sum_insert ha, BiDerivedOp.prime_add, ih]
+
+/-- `primeIter k` distributes over a finite sum. -/
+lemma BiDerivedOp.primeIter_sum {ι : Type*} {p s q r : ℕ} (k : ℕ) (t : Finset ι)
+    (F : ι → BiDerivedOp p s q r) :
+    BiDerivedOp.primeIter k (∑ i ∈ t, F i) = ∑ i ∈ t, BiDerivedOp.primeIter k (F i) := by
+  induction k with
+  | zero => simp [BiDerivedOp.primeIter]
+  | succ k ih =>
+      simp only [BiDerivedOp.primeIter_succ, ih, BiDerivedOp.prime_sum]
+
+/-- **`prime` is multiplicative on the tensor side** (EM `md 206`, `h'∇' = (h∇)'`): `(M₂ ∘ M₁)' =
+M₂' ∘ M₁'`. The bigraded analogue of `prime_comp`; reduced to the single–single case
+`BiOpLetter.prime_comp` by bilinearity of `comp` and additivity of `prime`. -/
+lemma BiDerivedOp.prime_comp {p s p' s' q r : ℕ} (M₂ : BiDerivedOp p' s' q r)
+    (M₁ : BiDerivedOp p s p' s') : (M₂.comp M₁).prime = M₂.prime.comp M₁.prime := by
+  induction M₁ using Finsupp.induction with
+  | zero => simp [BiDerivedOp.comp, BiDerivedOp.prime]
+  | single_add l₁ c₁ f _ _ ih =>
+    rw [BiDerivedOp.comp_add_right, BiDerivedOp.prime_add, ih, BiDerivedOp.prime_add,
+      BiDerivedOp.comp_add_right]
+    congr 1
+    clear ih
+    induction M₂ using Finsupp.induction with
+    | zero => simp [BiDerivedOp.comp, BiDerivedOp.prime]
+    | single_add l₂ c₂ g _ _ ih₂ =>
+      rw [BiDerivedOp.add_comp, BiDerivedOp.prime_add, ih₂, BiDerivedOp.prime_add,
+        BiDerivedOp.add_comp]
+      congr 1
+      simp only [BiDerivedOp.single_comp_single, BiDerivedOp.prime, Finsupp.mapDomain_single,
+        BiOpLetter.prime_comp]
+
+/-- **`prime` preserves tensor norms** (EM `md 143`–`145` + `md 161`'s "Therefore"): `δ⁰`-shifting a
+leading degeneracy keeps a leading degeneracy (`primeHom_not_mono`). This is the structural fact
+that makes EM (2.12) free. -/
+lemma BiIsNorm.prime {p s q r : ℕ} {M : BiDerivedOp p s q r} (h : BiIsNorm M) :
+    BiIsNorm M.prime := by
+  sorry
+
+/-! #### Realization of a (homogeneous) bi-graded operator + linearity
+
+A `BiDerivedOp p s q r` has fixed bidegrees, so its realization is a single summand map
+`X_{p,s} ⟶ X_{q,r}` (the `ℤ`-linear extension of `realizeComponent`). Mirrors `DerivedOp.realize`
+and its linearity stack. -/
+
+/-- Realize a homogeneous bi-graded operator as a bidegree-summand map `X_{p,s} ⟶ X_{q,r}`. -/
+noncomputable def BiDerivedOp.realize {p s q r : ℕ} (X : BisimplicialObject C)
+    (M : BiDerivedOp p s q r) :
+    (X.obj (Opposite.op ⦋p⦌)).obj (Opposite.op ⦋s⦌) ⟶
+      (X.obj (Opposite.op ⦋q⦌)).obj (Opposite.op ⦋r⦌) :=
+  M.sum fun l c => c • l.realizeComponent X
+
+@[simp] lemma BiDerivedOp.realize_zero {p s q r : ℕ} (X : BisimplicialObject C) :
+    BiDerivedOp.realize X (0 : BiDerivedOp p s q r) = 0 := by
+  simp [BiDerivedOp.realize]
+
+@[simp] lemma BiDerivedOp.realize_single {p s q r : ℕ} (X : BisimplicialObject C)
+    (l : BiOpLetter p s q r) (c : ℤ) :
+    BiDerivedOp.realize X (Finsupp.single l c) = c • l.realizeComponent X := by
+  simp [BiDerivedOp.realize, Finsupp.sum_single_index]
+
+lemma BiDerivedOp.realize_add {p s q r : ℕ} (X : BisimplicialObject C)
+    (M N : BiDerivedOp p s q r) :
+    BiDerivedOp.realize X (M + N) = BiDerivedOp.realize X M + BiDerivedOp.realize X N := by
+  sorry
+
+lemma BiDerivedOp.realize_neg {p s q r : ℕ} (X : BisimplicialObject C)
+    (M : BiDerivedOp p s q r) :
+    BiDerivedOp.realize X (-M) = -(BiDerivedOp.realize X M) := by
+  sorry
+
+/-- `realize` distributes over a finite sum. -/
+lemma BiDerivedOp.realize_sum {ι : Type*} {p s q r : ℕ} (X : BisimplicialObject C)
+    (t : Finset ι) (F : ι → BiDerivedOp p s q r) :
+    BiDerivedOp.realize X (∑ i ∈ t, F i) = ∑ i ∈ t, BiDerivedOp.realize X (F i) := by
+  classical
+  induction t using Finset.induction with
+  | empty => simp
+  | @insert a t ha ih =>
+      rw [Finset.sum_insert ha, Finset.sum_insert ha, BiDerivedOp.realize_add, ih]
+
+/-- `realize` turns bi-graded composition into hom composition (apply `M₁` then `M₂`). The
+tensor-side analogue of `realize_comp`; proved by reducing to the single-single case
+(`realizeComponent` of `BiOpLetter.comp`) via bilinearity. -/
+lemma BiDerivedOp.realize_comp {p s p' s' q r : ℕ} (X : BisimplicialObject C)
+    (M₂ : BiDerivedOp p' s' q r) (M₁ : BiDerivedOp p s p' s') :
+    BiDerivedOp.realize X (M₂.comp M₁) = BiDerivedOp.realize X M₁ ≫ BiDerivedOp.realize X M₂ := by
+  sorry
+
+/-! #### `BiIsNorm.killComponent` — a tensor norm dies under the bi-Moore retraction
+
+The tensor analogue of `IsNorm.kill` (`realize_comp_diagLetter_not_mono_comp_retractionN₂`): a
+tensor-norm operator `M : BiDerivedOp p s q r`, realized into the `(q,r)` summand of `F₁` (via
+`ιTotal`) and hit by the bi-normalized retraction `retractionN₁`, vanishes. This is the linchpin
+that makes EM's structural (2.12) (`md 161`) work: `f`/`∇` send norms to one-sided-degenerate
+letters, which `retractionN₁` (`PInfty ⊗ PInfty`) kills factorwise. -/
+
+/-- The `(q,r)`-summand injection into `F₁` at total degree `q + r`. -/
+noncomputable abbrev ιF₁ (X : BisimplicialObject C) (q r : ℕ) :
+    (X.obj (Opposite.op ⦋q⦌)).obj (Opposite.op ⦋r⦌) ⟶ (F₁.obj X).X (q + r) :=
+  HomologicalComplex₂.ιTotal (doubleComplex X) (ComplexShape.down ℕ) q r (q + r) (by
+    simp only [ComplexShape.π_def])
+
+/-- **Single-letter kill, `K`-leg** (genuine Dold–Kan input, EM `md 122`): a letter whose `K`-leg
+`fst` is non-injective realizes to a map *ending* (output side) in a `K`-degeneracy `s_i`, killed by
+the first `PInfty` factor of `retractionN₁`. The bi-graded analogue of
+`realize_diagLetter_comp_retractionN₂_eq_zero_of_not_mono`, restricted to one factor. -/
+lemma biLetter_fst_not_mono_comp_retractionN₁ {p s q r : ℕ} (X : BisimplicialObject C)
+    (l : BiOpLetter p s q r) (h : ¬ Mono l.fst) :
+    l.realizeComponent X ≫ ιF₁ X q r ≫ (retractionN₁ X).f (q + r) = 0 := by
+  sorry
+
+/-- **Single-letter kill, `L`-leg** (genuine Dold–Kan input, EM `md 122`): dual of
+`biLetter_fst_not_mono_comp_retractionN₁` for the inner (`L`) factor, killed by the second `PInfty`
+factor of `retractionN₁`. -/
+lemma biLetter_snd_not_mono_comp_retractionN₁ {p s q r : ℕ} (X : BisimplicialObject C)
+    (l : BiOpLetter p s q r) (h : ¬ Mono l.snd) :
+    l.realizeComponent X ≫ ιF₁ X q r ≫ (retractionN₁ X).f (q + r) = 0 := by
+  sorry
+
+/-- **A tensor norm dies under the bi-Moore retraction** (the linchpin, EM (2.12) `md 161`).
+Structural induction over `BiIsNorm`: linear cases by `realize`-linearity; the `degenFst`/`degenSnd`
+generators peel the leading one-sided degeneracy via `realize_comp` and kill it factorwise with the
+single-letter primitives. -/
+lemma BiIsNorm.killComponent {p s q r : ℕ} (X : BisimplicialObject C) {M : BiDerivedOp p s q r}
+    (h : BiIsNorm M) :
+    BiDerivedOp.realize X M ≫ ιF₁ X q r ≫ (retractionN₁ X).f (q + r) = 0 := by
+  induction h with
+  | zero => rw [BiDerivedOp.realize_zero, Limits.zero_comp]
+  | add _ _ ihM ihN =>
+      rw [BiDerivedOp.realize_add, Preadditive.add_comp, ihM, ihN, add_zero]
+  | neg _ ihM => rw [BiDerivedOp.realize_neg, Preadditive.neg_comp, ihM, neg_zero]
+  | degenFst θ hθ φ N =>
+      rw [BiDerivedOp.realize_comp, BiDerivedOp.realize_single, one_smul, Category.assoc,
+        biLetter_fst_not_mono_comp_retractionN₁ X ⟨θ, φ⟩ hθ, Limits.comp_zero]
+  | degenSnd θ φ hφ N =>
+      rw [BiDerivedOp.realize_comp, BiDerivedOp.realize_single, one_smul, Category.assoc,
+        biLetter_snd_not_mono_comp_retractionN₁ X ⟨θ, φ⟩ hφ, Limits.comp_zero]
+
+/-! #### `f` (= AW) and `∇` (= shuffle) as bi-graded operators, and the EM norm-preservation -/
+
+/-- EM's `f`-letter `⟨ι_front, ι_back⟩` (EM (2.8), `md 113`): the `(p,q)`-summand of Alexander–
+Whitney, from diagonal bidegree `(p+q, p+q)` to tensor bidegree `(p, q)`. -/
+def awLetter (p q : ℕ) : BiOpLetter (p + q) (p + q) p q := ⟨ι_front p q, ι_back p q⟩
+
+/-- **`awComponent` is the realization of EM's `f`-letter** `awLetter` (EM (2.8)/(2.9),
+`md 113`–`118`). Bridges the existing `awComponent` to the tensor-operator algebra (cf. the
+`realize_hOp` merge): `awComponent` and `realizeComponent` differ only by a naturality swap. -/
+lemma awComponent_eq_realizeComponent (X : BisimplicialObject C) (p q : ℕ) :
+    awComponent X p q = (awLetter p q).realizeComponent X := by
+  sorry
+
+/-- **`alexanderWhitney` realized via the bi-graded `f`-letters** (EM (2.9), `md 116`–`118`):
+`f` at degree `n` is the sum over target bidegrees `(p, n−p)` of the realized `awLetter`s, injected
+into `F₁` via `ιTotal`. Sigma-indexed over `p : Fin (n+1)` — the chosen total-realization shape.
+Pure plumbing over `awComponent_eq_realizeComponent` + the definition of `alexanderWhitney`. -/
+lemma alexanderWhitney_f_eq_sum (X : BisimplicialObject C) (n : ℕ) :
+    (alexanderWhitney X).f n
+      = ∑ p : Fin (n + 1),
+          eqToHom (by simp [Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) ≫
+            (awLetter (p : ℕ) (n - p)).realizeComponent X ≫
+              HomologicalComplex₂.ιTotal (doubleComplex X) (ComplexShape.down ℕ) p (n - p) n (by
+                simp only [ComplexShape.π_def, Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)]) := by
+  dsimp [alexanderWhitney]
+  simp_rw [awComponent_eq_realizeComponent]
+
+/-- EM's shuffle map `∇` as a bi-graded operator (EM I.5.7, `md 200`): the signed sum over
+`(p,q)`-shuffles of the letters `⟨shuffleFstHom μ, shuffleSndHom μ⟩`, from tensor bidegree `(p, q)`
+to the diagonal `(p+q, p+q)`. -/
+noncomputable def ezBiOp (p q : ℕ) : BiDerivedOp p q (p + q) (p + q) :=
+  ∑ μ : Shuffle p q, Finsupp.single ⟨shuffleFstHom μ, shuffleSndHom μ⟩ μ.sign
+
+/-- Diagonal inclusion of a letter: `OpLetter s q` is the diagonal `BiOpLetter s s q q`. -/
+def OpLetter.toBi {s q : ℕ} (l : OpLetter s q) : BiOpLetter s s q q := ⟨l.fst, l.snd⟩
+
+/-- Diagonal inclusion of operators `DerivedOp s q ↪ BiDerivedOp s s q q` (EM: `K × L` is the
+diagonal bidegree of `K ⊗ L`, `md 147`). -/
+noncomputable def DerivedOp.toBi {s q : ℕ} (M : DerivedOp s q) : BiDerivedOp s s q q :=
+  Finsupp.mapDomain OpLetter.toBi M
+
+/-- **`realize` is compatible with the diagonal inclusion**: the `F₂`-realization of a diagonal
+operator equals the bigraded `(s,s)→(q,q)`-summand realization of its image. Holds essentially
+definitionally, since `OpLetter.realize` and `BiOpLetter.realizeComponent` share the same formula on
+the diagonal. The bridge that lets the diagonal sub-bridge be computed in the bigraded algebra. -/
+lemma DerivedOp.realize_toBi {s q : ℕ} (X : BisimplicialObject C) (M : DerivedOp s q) :
+    DerivedOp.realize X M = BiDerivedOp.realize X M.toBi := by
+  sorry
+
+/-- `toBi` commutes with `prime` (both are `⟨primeHom·, primeHom·⟩` leg-wise). -/
+lemma DerivedOp.toBi_prime {s q : ℕ} (M : DerivedOp s q) :
+    (M.prime).toBi = (M.toBi).prime := by
+  rw [DerivedOp.prime, DerivedOp.toBi, DerivedOp.toBi, BiDerivedOp.prime,
+    ← Finsupp.mapDomain_comp, ← Finsupp.mapDomain_comp]
+  congr 1
+
+/-- `toBi` commutes with `comp` (both `comp`s are `⟨l₂.fst ≫ l₁.fst, l₂.snd ≫ l₁.snd⟩` leg-wise). -/
+lemma DerivedOp.toBi_comp {s q r : ℕ} (M₂ : DerivedOp q r) (M₁ : DerivedOp s q) :
+    (M₂.comp M₁).toBi = (M₂.toBi).comp (M₁.toBi) := by
+  sorry
+
+/-- `toBi` commutes with `primeIter` (no index cast: `DerivedOp (s+k) (q+k) ↪ BiDerivedOp …` matches
+`primeIter k` of `BiDerivedOp s s q q`). -/
+lemma DerivedOp.toBi_primeIter {s q : ℕ} (k : ℕ) (M : DerivedOp s q) :
+    (DerivedOp.primeIter k M).toBi = BiDerivedOp.primeIter k (M.toBi) := by
+  induction k with
+  | zero => rfl
+  | succ k ih =>
+      rw [DerivedOp.primeIter_succ, BiDerivedOp.primeIter_succ, DerivedOp.toBi_prime, ih]
+
+/-- **`h = ∇ f` as a bigraded operator identity** (EM `md 200`–`206`). Under the diagonal inclusion,
+`hOp` is the sum over the internal tensor bidegrees `(p, q − p)` of `∇ₚ ∘ fₚ` (`ezBiOp ∘ awLetter`).
+This is the *operator-level* (not realization-level) factorization of `h`: because each `hLetter` leg
+is literally `shuffle ≫ ι` (= a `∇`-leg after an `f`-leg), `hOp` already **is** the composite in the
+bigraded algebra. It is the key that lets priming distribute as EM's `h' = ∇'f'` via
+`BiDerivedOp.prime_comp`, with the diagonal `prime` matching the bigraded one leg-wise
+(`primeHom_comp`). -/
+lemma hOp_toBi_eq (q : ℕ) :
+    (hOp q).toBi =
+      ∑ p : Fin (q + 1),
+        (Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt) ▸
+          (ezBiOp (p : ℕ) (q - p)).comp (Finsupp.single (awLetter (p : ℕ) (q - p)) 1)) := by
+  sorry
+
+/-- **`ezComponent` is the realization of the `∇`-operator `ezBiOp`** (EM I.5.7, `md 200`). Bridges
+the existing `ezComponent` to the tensor-operator algebra. -/
+lemma ezComponent_eq_realize_ezBiOp (X : BisimplicialObject C) (p q : ℕ) :
+    ezComponent X p q
+      = (ezBiOp p q).sum fun l c => c • l.realizeComponent X := by
+  sorry
+
+/-- **`shuffleMap` realized via `ezBiOp`** (EM I.5.7, `md 200`), per total-complex summand: the
+`(p,q)`-injection into `F₁` followed by `∇` recovers the realized `ezBiOp`. Sigma-indexing is dual
+to `alexanderWhitney_f_eq_sum` — here `∇` maps *out* of the total complex, so it is pinned summand-
+wise by `ιTotal ≫ totalDesc`. Pure plumbing over `ezComponent_eq_realize_ezBiOp`. -/
+lemma ιTotal_comp_shuffleMap_f (X : BisimplicialObject C) (p q : ℕ) :
+    HomologicalComplex₂.ιTotal (doubleComplex X) (ComplexShape.down ℕ) p q (p + q) (by
+        simp only [ComplexShape.π_def]) ≫ (shuffleMap X).f (p + q)
+      = ((ezBiOp p q).sum fun l c => c • l.realizeComponent X) ≫
+          eqToHom (by simp [F₂]) := by
+  simp only [shuffleMap, HomologicalComplex₂.ι_totalDesc, ezComponent_eq_realize_ezBiOp]
+
+/-- **`f` maps norms into norms** (EM `md 122`–`126`, via the FD-rules (2.6)/(2.7) at `md 99`–`109`):
+post-composing the `f`-letter with a diagonal degeneracy `Dⱼ` (non-mono `θ`) lands in `D(K ⊗ L)`.
+For `i ≤ j` the `L`-factor is a norm (2.6); for `i > j` the `K`-factor is (2.7). -/
+lemma awLetter_comp_diagDegen_biIsNorm (p q m : ℕ)
+    (θ : (⦋p + q⦌ : SimplexCategory) ⟶ ⦋m⦌) (hθ : ¬ Mono θ) :
+    BiIsNorm (BiDerivedOp.comp
+      (Finsupp.single (awLetter p q) 1)
+      (Finsupp.single (⟨θ, θ⟩ : BiOpLetter m m (p + q) (p + q)) 1)) := by
+  sorry
+
+/-- **`∇` carries a tensor norm to a diagonal norm** (EM Lemma I.5.3, `md 91`; `md 206`): a tensor
+norm `M` (landing in the `(p,q)`-summand of `F₁`), pushed by `∇ = shuffleMap` onto the diagonal `F₂`
+and retracted by `ρ₂`, vanishes. This is the `∇`-half of "`h = ∇f` maps norms to norms" — the bridge
+`D(K ⊗ L) → D(K × L)`.
+
+**No new combinatorial input:** pure plumbing over `BiIsNorm.killComponent` and the 6b lemma
+`retractionN₁_inclusionN₁_shuffleMap_retractionN₂` (`(1 − P) ≫ ∇ ≫ ρ₂ = 0` for the Dold–Kan
+idempotent `P = retractionN₁ ≫ inclusionN₁` on `F₁`). A `killComponent`-killed element lies in
+`ker(retractionN₁) = im(1 − P)`, hence is annihilated by `∇ ≫ ρ₂`. -/
+lemma biIsNorm_comp_shuffleMap_retractionN₂ (X : BisimplicialObject C) {p q p' s' : ℕ}
+    (M : BiDerivedOp p' s' p q) (hM : BiIsNorm M) :
+    BiDerivedOp.realize X M ≫ ιF₁ X p q ≫ (shuffleMap X).f (p + q) ≫ (retractionN₂ X).f (p + q)
+      = 0 := by
+  -- 6b at degree `p+q`: `r₁ ≫ i₁ ≫ ∇ ≫ ρ₂ = ∇ ≫ ρ₂` (`P ≫ ∇ρ₂ = ∇ρ₂`).
+  have h6 := HomologicalComplex.congr_hom (retractionN₁_inclusionN₁_shuffleMap_retractionN₂ X) (p + q)
+  simp only [HomologicalComplex.comp_f] at h6
+  -- Replace `∇ ≫ ρ₂` by `r₁ ≫ i₁ ≫ ∇ ≫ ρ₂`, exposing the `killComponent` prefix `… ≫ r₁`.
+  rw [← h6]
+  -- Group `realize M ≫ ιF₁ ≫ r₁` (= 0 by `killComponent`) and kill the whole product.
+  slice_lhs 1 3 => rw [hM.killComponent X]
+  simp only [Limits.zero_comp]
+
+/-- A **bigraded operator is frontal** (EM): every letter fixes the bottom vertex `0` in both legs.
+Bigraded analogue of `DerivedOp.Frontal`. The shuffle `∇ = ezBiOp` is frontal (`ezBiOp_frontal`),
+which is exactly what EM `md 206` invokes ("since `∇` is a frontal operator …"). -/
+def BiDerivedOp.Frontal {p s q r : ℕ} (M : BiDerivedOp p s q r) : Prop :=
+  ∀ l ∈ M.support, IsFrontalHom l.fst ∧ IsFrontalHom l.snd
+
+/-- The **tensor-side zeroth degeneracy** `D₀ = ⟨σ₀, σ₀⟩ : X_{p,s} → X_{p+1,s+1}`. Bigraded analogue
+of `D0op`; the operator EM's frontality décalage `∇'D₀ = D∇` commutes past `∇'`. -/
+noncomputable def BiD0op (p s : ℕ) : BiDerivedOp p s (p + 1) (s + 1) :=
+  Finsupp.single ⟨SimplexCategory.σ 0, SimplexCategory.σ 0⟩ 1
+
+/-- **Every primed bigraded operator is frontal** — bigraded analogue of `prime_frontal`. Since
+`BiOpLetter.prime` applies `primeHom` to both legs and `primeHom` fixes the bottom vertex `0`
+(`primeHom_frontal`), every letter of `M.prime` is frontal in both variables, regardless of `M`. -/
+lemma BiDerivedOp.prime_frontal {p s q r : ℕ} (M : BiDerivedOp p s q r) :
+    (M.prime).Frontal := by
+  intro l hl
+  have hl' := Finsupp.mapDomain_support hl
+  rw [Finset.mem_image] at hl'
+  obtain ⟨l', _, rfl⟩ := hl'
+  exact ⟨primeHom_frontal _, primeHom_frontal _⟩
+
+/-- **`∇` is frontal** (EM `md 206`, "since `∇` is a frontal operator"). Each shuffle letter
+`⟨shuffleFstHom μ, shuffleSndHom μ⟩` fixes the bottom vertex in both legs, because a `(p,q)`-shuffle
+path starts at the origin (`μ 0 = (0,0)`), so both projections send `0 ↦ 0`. (Likely needs leg
+sub-lemmas `shuffleFstHom`/`shuffleSndHom` applied at `0`.) -/
+lemma ezBiOp_frontal (p q : ℕ) : (ezBiOp p q).Frontal := by
+  sorry
+
+/-- **Frontal ⟹ priming commutes with `D₀`, bigraded** (EM `md 206`, from Lemma I.3.3
+`(β')^* D₀ = D₀ β^*`). For a frontal bigraded operator, `M' ∘ D₀ = D₀ ∘ M`. The bigraded analogue of
+`prime_comp_D0_of_frontal`; specialized to `∇` (`ezBiOp_frontal`) it is EM's frontality décalage
+`∇'D₀ = D∇`, the engine of EM (2.12). Proof should mirror `prime_comp_D0_of_frontal`: bilinear
+`Finsupp.induction`, reducing to the letter identity `primeHom_comp_degenZero` on each leg. -/
+lemma BiDerivedOp.prime_comp_D0_of_frontal {p s q r : ℕ} (M : BiDerivedOp p s q r)
+    (hM : M.Frontal) :
+    (M.prime).comp (BiD0op p s) = (BiD0op q r).comp M := by
+  sorry
+
+/-- **An operator that factors through the bi-normalization carries tensor norms to `ρ₂`-killed
+terms.** This — *not* frontality — is the property that makes `∇` (and its primes) annihilate tensor
+norms (EM `md 155`, Lemma I.5.3). The *killing* is entirely `BiIsNorm.killComponent` (a tensor norm
+dies under the bi-Moore retraction `retractionN₁`); the operator `N` only has to expose that
+`retractionN₁` in front of `ρ₂`, which is exactly the 6b property
+`retractionN₁_inclusionN₁_shuffleMap_retractionN₂` that `∇` enjoys.
+
+Frontality alone is **insufficient**: the identity `⟨𝟙,𝟙⟩` is frontal, but `id ∘ M = M` leaves a
+one-sided tensor degeneracy that `ρ₂ = PInfty(diag)` (diagonal-only) does not cancel. The genuine
+hypothesis `hfac` is that `realize N ≫ ρ₂` admits an `ιF₁ ≫ retractionN₁` prefix. -/
+lemma comp_biIsNorm_retractionN₂_of_factorsRetractionN₁ {a b p s m : ℕ}
+    (X : BisimplicialObject C) (N : BiDerivedOp p s m m)
+    (G : (N₁.obj X).X (p + s) ⟶ (N₂.obj X).X m)
+    (hfac : BiDerivedOp.realize X N ≫ (retractionN₂ X).f m
+        = ιF₁ X p s ≫ (retractionN₁ X).f (p + s) ≫ G)
+    (M : BiDerivedOp a b p s) (hM : BiIsNorm M) :
+    BiDerivedOp.realize X (N.comp M) ≫ (retractionN₂ X).f m = 0 := by
+  -- `realize (N ∘ M) ≫ ρ₂ = realize M ≫ (realize N ≫ ρ₂) = realize M ≫ ιF₁ ≫ r₁ ≫ G`; the
+  -- prefix `realize M ≫ ιF₁ ≫ r₁` is `0` by `killComponent` (a tensor norm dies under `r₁`).
+  rw [BiDerivedOp.realize_comp, Category.assoc, hfac]
+  slice_lhs 1 3 => rw [hM.killComponent X]
+  rw [Limits.zero_comp]
+
+/-- **A single primed shuffle bi-letter factors through the bi-normalization** — the per-letter core
+of `primeIter_ezBiOp_factorsRetractionN₁`. One shuffle bi-letter `⟨shuffleFstHom μ, shuffleSndHom μ⟩`,
+primed `j+1` times and composed with `ρ₂`, admits an `ιF₁ ≫ retractionN₁` prefix. This is where the
+frontality / FD-rules of the primed (δ⁰-shifted) shuffle letter (EM `md 159`–`161`) are used. -/
+lemma primeIter_single_shuffleLetter_factorsRetractionN₁
+    (X : BisimplicialObject C) (p q j : ℕ) (μ : Shuffle p q) :
+    ∃ Gμ, BiDerivedOp.realize X
+            (BiDerivedOp.primeIter (j + 1)
+              (Finsupp.single ⟨shuffleFstHom μ, shuffleSndHom μ⟩ μ.sign))
+          ≫ (retractionN₂ X).f (p + q + (j + 1))
+        = ιF₁ X (p + (j + 1)) (q + (j + 1))
+            ≫ (retractionN₁ X).f (p + (j + 1) + (q + (j + 1))) ≫ Gμ := by
+  -- `primeIter (j+1) M = (primeIter j M).prime`, and every primed operator is frontal.
+  have hfrontal :
+      (BiDerivedOp.primeIter (j + 1)
+        (Finsupp.single ⟨shuffleFstHom μ, shuffleSndHom μ⟩ μ.sign)).Frontal :=
+    BiDerivedOp.prime_frontal _
+  sorry
+
+/-- **The primed shuffle factors through the bi-normalization** — EM Lemma I.5.3 (`∇` induces a
+chain map on the normalized complexes, `md 91`), extended to the primed `∇^{(j)}` via the (2.10)
+derived-operator calculus (the "Therefore" of `md 159`–`161`). Concretely: `∇^{(j)} ≫ ρ₂` admits an
+`ιF₁ ≫ retractionN₁` prefix — it factors through the tensor-side bi-Moore retraction. This is the
+single genuinely-EM ingredient behind "primed `∇` maps norms to norms": once it holds, killing tensor
+norms is automatic (`comp_biIsNorm_retractionN₂_of_factorsRetractionN₁`, via `killComponent`).
+
+For `j = 0` it is the 6b identity `retractionN₁_inclusionN₁_shuffleMap_retractionN₂` +
+`ιTotal_comp_shuffleMap_f` (`G = inclusionN₁ ≫ shuffleMap ≫ retractionN₂` composed appropriately).
+The primed levels are the derived-operator extension — the part EM gets for free from
+naturality-in-dimension of the FD-rules (the combinatorial fact our `prime` mirrors). -/
+lemma primeIter_ezBiOp_factorsRetractionN₁ (X : BisimplicialObject C) (p q j : ℕ) :
+    ∃ G : (N₁.obj X).X (p + j + (q + j)) ⟶ (N₂.obj X).X (p + q + j),
+      BiDerivedOp.realize X (BiDerivedOp.primeIter j (ezBiOp p q))
+          ≫ (retractionN₂ X).f (p + q + j)
+        = ιF₁ X (p + j) (q + j) ≫ (retractionN₁ X).f (p + j + (q + j)) ≫ G := by
+  cases j with
+  | zero =>
+      simp only [Nat.add_zero]
+      -- `G = i₁ ≫ ∇ ≫ ρ₂`; then `ιF₁ ≫ r₁ ≫ G = ιF₁ ≫ (r₁ ≫ i₁ ≫ ∇ ≫ ρ₂) = ιF₁ ≫ ∇ ≫ ρ₂`
+      -- (6b `retractionN₁_inclusionN₁_shuffleMap_retractionN₂`), matching `realize ∇ ≫ ρ₂` (`hez`).
+      refine ⟨(inclusionN₁ X).f (p + q) ≫ (shuffleMap X).f (p + q) ≫ (retractionN₂ X).f (p + q),
+        ?_⟩
+      have hez : BiDerivedOp.realize X (BiDerivedOp.primeIter 0 (ezBiOp p q))
+            ≫ (retractionN₂ X).f (p + q)
+          = ιF₁ X p q ≫ (shuffleMap X).f (p + q) ≫ (retractionN₂ X).f (p + q) := by
+        rw [← Category.assoc, ιTotal_comp_shuffleMap_f]
+        simp [BiDerivedOp.realize, BiDerivedOp.primeIter]
+      have h6 := HomologicalComplex.congr_hom
+        (retractionN₁_inclusionN₁_shuffleMap_retractionN₂ X) (p + q)
+      simp only [HomologicalComplex.comp_f] at h6
+      rw [hez, h6]
+  | succ j =>
+      -- Expand `∇ = ∑_μ ⟨shuffleFst μ, shuffleSnd μ⟩` and distribute `primeIter`/`realize`/`≫ ρ₂`
+      -- through the shuffle-sum, exposing the per-letter (δ⁰-shifted) shuffle terms.
+      simp only [ezBiOp, BiDerivedOp.primeIter_sum, BiDerivedOp.realize_sum, Preadditive.sum_comp]
+      -- Assemble `G = ∑_μ Gμ`; reduces to a per-letter factorization of each primed shuffle bi-letter.
+      suffices h : ∀ μ : Shuffle p q,
+          ∃ Gμ, BiDerivedOp.realize X
+                  (BiDerivedOp.primeIter (j + 1)
+                    (Finsupp.single ⟨shuffleFstHom μ, shuffleSndHom μ⟩ μ.sign))
+                ≫ (retractionN₂ X).f (p + q + (j + 1))
+              = ιF₁ X (p + (j + 1)) (q + (j + 1))
+                  ≫ (retractionN₁ X).f (p + (j + 1) + (q + (j + 1))) ≫ Gμ by
+        choose G hG using h
+        exact ⟨∑ μ, G μ, by simp only [hG, Preadditive.comp_sum]⟩
+      exact fun μ => primeIter_single_shuffleLetter_factorsRetractionN₁ X p q j μ
+
+/-- **`∇` primed `j` times still kills tensor norms** — the `prime`-tower generalization of
+`biIsNorm_comp_shuffleMap_retractionN₂` (the case `j = 0`). No induction: the primed shuffle factors
+through the bi-normalization (`primeIter_ezBiOp_factorsRetractionN₁`), so a tensor norm is killed by
+`comp_biIsNorm_retractionN₂_of_factorsRetractionN₁` (the `killComponent` mechanism). EM `md 155`–`161`
+(Lemma I.5.3 + the (2.10) "Therefore"). -/
+lemma realize_primeIter_ezBiOp_comp_biIsNorm_retractionN₂ (X : BisimplicialObject C)
+    {a b p q : ℕ} (j : ℕ) (M : BiDerivedOp a b (p + j) (q + j)) (hM : BiIsNorm M) :
+    BiDerivedOp.realize X ((BiDerivedOp.primeIter j (ezBiOp p q)).comp M)
+      ≫ (retractionN₂ X).f (p + q + j) = 0 := by
+  obtain ⟨G, hG⟩ := primeIter_ezBiOp_factorsRetractionN₁ X p q j
+  exact comp_biIsNorm_retractionN₂_of_factorsRetractionN₁ X _ G hG M hM
+
+/-- **Bigraded degeneracy index-shift** (bigraded analogue of `prime_degenOp`): priming the diagonal
+degeneracy letter `⟨σᵢ, σᵢ⟩` shifts the index, `(Dᵢ)′ = D_{i+1}`. Combinatorial core is `primeHom_σ`
+(`primeHom (σ i) = σ i.succ`); proof mirrors `prime_single_diag`. With `BiDerivedOp.prime_comp` this
+gives `M′ Dᵢ = (M D_{i-1})′` on the bigraded diagonal degeneracies. -/
+lemma BiDerivedOp.prime_diagDegen {q : ℕ} (i : Fin (q + 1)) :
+    BiDerivedOp.prime
+        (Finsupp.single
+          (⟨SimplexCategory.σ i, SimplexCategory.σ i⟩ : BiOpLetter q q (q + 1) (q + 1)) 1)
+      = Finsupp.single
+          (⟨SimplexCategory.σ i.succ, SimplexCategory.σ i.succ⟩ :
+            BiOpLetter (q + 1) (q + 1) (q + 1 + 1) (q + 1 + 1)) 1 := by
+  simp [BiDerivedOp.prime, Finsupp.mapDomain_single, BiOpLetter.prime, primeHom_σ]
+
+/-- **Priming preserves `ρ₂`-kill, bigraded** (bigraded analogue of `prime_preserves_retractionN₂_kill`,
+EM `md 161`'s "prime of a norm is a norm"). If a bigraded operator with diagonal target dies under
+`ρ₂`, so does its prime. This is the analytic descent bridge; it is what turns `(M D_{i-1})′ ≫ ρ₂ = 0`
+into `(M D_{i-1}) ≫ ρ₂ = 0`. -/
+lemma BiDerivedOp.prime_preserves_retractionN₂_kill {a b n : ℕ} (X : BisimplicialObject C)
+    (M : BiDerivedOp a b n n)
+    (h : BiDerivedOp.realize X M ≫ (retractionN₂ X).f n = 0) :
+    BiDerivedOp.realize X (BiDerivedOp.prime M) ≫ (retractionN₂ X).f (n + 1) = 0 := by
+  sorry
+
+/-- **A diagonal degeneracy `Dᵢ = ⟨σᵢ, σᵢ⟩` (via `degenOp`) is a tensor norm.** `degenOp q i` injected
+into the bigraded world by `.toBi` is the single diagonal degeneracy letter, a `BiIsNorm` generator
+(`degenFst`, since `σ i` is non-mono) with identity tail. -/
+lemma biIsNorm_degenOp_toBi {q : ℕ} (i : Fin (q + 1)) :
+    BiIsNorm (degenOp q i).toBi := by
+  have hσ : ¬ Mono (SimplexCategory.σ i) := by
+    intro h
+    have := SimplexCategory.len_le_of_mono (SimplexCategory.σ i)
+    simp only [SimplexCategory.len_mk] at this
+    omega
+  have hdeg : (degenOp q i).toBi
+      = Finsupp.single (⟨SimplexCategory.σ i, SimplexCategory.σ i⟩ :
+          BiOpLetter q q (q + 1) (q + 1)) 1 := by
+    simp [degenOp, DerivedOp.toBi, OpLetter.toBi, Finsupp.mapDomain_single]
+  rw [hdeg]
+  have h := BiIsNorm.degenFst (SimplexCategory.σ i) hσ (SimplexCategory.σ i)
+    (Finsupp.single (⟨𝟙 (⦋q⦌ : SimplexCategory), 𝟙 (⦋q⦌ : SimplexCategory)⟩ :
+      BiOpLetter q q q q) 1)
+  rw [BiDerivedOp.single_comp_single] at h
+  simpa [BiOpLetter.comp] using h
+
+/-- **`∇′ Dᵢ` is diagonally degenerate** (EM (2.12), `md 161`). `Dᵢ` is the **diagonal** degeneracy
+`⟨σᵢ, σᵢ⟩` of the cartesian product `K×L` (EM `md 124`: `Dⱼ(a×b) = Dⱼa × Dⱼb`), acting on the
+diagonal slice `(K×L)_q = K_q × L_q` (so both legs are at degree `q`, matching EM's argument
+`a_q × b_q`). The once-primed shuffle `∇′ = (ezBiOp q q).prime`, applied to `Dᵢ`, dies under the
+diagonal retraction `ρ₂`. Stands alongside the existing lemmas; restructuring to route the general
+lemma through it comes later. -/
+lemma ezBiOp_prime_comp_diagDegen_retractionN₂ {q : ℕ}
+    (X : BisimplicialObject C) (i : Fin (q + 1)) :
+    BiDerivedOp.realize X
+        ((ezBiOp q q).prime.comp (degenOp q i).toBi)
+      ≫ (retractionN₂ X).f (q + q + 1) = 0 := by
+  rcases eq_or_ne i 0 with hi | hi
+  · sorry
+  · obtain ⟨q', rfl⟩ : ∃ q', q = q' + 1 := by
+      rcases Nat.eq_zero_or_pos q with hq | hq
+      · subst hq; exact absurd (Fin.fin_one_eq_zero i) hi
+      · exact ⟨q - 1, by omega⟩
+    rw [show ((degenOp (q' + 1) i).toBi)
+          = BiDerivedOp.prime ((degenOp (q') (i.pred hi)).toBi) from by
+          simp only [degenOp, DerivedOp.toBi, OpLetter.toBi, Finsupp.mapDomain_single]
+          rw [BiDerivedOp.prime_diagDegen, Fin.succ_pred], ← BiDerivedOp.prime_comp]
+    refine BiDerivedOp.prime_preserves_retractionN₂_kill X _ ?_
+    rw [BiDerivedOp.realize_comp, Category.assoc]
+    have hez : BiDerivedOp.realize X (ezBiOp (q' + 1) (q' + 1))
+          ≫ (retractionN₂ X).f (q' + 1 + (q' + 1))
+        = ιF₁ X (q' + 1) (q' + 1) ≫ (shuffleMap X).f (q' + 1 + (q' + 1))
+            ≫ (retractionN₂ X).f (q' + 1 + (q' + 1)) := by
+      rw [← Category.assoc, ιTotal_comp_shuffleMap_f]
+      simp [BiDerivedOp.realize]
+    rw [hez]
+    refine biIsNorm_comp_shuffleMap_retractionN₂ X _ ?_
+    exact biIsNorm_degenOp_toBi (i.pred hi)
+
+/-- **`∇` of a (primed) tensor norm dies under `ρ₂`** — the `ezBiOp`→`shuffleMap` form of
+`biIsNorm_comp_shuffleMap_retractionN₂`. For a tensor norm `N`, the bigraded composite `∇ ∘ N`
+(`∇ = ezBiOp`), primed `k+1` times, realizes to zero after `ρ₂`. Reduces (via `BiDerivedOp.prime_comp`
++ `BiDerivedOp.primeIter_comp` to put it in `∇^{(k+1)} ∘ N^{(k+1)}` form, with `N^{(k+1)}` a norm by
+`BiIsNorm.prime`) to the `prime`-tower kill `realize_primeIter_ezBiOp_comp_biIsNorm_retractionN₂` at
+`j = k+1`. EM `md 206` (`h'∇' = ∇'`). -/
+lemma ezBiOp_comp_biIsNorm_primeIter_retractionN₂ (X : BisimplicialObject C) {a b p q : ℕ}
+    (k : ℕ) (N : BiDerivedOp a b p q) (hN : BiIsNorm N) :
+    BiDerivedOp.realize X (BiDerivedOp.primeIter k (((ezBiOp p q).comp N).prime))
+      ≫ (retractionN₂ X).f (p + q + 1 + k) = 0 := by
+  sorry
+
+/-- Cast-free repackaging of one `hOp_toBi_eq` summand for the sub-bridge: with the diagonal degree
+`n = p + r` supplied as `e`, `∇ₚ ∘ fₚ ∘ D` (primed `k` times) dies under `ρ₂`. `subst`-ing `e`
+removes the transport, then `comp_assoc` exposes the tensor norm `fₚ ∘ D` for the `∇`-kill bridge. -/
+private lemma realize_primeIter_ezBiOp_aw_comp_prime_retractionN₂ (X : BisimplicialObject C)
+    {m p r n : ℕ} (e : p + r = n) (k : ℕ) (D : BiDerivedOp m m n n)
+    (hN : BiIsNorm (BiDerivedOp.comp (Finsupp.single (awLetter p r) 1) (e ▸ D))) :
+    BiDerivedOp.realize X (BiDerivedOp.primeIter k
+        (((e ▸ ((ezBiOp p r).comp (Finsupp.single (awLetter p r) 1))).comp D).prime))
+      ≫ (retractionN₂ X).f (n + 1 + k) = 0 := by
+  subst e
+  rw [BiDerivedOp.comp_assoc]
+  exact ezBiOp_comp_biIsNorm_primeIter_retractionN₂ X k _ hN
+
+/-- Transport-only: a `single` letter pushed across a degree equality `e : p + r = n` is the `single`
+of the transported letter (memory `transport-cast.md`: `subst`-eliminate the dependent `▸`). -/
+private lemma biDerivedOp_cast_single {m p r n : ℕ} (e : p + r = n)
+    (l : BiOpLetter m m n n) (c : ℤ) :
+    (e ▸ Finsupp.single l c : BiDerivedOp m m (p + r) (p + r))
+      = Finsupp.single (e ▸ l : BiOpLetter m m (p + r) (p + r)) c := by
+  subst e; rfl
+
+/-- Transport-only: a diagonal letter `⟨f, g⟩` pushed across `e : p + r = n` transports each leg. -/
+private lemma biOpLetter_cast_diag {m p r n : ℕ} (e : p + r = n)
+    (f g : (⦋n⦌ : SimplexCategory) ⟶ ⦋m⦌) :
+    (e ▸ (⟨f, g⟩ : BiOpLetter m m n n) : BiOpLetter m m (p + r) (p + r))
+      = ⟨(e ▸ f : (⦋p + r⦌ : SimplexCategory) ⟶ ⦋m⦌),
+          (e ▸ g : (⦋p + r⦌ : SimplexCategory) ⟶ ⦋m⦌)⟩ := by
+  subst e; rfl
+
+/-- Transport-only: transport preserves non-mono-ness (it is an iso conjugation). -/
+private lemma not_mono_cast {m n n' : ℕ} (e : n = n')
+    (θ : (⦋n⦌ : SimplexCategory) ⟶ ⦋m⦌) (h : ¬ Mono θ) :
+    ¬ Mono (e ▸ θ : (⦋n'⦌ : SimplexCategory) ⟶ ⦋m⦌) := by
+  subst e; exact h
+
+/-- A degeneracy `σⱼ : ⦋q+1⦌ ⟶ ⦋q⦌` is never mono (it drops a dimension). -/
+private lemma not_mono_σ {q : ℕ} (j : Fin (q + 1)) : ¬ Mono (SimplexCategory.σ j) := by
+  intro h
+  have := SimplexCategory.len_le_of_mono (SimplexCategory.σ j)
+  simp only [SimplexCategory.len_mk] at this
+  omega
+
+/-- **The final sub-bridge — EM (2.12), `md 159`–`161`, in `prime`-tower form.** The primed operator
+`h' Dⱼ = (h ∘ Dⱼ)'` (and its whole tower `(h' Dⱼ)⁽ᵏ⁾`) dies under `ρ₂`. This is the genuinely new
+structural primitive of the EM-faithful route — the place where "priming commutes with the `∇f`
+factorization" is discharged. Stated with the leading `.prime` baked in so it matches EM's `h'Dᵢ`
+literally (and so the keystone reduces to it cast-free).
+
+**Intended proof (must NOT induct via a per-step `prime`-preserves-kill — that would reintroduce the
+analytic `prime_preserves_retractionN₂_kill`).** Uniformly in `k`:
+* `h = ∇ f` (`realize_hOp`); `f ∘ Dⱼ` realizes as `∇` of a **tensor norm** `BiIsNorm`
+  (`awLetter_comp_diagDegen_biIsNorm`).
+* Priming acts through the bigraded factorization (EM `md 206`, `(MN)' = M'N'`, `BiOpLetter.prime_comp`):
+  `(h ∘ Dⱼ)^{(k+1)}` realizes as `∇` of the `(k+1)`-times-primed tensor norm, still a `BiIsNorm`
+  (`BiIsNorm.prime`).
+* Each level then dies by `biIsNorm_comp_shuffleMap_retractionN₂` (the `∇`-half).
+The un-primed base `h ∘ Dⱼ ∈ D(K×L)` is `hOp_diagDegen_comp_retractionN₂`. -/
+lemma realize_primeIter_hOp_comp_degenOp_prime_comp_retractionN₂ {q : ℕ} (X : BisimplicialObject C)
+    (k : ℕ) (j : Fin (q + 1)) :
+    DerivedOp.realize X (DerivedOp.primeIter k (((hOp (q + 1)).comp (degenOp q j)).prime))
+      ≫ (retractionN₂ X).f (q + 1 + 1 + k) = 0 := by
+  rw [DerivedOp.realize_toBi, DerivedOp.toBi_primeIter, DerivedOp.toBi_prime,
+    DerivedOp.toBi_comp, hOp_toBi_eq, BiDerivedOp.sum_comp, BiDerivedOp.prime_sum,
+    BiDerivedOp.primeIter_sum, BiDerivedOp.realize_sum, Preadditive.sum_comp]
+  apply Finset.sum_eq_zero
+  intro p _
+  have hp : (↑p : ℕ) + (q + 1 - ↑p) = q + 1 := Nat.add_sub_cancel' (Nat.lt_succ_iff.mp p.isLt)
+  refine realize_primeIter_ezBiOp_aw_comp_prime_retractionN₂ X hp k (degenOp q j).toBi ?_
+  -- `(degenOp q j).toBi` is the single diagonal degeneracy letter `⟨σⱼ, σⱼ⟩`. Push the degree cast
+  -- through `single` and the letter (transport-only helpers), then it is `f ∘ Dⱼ` — a tensor norm.
+  have hdeg : (degenOp q j).toBi
+      = Finsupp.single (⟨SimplexCategory.σ j, SimplexCategory.σ j⟩ :
+          BiOpLetter q q (q + 1) (q + 1)) 1 := by
+    simp [degenOp, DerivedOp.toBi, OpLetter.toBi, Finsupp.mapDomain_single]
+  rw [hdeg, biDerivedOp_cast_single, biOpLetter_cast_diag]
+  all_goals first
+    | exact hp
+    | exact awLetter_comp_diagDegen_biIsNorm (↑p) (q + 1 - ↑p) q _
+        (not_mono_cast hp.symm (SimplexCategory.σ j) (not_mono_σ j))
+
+/-- **EM (2.12), `md 159`–`161` — the keystone, structural.** `h' Dᵢ` (with `i ≠ 0`) — and its whole
+`prime`-tower `(h' Dᵢ)^{(m)}` — dies under the diagonal retraction `ρ₂`. This is the *structural*
+replacement for the analytic décalage descent (`prime_preserves_retractionN₂_kill` →
+`frontal_lastFace_PInfty_kill`): it consumes EM's "Therefore" (`md 159`) directly.
+
+This is exactly the `N`-free `key` currently proved analytically inside
+`hPrimeIter_hPrimeDegen_comp_retractionN₂`; once filled, that lemma reduces to
+`rw [realize_comp, Category.assoc, this, Limits.comp_zero]` and the entire Tier-A/Tier-B analytic
+chain can be deleted.
+
+**Intended structural proof (EM `md 155`→`161`, no `prime`-preservation-of-kill):**
+* `h' Dᵢ = (h D_{i-1})'` — `prime_degenOp` (`Dᵢ = D_{i-1}'`) + multiplicativity `prime_comp`; the
+  whole `primeIter m` tower is then `(h D_{i-1})^{(m+1)}`.
+* `h = ∇ f` (`realize_hOp`) and `f D_{i-1}` is a **tensor norm** (`awLetter_comp_diagDegen_biIsNorm`),
+  so `h D_{i-1}` realizes as `∇` of a `BiIsNorm` (`biIsNorm_comp_shuffleMap_retractionN₂` gives the
+  un-primed kill).
+* **The one genuinely new sub-bridge (TODO):** priming commutes with this `∇`-factorization, i.e.
+  `realize ((∇-of-BiIsNorm)^{(m)})` is again `∇'⁽ᵐ⁾` of the `m`-times-primed `BiIsNorm`
+  (`BiIsNorm.prime`, EM `md 206` `h'∇' = (h∇)'`). Then each level dies by
+  `biIsNorm_comp_shuffleMap_retractionN₂` on the primed tensor norm. -/
+lemma realize_primeIter_hOp_prime_degen_comp_retractionN₂ {q : ℕ} (X : BisimplicialObject C)
+    (m : ℕ) (i : Fin (q + 1)) (hi : i ≠ 0) :
+    DerivedOp.realize X (DerivedOp.primeIter m ((hOp q).prime.comp (degenOp q i)))
+      ≫ (retractionN₂ X).f (q + 1 + m) = 0 := by
+  -- `i ≠ 0` forces `q ≥ 1`; write `q = q' + 1` so `Dᵢ = (D_{i-1})'` (`prime_degenOp`) is available.
+  obtain ⟨q', rfl⟩ : ∃ q', q = q' + 1 := by
+    rcases Nat.eq_zero_or_pos q with hq | hq
+    · subst hq; exact absurd (Fin.fin_one_eq_zero i) hi
+    · exact ⟨q - 1, by omega⟩
+  -- `h' Dᵢ = (h D_{i-1})'` (`prime_degenOp` + multiplicativity `prime_comp`); the operator under the
+  -- tower becomes `((h ∘ D_{i-1}))'`, matching the sub-bridge's `.prime` form at the same indices.
+  rw [show (degenOp (q' + 1) i) = (degenOp q' (i.pred hi)).prime from by
+        rw [prime_degenOp, Fin.succ_pred], ← prime_comp]
+  exact realize_primeIter_hOp_comp_degenOp_prime_comp_retractionN₂ X m (i.pred hi)
+
+/- TODO (integration — sigma-indexed total realization chosen: no global `realizeTotal`; the
+   bidegree sum lives in the `f`/`∇` bridges `alexanderWhitney_f_eq_sum` / `ιTotal_comp_shuffleMap_f`
+   over `Fin (n+1)`, matching the existing `alexanderWhitney`/`shuffleMap` defs):
+   1. `BiOpLetter.realizeComponent`-linearity + `realizeComponent_comp` (mirror `OpLetter.realize_comp`).
+   2. `BiIsNorm.killComponent` — a tensor-norm letter, realized on a summand and post-composed with
+      the bidegree-`(q,r)` component of the bi-Moore retraction `retractionN₁`, vanishes (leading
+      degeneracy ⟹ killed by `PInfty`; tensor analogue of `realize_comp_diagLetter_not_mono…`).
+      EM `md 122`.
+   3. Replace `alexanderWhitney_diagDegen_comp_retractionN₁` (retiring the analytic half of
+      `hOp_diagDegen_comp_retractionN₂`) using `alexanderWhitney_f_eq_sum` +
+      `awLetter_comp_diagDegen_biIsNorm` + `BiIsNorm.killComponent`.
+   4. Replace `prime_preserves_retractionN₂_kill` (and delete `frontal_lastFace_PInfty_kill`,
+      `prime_preserves_PInfty_kill`, `realize_prime_*`, `alexanderWhitney_prime_comp_retractionN₁`)
+      by: `h = ∇f` ⇒ `h Dᵢ ∈ D(K×L)` (step 3 + `ezBiOp_comp_biIsNorm…`), then `h' Dᵢ = (h D_{i-1})'`
+      (`prime_degenOp` + `BiOpLetter.prime_comp`) ∈ `D(K×L)` by `BiIsNorm.prime` — EM (2.12), `md 161`. -/
+
 end BisimplicialObject
 
 end CategoryTheory
@@ -1361,9 +2713,10 @@ one genuinely hard combinatorial step is **(4)**, extracting `hOp`'s representat
 - [x] **(3b)** `lastFace_comp_prime` (`F₀ M' = M F₀`, I.3.3). Reduce to the letter identity
       `δ 0 ≫ primeHom θ = θ ≫ δ 0` (the unprimed `F₀` "eats" the prepended vertex). `Hom.ext` +
       `Fin.cases` + `omega`. **The one identity not from multiplicativity.**
-- [ ] **(3c)** `prime_comp_D0_of_frontal` (`M' D₀ = D₀ M` for frontal `M`, I.3.3). Letter identity
-      `σ 0 ≫ primeHom θ = θ ≫ σ 0` **using** `IsFrontalHom θ` (`θ 0 = 0`); without frontality it
-      fails at the bottom vertex. `Hom.ext` + `Fin.cases` + `omega`, casing on `θ 0 = 0`.
+- [x] **(3c)** **DONE** — `prime_comp_D0_of_frontal` (`M' D₀ = D₀ M` for frontal `M`, I.3.3). Letter
+      identity `σ 0 ≫ primeHom θ = θ ≫ σ 0` (`primeHom_comp_degenZero`) **using** `IsFrontalHom θ`
+      (`θ 0 = 0`); without frontality it fails at the bottom vertex. `Finsupp.induction` + the letter
+      identity. (Also added the degeneracy index-shift `primeHom_σ`/`prime_degenOp` for EM (2.12).)
 - [x] **(3d)** `boundary_comp_D0` (`∂ D₀ = D₀ ∂'`). NB: EM line 179 writes this as `∂ D₀ = 1 − D₀ ∂'`,
       but that quantity is `∂' D₀`; since `∂ = F₀ − ∂'` the bottom two faces `F₀ D₀ = F₁ D₀ = 1`
       cancel, so the true identity is `∂ D₀ = D₀ ∂'`. Proved at the operator level: distribute `comp`
@@ -1373,17 +2726,20 @@ one genuinely hard combinatorial step is **(4)**, extracting `hOp`'s representat
 
 ### Phase 4 — `hOp` representation (hard, isolated; see "characterize" discussion)
 
-- [ ] **(4a)** Define `hOp q` as the explicit `Σ_{p,μ} μ.sign • single ⟨ι_front ≫ fstHom, ι_back ≫
-      sndHom⟩` (the `awComponent ≫ ezComponent` merge). *Or* obtain it by `Classical.choice` of an
-      existence statement and only ever use (4b)/(4c).
-- [ ] **(4b)** `realize_hOp` (`realize (hOp q) = (alexanderWhitney X ≫ shuffleMap X).f q`). The
-      Pattern-5 merge again, summed over splits/shuffles; mirrors `awShuffle_f_eq_sum`
-      (`Bisimplicial.lean:1318`) composed with the EZ side.
+- [x] **(4a)** **DONE** — Define `hOp q` explicitly as `Σ_{p,μ} μ.sign • single (hLetter q p μ)`,
+      where `hLetter` is `⟨shuffleFstHom μ ≫ ι_front, shuffleSndHom μ ≫ ι_back⟩` with the arithmetic
+      `eqToHom` transports for `p + (q - p) = q`. This is the formal AW split followed by one EZ shuffle.
+- [~] **(4b)** **PLUMBING DONE, MERGE SORRY REMAINS** — `realize_hOp`
+      (`realize (hOp q) = (alexanderWhitney X ≫ shuffleMap X).f q`) is proved from
+      `awShuffle_f_eq_sum` (`Bisimplicial.lean:1318`) and the drafted bridge `hLetter_realize`.
+      The only remaining work is `hLetter_realize`: the Pattern-5 merge showing one concrete
+      `hLetter` realizes to the corresponding `awComponent ≫ ezComponent` shuffle summand.
 - [ ] **(4c)** `hOp_frontalFst` — `ι_front` fixes `0`, so the horizontal words are frontal.
       **Optional** (only for `fΦ = 0`, 2.4); skip unless needed.
-- [ ] **(4d)** `phiOp_frontal` — induction on `q`: `phiOp 0 = 0` is vacuously frontal; the step is a
-      sum of primed operators, each frontal by `prime_frontal` (+ `Frontal` closed under `+`/`comp`/
-      `zsmul`/`single`-support). Needs small `Frontal`-algebra helper lemmas (add as you go).
+- [x] **(4d)** **DONE** — `phiOp_frontal`: `cases q`; `phiOp 0 = 0` is vacuously frontal
+      (`DerivedOp.Frontal.zero`); the `succ` step is `−h' + h'·D₀`, each summand frontal via
+      `prime_frontal` for the `h'` and `IsFrontalHom (σ 0)` for the `D₀` factor. Added the
+      `Frontal`-algebra helpers `IsFrontalHom.comp`, `DerivedOp.Frontal.{zero,single,neg,add,comp_single}`.
 
 ### Phase 5 — the EM induction (the crux, hard) — `mcl2_sections_1_2.md:177`–`194`
 
@@ -1422,8 +2778,39 @@ one genuinely hard combinatorial step is **(4)**, extracting `hOp`'s representat
       - `boundaryOp_comp_hOp` (`∂h = h∂`, `h` is a chain map, EM 155).
       - `lastFace_comp_hPrime_comp_D0` (`F₀h'D₀ = h`, EM 192).
       - `hOp_zero_comp_retraction` (`q=0` retraction base, EM 169).
-      - `hPrimeIter_diagDegen_comp_retractionN₂` (EM (2.12), general `h`-degeneracy kill, feeds
-        `IsNorm.kill`).
+      - `hPrimeIter_hPrimeDegen_comp_retractionN₂` (EM (2.12), paper-shaped `h' Dᵢ` kill, feeds
+        `IsNorm.kill`). The argument follows EM's "Therefore" (md 155→161):
+        * **`h`-norm fact (proved):** `hOp_diagDegen_comp_retractionN₂` — `h` after a diagonal
+          degeneracy dies under `ρ₂`. Itself decomposed into the `f`-half
+          `alexanderWhitney_diagDegen_comp_retractionN₁` (**sorry**, genuine Dold–Kan: AW of a
+          degenerate diagonal lands in degenerate `F₁`) and the `∇`-half (6b,
+          `retractionN₁_inclusionN₁_shuffleMap_retractionN₂`), glued by `realize_hOp`.
+        * **degeneracy index-shift (proved):** `prime_degenOp` (`Dᵢ = (D_{i-1})'`, via new
+          `primeHom_σ : primeHom (σ i) = σ i.succ`) + multiplicativity `prime_comp` give
+          `h' Dᵢ = (h D_{i-1})'`.
+        * **prime-preservation (EM "prime of a norm is a norm", md 161/167) — CHOSEN ROUTE:
+          bi-graded tensor-side derived operator.** EM justify this *structurally*, not
+          analytically: a norm is a sum of leading-degeneracy operators, and priming (`δ⁰`-shift)
+          sends a degeneracy to a degeneracy (`primeHom_not_mono`). Critically, the degeneracy in
+          `h∘D` is **one-sided / off-diagonal** — it lives in the tensor product `K⊗L` (= `F₁`),
+          becoming a *diagonal* norm only after `∇`. EM can prime it for free because their derived
+          operator `M ↦ M'` is defined on the **tensor side** too (md 135–147: `M : K_p⊗L_s →
+          K_q⊗L_r`, `M'` by `δ⁰`-shift; they use `f'`, `∇'`, `(MN)'=M'N'`, md 200–206). Our
+          `DerivedOp`/`prime` lives **only on the diagonal `F₂`**, so we cannot mirror this yet.
+          **TO DO (the build):** introduce a bi-graded derived operator on `F₁` (independent
+          degrees in the two factors — our `OpLetter` is already a pair `⟨β,γ⟩`, so this generalizes
+          the diagonal `s↦q` restriction), with `prime`/`realize`-on-`F₁`; express `f = AW` and
+          `∇ = shuffleMap` as such operators with `f'`,`∇'`; prove "f/∇ map one-sided norms to
+          norms" as *operator identities* (EM (2.6)/(2.7)). Then `h' Dᵢ = (h D_{i-1})'` lands in
+          the (diagonal) norm **termwise**, with no descent lemma. See plan §"Bi-graded tensor-side
+          derived operator (EM-faithful prime route)".
+        * **INTERIM analytic stand-ins (paper-independent — to be retired by the build above):**
+          `prime_preserves_retractionN₂_kill`/`prime_preserves_PInfty_kill` reduce to the abstract
+          décalage descent `frontal_lastFace_PInfty_kill` ("frontal + bottom-face-degenerate ⟹
+          degenerate", via Moore `Q∞`/`hσ` — **not in EM**), or to the closer-to-EM but still
+          analytic `realize_prime_hOp_mod_norm` (`h' = h_{q+1}` mod norms) + its `f`-half
+          `alexanderWhitney_prime_comp_retractionN₁`. All of these are **deletable** once the
+          bi-graded structural route lands.
 - [x] **(5c)** **DONE** — `phi_comm_retraction`: assemble (5a)+(5b) and `realize_hOp`; pure plumbing.
       `succ m` reduces (via `dNext_phiHomRaw`/`prevD_phiHomRaw`/`realize_single_id`/`← realize_hOp`) to
       `phi_comm_op X m`; `zero` uses `dNext 0 = prevD 0 = 0` + `hOp_zero_comp_retraction`.

@@ -114,15 +114,18 @@ existing Mathlib Dold–Kan API rather than building a general quotient/derived-
      and the naturality/idempotence lemmas for `PInfty`.
    - So the “preserves norms” proofs become “this term is killed by `≫ retractionN₂`”.
 
-3. **Create only a tiny local derived-operator API.**
-   - No general Mathlib-quality framework; just enough to express EM `(2.13)` and the induction.
-   - Definitions/lemmas needed locally:
-     - the derived operator `prime` (EM's `M ↦ M'`) for the class of diagonal operators used here;
-     - a `Frontal` predicate for those operators;
-     - the identities EM uses:
-       `prime_comp_D0`, interaction with the truncated boundary `∂'`,
-       and the “higher faces are degenerate / killed by `PInfty`” consequence.
-   - This layer should be tailored to `F₂.obj X`, not abstracted over arbitrary simplicial gadgets.
+3. **Derived-operator API — diagonal `F₂` layer (built) + bi-graded `F₁` layer (CHOSEN, TODO).**
+   - **Diagonal layer (`BisimplicialDerivedOp.lean`, largely built):** the derived operator
+     `prime` (EM's `M ↦ M'`), a `Frontal` predicate, and EM's identities `prime_comp_D0_of_frontal`,
+     `lastFace_comp_prime`, `boundary_comp_D0`, etc., all tailored to `F₂.obj X`.
+   - **Bi-graded tensor-side layer (NEW, chosen — see §"Bi-graded tensor-side derived operator"
+     below):** the EM (2.12) "prime of a norm is a norm" step **cannot** be done on the diagonal
+     `F₂` alone, because the degeneracy in `h∘D` is one-sided (lives in the tensor `F₁ = K⊗L`) and
+     only becomes a diagonal norm after `∇`. EM prime operators on the **tensor side** too
+     (md 135–147); we must mirror that. Build a bi-graded `DerivedOp` on `F₁` (independent degrees
+     per factor), with `prime`/`realize`, express `f`/`∇` as such operators, and prove their
+     one-sided norm-preservation as operator identities. This **replaces** the interim analytic
+     descent (`frontal_lastFace_PInfty_kill` etc.), which is not in EM.
 
 4. **Define the recursive homotopy operator following EM `(2.13)`.**
    - Base case: `phiRaw X 0 = 0`.
@@ -162,6 +165,47 @@ existing Mathlib Dold–Kan API rather than building a general quotient/derived-
 
 This is the smallest plan that stays faithful to EM and avoids duplicating Mathlib's existing
 normalization machinery.
+
+### Bi-graded tensor-side derived operator (EM-faithful `prime` route) — CHOSEN
+
+**Why.** The induction's lone hard input is EM (2.12) "`h' Dᵢ` is a norm", i.e. **"prime of a norm
+is a norm"** (`prime_preserves_retractionN₂_kill`). EM justify this *structurally* (md 161/167,
+208–219): a norm is a sum of leading-degeneracy operators, and priming (`δ⁰`-shift) sends a
+degeneracy to a degeneracy. The diagonal `IsNorm.prime` already does this for **diagonal**
+degeneracies `⟨θ,θ⟩` — but `h∘D`'s degeneracy is **one-sided/off-diagonal**: it lives in the
+tensor product `K⊗L` (= `F₁`), becoming a diagonal norm only after `∇`. So the diagonal `F₂`
+algebra cannot witness it structurally, and priming our *analytic* `ρ₂`-kill needs a descent.
+
+**Key fact (from EM, md 135–147, 200–206).** EM define the derived operator `M ↦ M'` for natural
+operators **on the tensor side** `M : K_p⊗L_s → K_q⊗L_r` (by `δ⁰`-shifting every structure map),
+use `f'`, `∇'`, and multiplicativity `(MN)' = M'N'`. So `h' = (∇f)' = ∇'f'`, and each of `f'`,
+`∇'` preserves the one-sided norm *for free* (`δ⁰`-shift keeps a leading degeneracy). We only built
+`prime` on the **diagonal `F₂`**; this is the missing piece.
+
+**Build (replaces the analytic descent, which is NOT in EM):**
+1. **Bi-graded `BiDerivedOp`.** Generalize `OpLetter`/`DerivedOp` from the diagonal restriction
+   (both legs `⦋q⦌→⦋s⦌`) to **independent bidegrees** in the two factors, realized on the tensor /
+   total complex `F₁` (`K⊗L`). Our `OpLetter` is already a pair `⟨β, γ⟩`, so this reuses
+   `primeHom`, `primeHom_comp`, `primeHom_not_mono`, and the `Finsupp` machinery verbatim, just
+   re-indexed.
+2. **`prime`/`realize` on `F₁`.** `prime` = `δ⁰`-shift both legs; `realize` onto `F₁.obj X` via the
+   `awComponent`/`ezComponent` structure. Get `f'`, `∇'` and `(MN)'=M'N'`.
+3. **One-sided norm preservation as operator identities** (EM (2.6)/(2.7)): `f`/`∇` map one-sided
+   tensor norms to norms, *structurally* (leading degeneracy), and priming preserves this.
+4. **Conclude (2.12) termwise.** `h' Dᵢ = (h D_{i-1})'` is then a sum of leading-degeneracy
+   operators ⟹ a norm, with **no descent lemma**.
+
+**What this retires.** `frontal_lastFace_PInfty_kill`, `prime_preserves_PInfty_kill`,
+`prime_preserves_retractionN₂_kill`, `realize_prime_hOp_mod_norm`,
+`alexanderWhitney_prime_comp_retractionN₁`, `realize_prime_comp_lastFace` — all interim analytic
+stand-ins, deletable once the structural route lands.
+
+**Caveats.** (i) Substantial — it is a second copy of the derived-operator framework (bi-graded, on
+`F₁`) plus the `f`/`∇` operator-identity norm-preservation; comparable to (or larger than) the
+diagonal layer. (ii) General-bisimplicial `X` (not literal `K×L`): `F₁` is the AW-target total
+complex and `f`/`∇` are built from the two simplicial directions, so they *are* expressible as
+bi-graded operators — but confirm `F₁` supports the `(2.10)` expansion as cleanly as `F₂`. (iii)
+It **replaces**, not augments, the analytic spine.
 
 **Ingredient 2 — `bridge₂ : HomotopyEquiv N₂ (F₂.obj X)`** — **FREE from Mathlib:**
 `AlgebraicTopology.DoldKan.homotopyEquivNormalizedMooreComplexAlternatingFaceMapComplex` at

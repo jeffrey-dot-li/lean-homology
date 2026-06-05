@@ -222,6 +222,91 @@ private lemma shuffle_fst_lt_iff_not_snd_lt {p q : ℕ} (u : Shuffle p q) (r : F
     ¬ ((u.1 r.castSucc).2.val < (u.1 r.succ).2.val) := by
   rcases shuffle_step u r with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> omega
 
+/-- A shuffle path crosses every intermediate `snd`-level: for `i + 1 ≤ q` there is a step `a`
+that is a **`q`-step at level `i`** — the second coordinate goes `i → i + 1` while the first
+coordinate is fixed. This is the degeneracy analog of the face-insertion step lemmas, and is what
+lets the Eilenberg–Zilber map carry a one-direction degeneracy to a diagonal one. -/
+lemma exists_snd_step {p q : ℕ} (μ : Shuffle p q) (i : ℕ) (hi : i + 1 ≤ q) :
+    ∃ a : Fin (p + q), (μ.1 a.castSucc).2.val = i ∧ (μ.1 a.succ).2.val = i + 1 ∧
+      (μ.1 a.castSucc).1 = (μ.1 a.succ).1 := by
+  classical
+  let S : Finset (Fin (p + q + 1)) := Finset.univ.filter (fun r => i + 1 ≤ (μ.1 r).2.val)
+  have hlast : Fin.last (p + q) ∈ S := by
+    simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]
+    have hsum := coordSum_eq μ (Fin.last (p + q))
+    have h1 := (μ.1 (Fin.last (p + q))).1.isLt
+    have h2 := (μ.1 (Fin.last (p + q))).2.isLt
+    simp only [Fin.val_last] at hsum
+    omega
+  have hSne : S.Nonempty := ⟨_, hlast⟩
+  set a0 := S.min' hSne with ha0_def
+  have ha0S : a0 ∈ S := S.min'_mem hSne
+  have ha0 : i + 1 ≤ (μ.1 a0).2.val := by
+    have h := ha0S; simp only [S, Finset.mem_filter, Finset.mem_univ, true_and] at h; exact h
+  have ha0pos : 0 < a0.val := by
+    rcases Nat.eq_zero_or_pos a0.val with h | h
+    · exfalso
+      have hsum := coordSum_eq μ a0
+      rw [h] at hsum
+      omega
+    · exact h
+  set a : Fin (p + q) := ⟨a0.val - 1, by have := a0.isLt; omega⟩ with ha_def
+  have ha_val : a.val = a0.val - 1 := rfl
+  have hsucc : a.succ = a0 := Fin.ext (by rw [Fin.val_succ, ha_val]; omega)
+  have hcast_lt : a.castSucc < a0 := by
+    rw [Fin.lt_def, Fin.coe_castSucc, ha_val]; omega
+  have hcast_notin : a.castSucc ∉ S := fun h => absurd (S.min'_le _ h) (not_le.mpr hcast_lt)
+  have hcast_le : (μ.1 a.castSucc).2.val ≤ i := by
+    by_contra h
+    exact hcast_notin
+      (by simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]; omega)
+  have hsucc_ge : i + 1 ≤ (μ.1 a.succ).2.val := by rw [hsucc]; exact ha0
+  rcases shuffle_step μ a with ⟨hf, hs⟩ | ⟨hf, hs⟩
+  · exact absurd hs (by omega)
+  · exact ⟨a, by omega, by omega, Fin.ext hf⟩
+
+/-- The first-coordinate analog of `exists_snd_step`: for `i + 1 ≤ p` there is a **`p`-step at
+level `i`** — the first coordinate goes `i → i + 1` while the second coordinate is fixed. Used for
+the outer (horizontal) Eilenberg–Zilber degeneracy kill. -/
+lemma exists_fst_step {p q : ℕ} (μ : Shuffle p q) (i : ℕ) (hi : i + 1 ≤ p) :
+    ∃ a : Fin (p + q), (μ.1 a.castSucc).1.val = i ∧ (μ.1 a.succ).1.val = i + 1 ∧
+      (μ.1 a.castSucc).2 = (μ.1 a.succ).2 := by
+  classical
+  let S : Finset (Fin (p + q + 1)) := Finset.univ.filter (fun r => i + 1 ≤ (μ.1 r).1.val)
+  have hlast : Fin.last (p + q) ∈ S := by
+    simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]
+    have hsum := coordSum_eq μ (Fin.last (p + q))
+    have h1 := (μ.1 (Fin.last (p + q))).1.isLt
+    have h2 := (μ.1 (Fin.last (p + q))).2.isLt
+    simp only [Fin.val_last] at hsum
+    omega
+  have hSne : S.Nonempty := ⟨_, hlast⟩
+  set a0 := S.min' hSne with ha0_def
+  have ha0S : a0 ∈ S := S.min'_mem hSne
+  have ha0 : i + 1 ≤ (μ.1 a0).1.val := by
+    have h := ha0S; simp only [S, Finset.mem_filter, Finset.mem_univ, true_and] at h; exact h
+  have ha0pos : 0 < a0.val := by
+    rcases Nat.eq_zero_or_pos a0.val with h | h
+    · exfalso
+      have hsum := coordSum_eq μ a0
+      rw [h] at hsum
+      omega
+    · exact h
+  set a : Fin (p + q) := ⟨a0.val - 1, by have := a0.isLt; omega⟩ with ha_def
+  have ha_val : a.val = a0.val - 1 := rfl
+  have hsucc : a.succ = a0 := Fin.ext (by rw [Fin.val_succ, ha_val]; omega)
+  have hcast_lt : a.castSucc < a0 := by
+    rw [Fin.lt_def, Fin.coe_castSucc, ha_val]; omega
+  have hcast_notin : a.castSucc ∉ S := fun h => absurd (S.min'_le _ h) (not_le.mpr hcast_lt)
+  have hcast_le : (μ.1 a.castSucc).1.val ≤ i := by
+    by_contra h
+    exact hcast_notin
+      (by simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]; omega)
+  have hsucc_ge : i + 1 ≤ (μ.1 a.succ).1.val := by rw [hsucc]; exact ha0
+  rcases shuffle_step μ a with ⟨hf, hs⟩ | ⟨hf, hs⟩
+  · exact ⟨a, by omega, by omega, Fin.ext hs⟩
+  · exact absurd hf (by omega)
+
 /-- The swap of a shuffle at position x gives the swapped coordinates of u at the same position. -/
 private lemma swap_apply_fst {p q : ℕ} (u : Shuffle p q) (x : Fin (q + p + 1)) :
     ((u.swap).1 x).1.val = (u.1 (x.cast (by omega))).2.val := by

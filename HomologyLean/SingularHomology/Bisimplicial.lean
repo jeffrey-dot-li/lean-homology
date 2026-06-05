@@ -1287,7 +1287,7 @@ lemma emHomotopyHom_zero (X : BisimplicialObject C) (i j : ℕ)
 
 /-- Base case `n = 0` of `∇AW = 1 + d(H)`: on `X_{0,0}` only the `p = q = 0` shuffle
 contributes and the front/back faces are identities, so `∇AW` is already the identity. -/
-private lemma awShuffle_f_zero (X : BisimplicialObject C) :
+lemma awShuffle_f_zero (X : BisimplicialObject C) :
     (alexanderWhitney X ≫ shuffleMap X).f 0 =
       (𝟙 (F₂.obj X) : (F₂.obj X) ⟶ (F₂.obj X)).f 0 := by
   rw [HomologicalComplex.comp_f]
