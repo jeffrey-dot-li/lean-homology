@@ -1,5 +1,7 @@
 import HomologyLean.SingularHomology.BisimplicialNormalizedDefs
 import Mathlib.Data.Finsupp.Basic
+import Mathlib.Algebra.Category.ModuleCat.Abelian
+import Mathlib.Algebra.Category.ModuleCat.Adjunctions
 
 /-!
 # Eilenberg–Mac Lane derived-operator API for the normalized Eilenberg–Zilber homotopy
@@ -885,11 +887,109 @@ noncomputable def idOp (q : ℕ) : DerivedOp q q := Finsupp.single ⟨𝟙 _, �
 EM (markdown lines 155, 167, 192, 161) only ever uses `h` through derived-operator properties,
 never its explicit letters. We isolate them here as the (currently `sorry`'d) inputs to (5b). -/
 
+/-- The represented simplicial type `Δ[s] : b ↦ (⦋b⦌ ⟶ ⦋s⦌)` (the `SimplexCategory` Yoneda). -/
+private def ysimp (s : ℕ) : SimplexCategoryᵒᵖ ⥤ Type := yoneda.obj (⦋s⦌ : SimplexCategory)
+
+/-- The bi-represented **bisimplicial type** at `(s, s)`: `(a, b) ↦ (⦋a⦌ ⟶ ⦋s⦌) × (⦋b⦌ ⟶ ⦋s⦌)`,
+the horizontal map acting on the first factor and the vertical on the second. -/
+private def bitype (s : ℕ) : BisimplicialObject (Type) where
+  obj a :=
+    { obj := fun b => (ysimp s).obj a × (ysimp s).obj b
+      map := fun {b b'} g p => (p.1, (ysimp s).map g p.2)
+      map_id := by intro b; ext p <;> simp
+      map_comp := by intro b b' b'' g g'; ext p <;> simp }
+  map := fun {a a'} f =>
+    { app := fun b p => ((ysimp s).map f p.1, p.2)
+      naturality := by intro b b' g; ext p <;> simp }
+  map_id := by intro a; ext b p <;> simp
+  map_comp := by intro a a' a'' f f'; ext b p <;> simp
+
+/-- Postcompose a (bi)simplicial type with the free `ℤ`-module functor. -/
+private noncomputable def freeWhisker :
+    (SimplexCategoryᵒᵖ ⥤ Type) ⥤ (SimplexCategoryᵒᵖ ⥤ ModuleCat.{0} ℤ) :=
+  (Functor.whiskeringRight SimplexCategoryᵒᵖ Type (ModuleCat.{0} ℤ)).obj (ModuleCat.free ℤ)
+
+/-- A **universal bisimplicial object** detecting all derived operators out of degree `s`:
+the free `ℤ`-module on the bi-represented bisimplicial set at `(s, s)`. Realizing a derived
+operator against it recovers it as a `Finsupp`, so `realize (univOp s)` is injective
+(`realize_univOp_injective`). -/
+noncomputable def univOp (s : ℕ) : BisimplicialObject (ModuleCat.{0} ℤ) :=
+  bitype s ⋙ freeWhisker
+
+/-- The underlying pair of `SimplexCategory` maps of a letter. Injective (a letter *is* its pair),
+so it indexes the free `ℤ`-module realizing `univOp`. -/
+private def opToPair {s q : ℕ} (l : OpLetter s q) :
+    ((⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) × ((⦋q⦌ : SimplexCategory) ⟶ ⦋s⦌) := (l.fst, l.snd)
+
+private lemma opToPair_injective {s q : ℕ} :
+    Function.Injective (opToPair (s := s) (q := q)) := by
+  intro l l' h
+  cases l; cases l'
+  simpa only [opToPair, Prod.mk.injEq, OpLetter.mk.injEq] using h
+
+/-- The universal generator `(𝟙, 𝟙) ∈ X_{s,s}` for `X = univOp s`. -/
+private noncomputable def univGen (s : ℕ) : (F₂.obj (univOp s)).X s :=
+  ModuleCat.freeMk (R := ℤ) ((𝟙 (⦋s⦌ : SimplexCategory)), (𝟙 (⦋s⦌ : SimplexCategory)))
+
+private lemma realize_univOp_single_gen_one {s q : ℕ} (l : OpLetter s q) :
+    (DerivedOp.realize (univOp s) (Finsupp.single l 1)) (univGen s)
+      = ModuleCat.freeMk (R := ℤ) (opToPair l) := by
+  rw [realize_single, one_smul]
+  simp only [OpLetter.realize, univOp, freeWhisker, univGen, Functor.comp_obj, Functor.comp_map,
+    Functor.whiskeringRight_obj_obj, Functor.whiskeringRight_obj_map,
+    Functor.whiskerRight_app, ModuleCat.comp_apply, bitype, ysimp,
+    yoneda_obj_map, Quiver.Hom.unop_op, opToPair]
+  erw [ModuleCat.free_map_apply, ModuleCat.free_map_apply]
+  simp
+
+private lemma realize_univOp_single_gen {s q : ℕ} (l : OpLetter s q) (c : ℤ) :
+    (DerivedOp.realize (univOp s) (Finsupp.single l c)) (univGen s)
+      = Finsupp.single (opToPair l) c := by
+  rw [show (Finsupp.single l c : DerivedOp s q) = c • Finsupp.single l 1 from by
+        rw [Finsupp.smul_single, smul_eq_mul, mul_one], realize_zsmul]
+  rw [show (ConcreteCategory.hom (c • DerivedOp.realize (univOp s) (Finsupp.single l 1)))
+        (univGen s)
+        = c • (ConcreteCategory.hom (DerivedOp.realize (univOp s) (Finsupp.single l 1)))
+          (univGen s) from rfl,
+    realize_univOp_single_gen_one, ModuleCat.freeMk, Finsupp.smul_single, smul_eq_mul, mul_one]
+
+/-- Realizing `M` on `univOp` and evaluating at the universal generator recovers `M` (reindexed
+along the letter-to-pair bijection): `realize (univOp s) M (gen) = mapDomain opToPair M`. -/
+private lemma realize_univOp_gen {s q : ℕ} (M : DerivedOp s q) :
+    (DerivedOp.realize (univOp s) M) (univGen s) = Finsupp.mapDomain opToPair M := by
+  induction M using Finsupp.induction with
+  | zero => rw [realize_zero, Finsupp.mapDomain_zero]; rfl
+  | single_add l c f _ _ ih =>
+      rw [realize_add,
+        show (ConcreteCategory.hom (DerivedOp.realize (univOp s) (Finsupp.single l c)
+              + DerivedOp.realize (univOp s) f)) (univGen s)
+            = (ConcreteCategory.hom (DerivedOp.realize (univOp s) (Finsupp.single l c)))
+                (univGen s)
+              + (ConcreteCategory.hom (DerivedOp.realize (univOp s) f)) (univGen s) from rfl,
+        realize_univOp_single_gen, ih, Finsupp.mapDomain_add, Finsupp.mapDomain_single]
+
+/-- `realize` against the universal object is **injective**: a derived operator is determined by
+its realization on `univOp`. This is the faithfulness principle that lets us deduce formal
+`DerivedOp` identities from their (realized) chain-level counterparts. -/
+lemma realize_univOp_injective {s q : ℕ} :
+    Function.Injective (fun M : DerivedOp s q => M.realize (univOp s)) := by
+  intro M N h
+  have hg := congrArg
+    (fun φ : (F₂.obj (univOp s)).X s ⟶ (F₂.obj (univOp s)).X q =>
+      (ConcreteCategory.hom φ) (univGen s)) h
+  simp only [realize_univOp_gen] at hg
+  exact Finsupp.mapDomain_injective opToPair_injective hg
+
 /-- **`∂ h = h ∂` (EM line 155, `∂*h' = h'∂*`).** `h = ∇f` is a chain map, so `boundaryOp` commutes
-with `hOp`. -/
+with `hOp`. Proof: `realize` against the universal object is injective, and on the realized side
+this is just the chain-map condition `comm` of `alexanderWhitney ≫ shuffleMap`. -/
 lemma boundaryOp_comp_hOp (q : ℕ) :
     (boundaryOp q).comp (hOp (q + 1)) = (hOp q).comp (boundaryOp q) := by
-  sorry
+  apply realize_univOp_injective
+  change ((boundaryOp q).comp (hOp (q + 1))).realize (univOp (q + 1))
+    = ((hOp q).comp (boundaryOp q)).realize (univOp (q + 1))
+  rw [realize_comp, realize_comp, realize_hOp, realize_hOp, realize_boundaryOp]
+  exact (alexanderWhitney (univOp (q + 1)) ≫ shuffleMap (univOp (q + 1))).comm (q + 1) q
 
 /-- **`F₀ h' = h F₀` (EM, Lemma I.3.3).** Just `lastFace_comp_prime` specialized to `hOp`. -/
 lemma lastFace_comp_hPrime (q : ℕ) :
