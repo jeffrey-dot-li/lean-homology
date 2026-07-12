@@ -49,27 +49,19 @@ lemma inclusionN₁_comp_retractionN₁ (X : BisimplicialObject C) :
   let Y := ((alternatingFaceMapComplex (SimplicialObject C)).obj X)
   let M := (normalizedMooreComplex C).mapHomologicalComplex (ComplexShape.down ℕ)
   have hBC :
-      (NatTrans.mapHomologicalComplex mooreInclusion _).app Y ≫
-          (NatTrans.mapHomologicalComplex mooreRetraction _).app Y =
-        𝟙 (M.obj Y) := by
+      (NatTrans.mapHomologicalComplex mooreInclusion _).app
+            ((alternatingFaceMapComplex (SimplicialObject C)).obj X) ≫
+          (NatTrans.mapHomologicalComplex mooreRetraction _).app
+            ((alternatingFaceMapComplex (SimplicialObject C)).obj X) =
+        𝟙 (M.obj ((alternatingFaceMapComplex (SimplicialObject C)).obj X)) := by
     rw [← NatTrans.comp_app, ← NatTrans.mapHomologicalComplex_comp,
       mooreInclusion_comp_mooreRetraction, NatTrans.mapHomologicalComplex_id, NatTrans.id_app]
-  calc
-    (M.map (inclusionOfMooreComplexMap X) ≫
-          (NatTrans.mapHomologicalComplex mooreInclusion _).app Y) ≫
-        ((NatTrans.mapHomologicalComplex mooreRetraction _).app Y ≫
-          M.map (PInftyToNormalizedMooreComplex X)) =
-      M.map (inclusionOfMooreComplexMap X) ≫
-          ((NatTrans.mapHomologicalComplex mooreInclusion _).app Y ≫
-            (NatTrans.mapHomologicalComplex mooreRetraction _).app Y) ≫
-        M.map (PInftyToNormalizedMooreComplex X) := by simp only [Category.assoc]
-    _ = M.map (inclusionOfMooreComplexMap X) ≫ M.map (PInftyToNormalizedMooreComplex X) := by
-      rw [hBC, Category.id_comp]
-    _ = 𝟙 (M.obj ((normalizedMooreComplex (SimplicialObject C)).obj X)) := by
-      rw [← M.map_comp]
-      change M.map (inclusionOfMooreComplexMap X ≫
-          (splitMonoInclusionOfMooreComplexMap X).retraction) = _
-      rw [(splitMonoInclusionOfMooreComplexMap X).id, M.map_id]
+  slice_lhs 2 3 => rw [hBC]
+  rw [Category.id_comp]
+  rw [← Functor.map_comp]
+  change M.map (inclusionOfMooreComplexMap X ≫ (splitMonoInclusionOfMooreComplexMap X).retraction) = _
+  rw [(splitMonoInclusionOfMooreComplexMap X).id, Functor.map_id]
+
 
 /-- **Non-diagonal ⟹ one projection collapses at `j+1`.** If vertex `j+1` is not a diagonal
 (corner) vertex of the shuffle `x`, then the two adjacent steps point the same way, so deleting

@@ -98,8 +98,10 @@ lemma ι_front_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [OrderEmbedding.toOrderHom_coe, OrderEmbedding.coe_ofStrictMono,
+    OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, Fin.cast_mk]
   simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
   split_ifs <;> simp_all
 
@@ -112,8 +114,10 @@ lemma ι_front_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [OrderEmbedding.toOrderHom_coe, OrderEmbedding.coe_ofStrictMono, Fin.cast_refl,
+    OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, id_eq]
   simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
   split_ifs <;> simp_all
   omega
@@ -127,8 +131,10 @@ lemma ι_back_comp_δ_of_le (p q : ℕ) (k : Fin (p + q + 2))
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [OrderEmbedding.toOrderHom_coe, OrderEmbedding.coe_ofStrictMono,
+    OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, Fin.cast_mk]
   simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
   split_ifs <;> simp_all <;> omega
 
@@ -142,8 +148,10 @@ lemma ι_back_comp_δ_of_gt (p q : ℕ) (k : Fin (p + q + 2))
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [OrderEmbedding.toOrderHom_coe, OrderEmbedding.coe_ofStrictMono, Fin.cast_refl,
+    OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, id_eq]
   simp only [Fin.succAbove, Fin.lt_def, Fin.val_castSucc]
   split_ifs <;> simp_all <;> omega
 
@@ -155,11 +163,10 @@ private lemma δ_last_comp_ι_front (p q : ℕ) :
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_front, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
-  simp only [Fin.succAbove, Fin.lt_def, Fin.val_last, Fin.val_castSucc]
-  split_ifs
-  simp_all
+  simp
+
 
 /-- The bottom face of `[q+1]` followed by the back inclusion shifts the back block
 from offset `p` to offset `p+1`, up to the arithmetic reassociation of the target. -/
@@ -169,8 +176,10 @@ private lemma δ_zero_comp_ι_back (p q : ℕ) :
   ext ⟨i, hi⟩
   simp only [SimplexCategory.comp_toOrderHom, OrderHom.comp_coe, Function.comp_apply,
     SimplexCategory.eqToHom_toOrderHom, SimplexCategory.len_mk]
-  simp only [SimplexCategory.len_mk] at hi
+  simp only [] at hi
   dsimp [ι_back, SimplexCategory.δ, Fin.succAboveOrderEmb, Fin.castOrderIso]
+  simp only [OrderEmbedding.toOrderHom_coe, OrderEmbedding.coe_ofStrictMono, Fin.succ_mk,
+    OrderIso.coe_toOrderEmbedding, RelIso.coe_fn_mk, Equiv.coe_fn_mk, Fin.cast_mk]
   omega
 
 /-! ### Alexander-Whitney map
@@ -341,7 +350,9 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
   comm' := by
     intro i j h
     simp only [id]
-    rw [ComplexShape.down_Rel] at h; subst h
+    rw [ComplexShape.down_Rel] at h;
+    subst h
+
     -- Expand the total differential on the left into its `D₁ + D₂` pieces.
     simp only [Preadditive.sum_comp, Category.assoc]
     change ∑ x : Fin (j + 2), _ ≫ _ ≫ _ ≫

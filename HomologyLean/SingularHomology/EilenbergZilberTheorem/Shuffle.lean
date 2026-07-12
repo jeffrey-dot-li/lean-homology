@@ -421,14 +421,24 @@ lemma invCount_add_invCount_swap {p q : ℕ} (u : Shuffle p q) :
     u.invCount + (u.swap).invCount = p * q := by
   -- The sum of the differences in the product of coordinates is a telescoping sum, so most terms cancel out.
   have h_telescope : ∑ r : Fin (p + q), ((u.1 (Fin.succ r)).1.val * (u.1 (Fin.succ r)).2.val - (u.1 (Fin.castSucc r)).1.val * (u.1 (Fin.castSucc r)).2.val) = (u.1 (Fin.last (p + q))).1.val * (u.1 (Fin.last (p + q))).2.val - (u.1 0).1.val * (u.1 0).2.val := by
-    have h_telescope : ∀ (n : ℕ) (f : Fin (n + 1) → ℕ), (∀ i : Fin n, f (Fin.castSucc i) ≤ f (Fin.succ i)) → ∑ i : Fin n, (f (Fin.succ i) - f (Fin.castSucc i)) = f (Fin.last n) - f 0 := by
-      intro n f hf; induction' n with n ih <;> simp_all +decide [ Fin.sum_univ_castSucc ] ;
-      convert congr_arg₂ ( · + · ) ( ih ( fun i => f i.castSucc ) ( fun i => hf ( Fin.castSucc i ) ) ) rfl using 1;
-      simp +zetaDelta at *;
-      rw [ tsub_add_eq_add_tsub ];
-      · rw [ Nat.add_sub_of_le ];
-        exact hf ( Fin.last _ );
-      · exact Fin.inductionOn ( Fin.last n |> Fin.castSucc ) ( by norm_num ) fun i hi => by linarith! [ hf i ] ;
+    have h_telescope_int : ∀ (n : ℕ) (f : Fin (n + 1) → ℤ),
+        ∑ i : Fin n, (f i.succ - f i.castSucc) = f (Fin.last n) - f 0 := by
+      intro n f
+      induction' n with n ih
+      · simp
+      · rw [Fin.sum_univ_castSucc]
+        simp only [Fin.succ_castSucc]
+        rw [ih (fun i => f i.castSucc)]
+        simp
+    have h_telescope : ∀ (n : ℕ) (f : Fin (n + 1) → ℕ),
+        (∀ i : Fin n, f i.castSucc ≤ f i.succ) →
+        ∑ i : Fin n, (f i.succ - f i.castSucc) = f (Fin.last n) - f 0 := by
+      intro n f hf
+      have hmono : Monotone f := Fin.monotone_iff_le_succ.mpr hf
+      apply Nat.cast_injective (R := ℤ)
+      rw [Nat.cast_sub (hmono (Fin.zero_le _)), Nat.cast_sum]
+      simp_rw [Nat.cast_sub (hf _)]
+      exact h_telescope_int n (fun i => (f i : ℤ))
     convert h_telescope ( p + q ) ( fun i => ( u.1 i ).1.val * ( u.1 i ).2.val ) _ using 1;
     exact fun i => mul_le_mul' ( u.1.monotone ( Nat.le_succ _ ) |>.1 ) ( u.1.monotone ( Nat.le_succ _ ) |>.2 );
   convert h_telescope using 1;
@@ -647,16 +657,27 @@ private lemma insertLeftIndex_iff {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2
 private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
     (r : Fin (p + q + 1)) :
     (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val := by
-  convert insertLeftIndex_iff ( ν.swap ) k ( Fin.cast ( by omega ) r ) using 1;
-  unfold Shuffle.insertRightIndex Shuffle.swap Shuffle.insertLeftIndex; simp +decide [ Fin.val_add, Nat.mod_eq_of_lt ] ;
-  rw [ Finset.card_filter, Finset.card_filter ] ; ring!;
-  convert Iff.rfl using 3 ; ring!;
-  · grind;
-  · simp +decide [ add_comm, Fin.cast ];
-    congr! 3;
-    congr! 2;
-    congr! 2;
-    exact?
+  constructor <;> intro h
+  · have h_filter :
+        {x : Fin (p + q + 1) | (ν.1 x).2.val < k.val} ⊇ Finset.Iio r := by
+      intro x hx
+      exact lt_of_le_of_lt
+        (Nat.cast_le.mpr ((ν.1.monotone (le_of_lt (by aesop))).2)) h
+    have h_filter_card :
+        Finset.card (Finset.filter (fun x => (ν.1 x).2.val < k.val) Finset.univ) ≥
+          Finset.card (Finset.Iio r) + 1 := by
+      refine Finset.card_lt_card ?_
+      simp_all +decide [Finset.ssubset_def, Finset.subset_iff]
+      exact ⟨fun x hx => h_filter hx, r, h, le_rfl⟩
+    aesop
+  · contrapose! h
+    exact le_trans
+      (Finset.card_le_card (show
+        Finset.filter (fun x : Fin (p + q + 1) => (ν.1 x).2.val < k.val) Finset.univ ⊆
+          Finset.Iio r from fun x hx => Finset.mem_Iio.mpr (lt_of_not_ge fun hx' => by
+            have hmono : (ν.1 r).2.val ≤ (ν.1 x).2.val := (ν.1.monotone hx').2
+            linarith [Finset.mem_filter.mp hx])))
+      (by simp +decide [Finset.card_sdiff, Finset.card_range])
 
 /-! ##### Insertion maps (RHS → LHS direction) -/
 
@@ -1195,10 +1216,15 @@ private lemma insertLeftStep_invCount_term_skip {p q : ℕ}
     · congr 2;
     -- Goal 2: contradiction (succAbove preserves ordering)
     · exfalso; rename_i h_sa h_not
-      exact h_not (Fin.succAbove_lt_succAbove_iff.mp (by convert h_sa using 2))
+      exact h_not (Fin.succAbove_lt_succAbove_iff.mp (by
+        convert h_sa using 2 <;>
+          (congr 1 <;> ext <;> simp [Fin.val_castSucc, Fin.val_succ])))
     -- Goal 3: contradiction (same)
     · exfalso; rename_i h_sa h_orig
-      exact h_sa (Fin.succAbove_lt_succAbove_iff.mpr (by convert h_orig using 2))
+      apply h_sa
+      exact Fin.succAbove_lt_succAbove_iff.mpr (by
+        convert h_orig using 2 <;>
+          (congr 1 <;> ext <;> simp [Fin.val_castSucc, Fin.val_succ]))
   · by_cases h2 : i.val < t
     · -- Case 2: i < t ≤ i+1 (castSucc before, succ at insertion point)
       simp only [h2]
@@ -1243,9 +1269,15 @@ private lemma insertLeftStep_invCount_term_skip {p q : ℕ}
       all_goals simp only [] at *
       · congr 2;
       · exfalso; rename_i h_sa h_not
-        exact h_not (Fin.succAbove_lt_succAbove_iff.mp (by convert h_sa using 2))
+        apply h_not
+        exact Fin.succAbove_lt_succAbove_iff.mp (by
+          convert h_sa using 2 <;>
+            (congr 1))
       · exfalso; rename_i h_sa h_orig
-        exact h_sa (Fin.succAbove_lt_succAbove_iff.mpr (by convert h_orig using 2))
+        apply h_sa
+        exact Fin.succAbove_lt_succAbove_iff.mpr (by
+          convert h_orig using 2 <;>
+            (congr 1))
 
 /-- **Key inversion-count identity** (additive form, avoiding ℕ subtraction):
 `invCount(insertLeftStep ν j) + j = invCount(ν) + insertLeftIndex(ν, j)`.
@@ -1682,16 +1714,39 @@ open HomologyLean.SingularHomology
 lemma ne_snd_of_isRightVertex {p q : ℕ} {μ : Shuffle p (q + 1)} {r : Index (p + (q + 1))}
     (h : isRightVertex μ r) (k : Index (p + (q + 1))) (hkr : k ≠ r) :
     (μ.1 k).2 ≠ (μ.1 r).2 := by
-      convert ne_fst_of_isLeftVertex ( show isLeftVertex ( μ.swap ) ( Fin.castLE ( by linarith ) r ) from ?_ ) ( Fin.castLE ( by linarith ) k ) ?_ using 1 <;> simp_all +decide [ isLeftVertex, isRightVertex ];
-      unfold Shuffle.isLeftStep at *; simp_all +decide [ add_comm, Fin.castLE ] ;
-      constructor <;> intro k hk
-      all_goals generalize_proofs at *;
-      · simp_all +decide [ Shuffle.swap, Fin.ext_iff ];
-        have := h.1 ⟨ k, by linarith ⟩ hk; simp_all +decide [ Fin.cast, Fin.castSucc ] ;
-        have := coordSum_eq μ r; have := coordSum_eq μ ⟨ k, by linarith ⟩ ; simp_all +decide [ Fin.castAdd ] ; omega;
-      · have := h.2 ⟨ k, by linarith [ Fin.is_lt k ] ⟩ ( by simpa [ Fin.ext_iff ] using hk ) ; simp_all +decide [ Fin.ext_iff, Shuffle.swap ] ;
-        have := coordSum_eq μ ( Fin.castLE ( by linarith ) k ) ; have := coordSum_eq μ ( Fin.castLE ( by linarith ) k |> Fin.succ ) ; simp_all +decide [ Fin.castLE, Fin.succ ] ;
-        grind
+  by_cases h_cases : k.val < r.val
+  · have h_le : (μ.1 k).2 ≤ (μ.1 (Fin.mk (r.val - 1) (by omega))).2 :=
+      (μ.1.monotone (Nat.le_sub_one_of_lt h_cases)).2
+    rcases r with ⟨_ | r, hr⟩ <;> simp_all +decide
+    · tauto
+    · have hnot := h.1 ⟨r, by omega⟩ rfl
+      unfold isLeftStep at hnot
+      have hidx1 : (⟨r, by omega⟩ : Fin (p + (q + 1))).castSucc =
+          ⟨r, by omega⟩ := Fin.ext (by simp [Fin.val_castSucc])
+      have hidx2 : (⟨r, by omega⟩ : Fin (p + (q + 1))).succ =
+          ⟨r + 1, hr⟩ := Fin.ext (by simp [Fin.val_succ])
+      rcases shuffle_step μ ⟨r, by omega⟩ with hs | hs
+      · rw [hidx1, hidx2] at hnot hs; omega
+      · rw [hidx1, hidx2] at hs
+        exact ne_of_lt (lt_of_le_of_lt h_le (Fin.lt_def.mpr (by omega)))
+  · have h_k_gt_r : r.val + 1 ≤ k.val := by
+      exact Nat.succ_le_of_lt
+        (lt_of_le_of_ne (le_of_not_gt h_cases)
+          (Ne.symm (by simpa [Fin.ext_iff] using hkr)))
+    have h_right_vertex :
+        (μ.1 r).2.val < (μ.1 (Fin.mk (r.val + 1) (by omega))).2.val := by
+      have hnot := h.2 ⟨r.val, by omega⟩ rfl
+      unfold isLeftStep at hnot
+      have hidx1 : (⟨r.val, by omega⟩ : Fin (p + (q + 1))).castSucc = r :=
+        Fin.ext (by simp [Fin.val_castSucc])
+      have hidx2 : (⟨r.val, by omega⟩ : Fin (p + (q + 1))).succ =
+          ⟨r.val + 1, by omega⟩ := Fin.ext (by simp [Fin.val_succ])
+      rcases shuffle_step μ ⟨r.val, by omega⟩ with hs | hs
+      · rw [hidx1, hidx2] at hnot hs; omega
+      · rw [hidx1, hidx2] at hs; omega
+    exact ne_of_gt
+      (lt_of_lt_of_le h_right_vertex
+        ((μ.1.monotone (Nat.succ_le_of_lt h_k_gt_r)).2))
 
 open HomologyLean.SingularHomology
 
@@ -1841,7 +1896,7 @@ lemma insertLeft_removeLeft {p q : ℕ} {μ : Shuffle (p + 1) q} {r : Fin (p + q
       have h_insert : insertLeftStep ν j = μ := by
         -- By definition of `insertLeftStep`, we know that `insertLeftStep ν j` is equal to `μ`.
         have h_insert : insertLeftIndex ν j = Fin.cast (by omega) r := by
-          exact?
+          exact insertIndex_removeLeft h
         generalize_proofs at *;
         exact (by
           have h_eq : ∀ k : Fin ((p + 1) + q + 1), (insertLeftStep ν j).1 k = μ.1 k := by
@@ -1883,49 +1938,51 @@ lemma insertLeft_removeLeft {p q : ℕ} {μ : Shuffle (p + 1) q} {r : Fin (p + q
             have h_eq : (ν.1 ⟨k.val, by omega⟩).2 = (μ.1 k).2 := by
               simp [ν, removeLeft] at *; (
               simp [removeLeftFun, Fin.succAbove] at *; (
-              rw [ if_pos ( by simpa [ Fin.cast ] using ‹ ( k : ℕ ) < r › ) ]))
+              rw [if_pos (Fin.lt_def.mpr (by
+                simpa [Fin.val_cast] using ‹(k : ℕ) < r›))]))
             generalize_proofs at *; (
             aesop
             skip)))))));
-            by_cases hk' : k.val = (insertLeftIndex ν j).val <;> simp_all +decide [ Fin.ext_iff ] ; (
-            rw [ show k = ⟨ r.val, by linarith [ Fin.is_lt r ] ⟩ from Fin.ext hk' ] ; simp +decide [ *, insertLeftStep ] ; (
-                  -- By definition of `insertLeftStep`, we know that `insertLeftStep ν j` is equal to `μ` at the point `r`.
-                  simp [insertLeftStep, insertLeftStepFun, h_insert] at *; (
-                  -- By definition of `μ`, we know that `μ.1 r = (j, (μ.1 r).2)`.
-                  have h_mu_r : μ.1 (Fin.cast (by omega) r) = (j, (μ.1 (Fin.cast (by omega) r)).2) := by
-                    exact?
-                  generalize_proofs at *; (
-                  convert h_mu_r.symm using 2 ; simp +decide [ Fin.cast ] ; ring!; (
-                  exact Fin.ext ( by linarith! [ Nat.sub_add_cancel ( show ( j : ℕ ) ≤ r from by linarith! [ Fin.is_lt r, Fin.is_lt j, coordSum_eq μ ( Fin.cast ( by linarith ) r ) ] ), coordSum_eq μ ( Fin.cast ( by linarith ) r ) ] ) ;)))));
-            have h_eq : ν.1 (Fin.mk (k.val - 1) (by
-            grind)) = (finRemove j (μ.1 k).1, (μ.1 k).2) := by
-              have h_eq : Fin.succAbove (Fin.cast (by omega) r) (Fin.mk (k.val - 1) (by
-              omega
-              skip)) = k := by
-                simp +decide [ Fin.succAbove, hk, hk' ];
-                split_ifs <;> simp_all +decide [ Fin.lt_iff_val_lt_val ] ; omega;
-                exact Fin.ext ( Nat.succ_pred_eq_of_pos ( Nat.pos_of_ne_zero ( by aesop ) ) )
-              generalize_proofs at *; (
-              convert congr_arg ( fun x : Index ( p + 1 + q ) => ( finRemove j ( μ.1 x ).1, ( μ.1 x ).2 ) ) h_eq using 1
-              skip)
-            generalize_proofs at *; (
-            have h_eq_fun : j.succAbove (finRemove j (μ.1 k).1) = (μ.1 k).1 := by
-              apply succAbove_finRemove
-              generalize_proofs at *; (
-              intro h_eq; have := ne_fst_of_isLeftVertex h k; simp_all +decide [ Fin.ext_iff, Fin.val_add ] ;
-              exact this rfl
-              skip)
-            generalize_proofs at *; (
-            have h_eq_fun : (insertLeftStep ν j).1 k = (j.succAbove (ν.1 (Fin.mk (k.val - 1) (by
-            exact?))).1, (ν.1 (Fin.mk (k.val - 1) (by
-            exact?))).2) := by
-              have h_eq_fun : (insertLeftStep ν j).1 k = (insertLeftStepFun ν j k) := by
-                exact?
-              generalize_proofs at *; (
-              rw [h_eq_fun];
-              simp +decide [ insertLeftStepFun, h_insert, hk, hk' ])
-            generalize_proofs at *; (
-            aesop ( simp_config := { singlePass := true } ) ;)))
+            by_cases hk' : k.val = (insertLeftIndex ν j).val
+            · -- Case k = insertLeftIndex (= r)
+              have hk'_eq : k.val = r.val := by simpa [h_insert] using hk'
+              rw [show k = ⟨r.val, by linarith [Fin.is_lt r]⟩ from Fin.ext hk'_eq]
+              have hr_cast : (⟨r.val, by omega⟩ : Fin (p + 1 + q + 1)) =
+                  Fin.cast (by omega) r := Fin.ext (by simp [Fin.val_cast])
+              simp [insertLeftStep, insertLeftStepFun, h_insert, hk'_eq]
+              have hμ : μ.1 ⟨r.val, by omega⟩ = μ.1 (Fin.cast (by omega) r) :=
+                congrArg _ hr_cast
+              rw [hμ]
+              refine Prod.ext rfl ?_
+              exact Fin.ext (by
+                have hsum := coordSum_eq μ (Fin.cast (by omega) r)
+                simp [j, Fin.val_cast] at hsum ⊢
+                omega)
+            · -- Case k > insertLeftIndex (= r)
+              have h_eq : ν.1 (Fin.mk (k.val - 1) (by omega)) =
+                  (finRemove j (μ.1 k).1, (μ.1 k).2) := by
+                have h_eq : Fin.succAbove (Fin.cast (by omega) r)
+                    (Fin.mk (k.val - 1) (by omega)) = k := by
+                  rw [Fin.succAbove_of_le_castSucc]
+                  · exact Fin.ext (by simp [Fin.val_succ]; omega)
+                  · simp only [Fin.le_def, Fin.val_cast, Fin.val_mk, Fin.val_castSucc]
+                    have : (insertLeftIndex ν j).val = r.val := by
+                      simpa [Fin.val_cast] using congrArg Fin.val h_insert
+                    omega
+                simpa [ν, removeLeft, removeLeftFun] using
+                  congr_arg (fun x : Index (p + 1 + q) =>
+                    (finRemove j (μ.1 x).1, (μ.1 x).2)) h_eq
+              have h_eq_fun : j.succAbove (finRemove j (μ.1 k).1) = (μ.1 k).1 := by
+                apply succAbove_finRemove
+                apply ne_fst_of_isLeftVertex h k
+                intro hkr
+                apply hk'
+                simpa [Fin.ext_iff, h_insert] using congr_arg Fin.val hkr
+              have h_eq_fun : (insertLeftStep ν j).1 k =
+                  (j.succAbove (ν.1 (Fin.mk (k.val - 1) (by omega))).1,
+                    (ν.1 (Fin.mk (k.val - 1) (by omega))).2) := by
+                simp [insertLeftStep, insertLeftStepFun, hk, hk']
+              aesop (simp_config := { singlePass := true })
           exact (by
             have h_eq_fun : (insertLeftStep ν j).1 = μ.1 := by
               exact funext h_eq |> fun h => by simpa using h;
@@ -1965,15 +2022,13 @@ lemma insertIndex_removeRight {p q : ℕ} {μ : Shuffle p (q + 1)} {r : Fin (p +
         · grind;
         · aesop;
         · aesop;
-      · unfold HomologyLean.SingularHomology.Shuffle.insertRightIndex; simp +decide [ Finset.sum_ite ] ;
-        congr! 2;
-        ext k; exact (by
-        convert finRemove_val_lt_iff _ using 1;
-        convert ne_snd_of_isRightVertex h _ _ using 1;
-        simp +decide [ Fin.succAbove ];
-        split_ifs <;> simp_all +decide [ Fin.ext_iff ];
-        · exact ne_of_lt ‹_›;
-        · exact ne_of_gt ( Nat.lt_succ_of_le ‹_› ))
+      · unfold HomologyLean.SingularHomology.Shuffle.insertRightIndex; simp +decide
+        congr! 2
+        rename_i x hx
+        simp [removeRight, removeRightFun]
+        have hne : (μ.1 (r.succAbove x)).2 ≠ (μ.1 r).2 :=
+          ne_snd_of_isRightVertex h _ (Fin.succAbove_ne r x)
+        rw [finRemove_val_lt_iff hne]
 
 open HomologyLean.SingularHomology
 
@@ -1994,16 +2049,16 @@ lemma isRightVertex_swap {p q : ℕ} {μ : Shuffle p q} {r : Fin (p + q + 1)} :
             have := coordSum_eq μ ⟨ k, by linarith [ Fin.is_lt k ] ⟩ ; have := coordSum_eq μ ⟨ k + 1, by linarith [ Fin.is_lt k ] ⟩ ; simp_all +decide [ Fin.add_def, Nat.mod_eq_of_lt ] ;
             constructor <;> intro <;> omega;
           · exact Fin.ext ( by simpa [ Fin.ext_iff ] using congr_arg Fin.val hk );
-        · simp_all +decide [ add_comm ];
-          convert lt_of_le_of_ne _ _ using 1;
-          · convert μ.1.monotone _ |> And.right using 1;
-            simp +decide [ Fin.ext_iff, Fin.le_iff_val_le_val ] at hk ⊢ ; omega;
-          · intro H; have := μ.2; simp_all +decide [ Fin.ext_iff ] ;
-            have := @this ( Fin.cast ( by linarith ) k |> Fin.succ ) r ; simp_all +decide [ Fin.ext_iff ] ;
-            exact this ( Prod.ext ( by
-              convert h.2 ⟨ k, by linarith [ Fin.is_lt k ] ⟩ hk |> le_antisymm <| _ using 1;
-              exact μ.1.monotone ( Nat.le_succ_of_le ( by simp [ hk ] ) ) |>.1 ) ( by
-              exact Fin.ext H.symm ) );
+        · -- castSucc case: ¬isLeftStep at k ⇒ snd increases ⇒ isLeftStep for swap
+          have hk' : (⟨k.val, by omega⟩ : Fin (p + q)).castSucc = r :=
+            Fin.ext (by simpa [Fin.val_castSucc, Fin.val_cast] using congrArg Fin.val hk)
+          have hnot : ¬isLeftStep μ ⟨k.val, by omega⟩ := h.2 _ hk'
+          have hsnd : (μ.1 (⟨k.val, by omega⟩ : Fin (p + q)).castSucc).2.val <
+              (μ.1 (⟨k.val, by omega⟩ : Fin (p + q)).succ).2.val := by
+            have hiff := shuffle_fst_lt_iff_not_snd_lt μ ⟨k.val, by omega⟩
+            exact Decidable.not_not.mp (mt hiff.mpr hnot)
+          convert hsnd using 1 <;>
+            (first | rfl | congr 1 <;> ext <;> simp [Fin.val_castSucc, Fin.val_succ, Fin.val_cast])
       · intro h;
         constructor <;> intro k hk <;> simp_all +decide [ Fin.ext_iff, add_comm ];
         · contrapose! h;
@@ -2072,39 +2127,39 @@ lemma nondiag_mem_insertLeft_or_insertRight {p q : ℕ}
       μ = insertRightStep ν k ∧ (insertRightIndex ν k).val = r.val) := by
   -- By definition of diagonal vertex, if r is not diagonal, then it must be either left or right.
   have h_cases : isLeftVertex μ r ∨ isRightVertex μ r := by
-    convert not_diagonal_iff_left_or_right.mp _;
-    rotate_left;
-    rotate_left;
-    exact ⟨ r.val, by linarith [ Fin.is_lt r ] ⟩
-    all_goals generalize_proofs at *;
-    · convert hr using 1;
-    · exact?;
-    · exact?;
-  obtain h | h := h_cases <;> [ left; right ];
-  · refine' ⟨ _, _, Eq.symm ( insertLeft_removeLeft _ ), _ ⟩;
-    exact ⟨ r.val, by linarith [ Fin.is_lt r ] ⟩;
-    convert h using 1
-    generalize_proofs at *;
-    exact congr_arg Fin.val ( insertIndex_removeLeft _ );
-  · -- Let $k = (μ.1 r).2$ and $ν = removeRight μ r h$.
-    use (μ.1 r).2, removeRight μ r h;
-    -- By definition of `removeRight`, we know that applying `insertRightStep` to the result gives back `μ`.
-    have h_swap_removeRight : (μ.removeRight r h).swap =
-        (μ.swap).removeLeft (r.cast (by omega)) (isRightVertex_swap.mp h) := by
-      exact (removeRight_eq_swap_removeLeft μ r h).symm ▸ rfl
-    have h_insertRight_swap : ((μ.removeRight r h).insertRightStep ((μ.1 r).2)).swap =
-        insertLeftStep ((μ.removeRight r h).swap) ((μ.1 r).2) := by
-      exact insertRightStep_eq_swap _ _
-    have h_insert_right : μ = (μ.removeRight r h).insertRightStep ((μ.1 r).2) := by
-      suffices hsuff : (μ.removeRight r h).insertRightStep ((μ.1 r).2) = μ by exact hsuff.symm
-      have : ((μ.removeRight r h).insertRightStep ((μ.1 r).2)).swap.swap =
-          ((μ.removeRight r h).insertRightStep ((μ.1 r).2)) := swap_swap _
-      rw [← this, h_insertRight_swap, h_swap_removeRight]
-      generalize_proofs at *
-      convert (swap_swap μ).symm using 1
-      convert congr_arg Shuffle.swap (insertLeft_removeLeft ‹_›)
-    generalize_proofs at *
-    exact ⟨ h_insert_right, by simpa using congr_arg Fin.val ( insertIndex_removeRight h ) ⟩
+    simpa [Fin.cast] using
+      (not_diagonal_iff_left_or_right
+        (μ := μ) (r := (⟨r.val, by omega⟩ : Fin (p + q + 3)))).mp
+        (by simpa [Fin.cast] using hr)
+  obtain h | h := h_cases <;> [left; right]
+  · -- Left vertex case
+    let rFin : Fin (p + (q + 1) + 2) := ⟨r.val, by omega⟩
+    have hr_eq : (rFin.cast (by omega) : Index ((p + 1) + (q + 1))) = r := Fin.ext rfl
+    have h' : isLeftVertex μ (rFin.cast (by omega)) := hr_eq ▸ h
+    refine ⟨(μ.1 (rFin.cast (by omega))).1, removeLeft μ rFin h',
+      (insertLeft_removeLeft h').symm, ?_⟩
+    simpa [hr_eq] using congrArg Fin.val (insertIndex_removeLeft h')
+  · -- Right vertex case
+    let rFin : Fin ((p + 1) + q + 2) := ⟨r.val, by omega⟩
+    have hr_eq : (rFin.cast (by omega) : Index ((p + 1) + (q + 1))) = r := Fin.ext rfl
+    have h' : isRightVertex μ (rFin.cast (by omega)) := hr_eq ▸ h
+    refine ⟨(μ.1 (rFin.cast (by omega))).2, removeRight μ rFin h', ?_, ?_⟩
+    · have h_swap := removeRight_eq_swap_removeLeft μ rFin h'
+      have h_ins := insertRightStep_eq_swap (removeRight μ rFin h')
+        (μ.1 (rFin.cast (by omega))).2
+      apply (swapEquiv (p + 1) (q + 1)).injective
+      change μ.swap = ((μ.removeRight rFin h').insertRightStep
+        (μ.1 (rFin.cast (by omega))).2).swap
+      rw [h_ins, h_swap, swap_swap]
+      let rFin' : Fin (q + (p + 1) + 2) := rFin.cast (by omega)
+      have hL : isLeftVertex μ.swap (rFin'.cast (by omega)) := by
+        have := isRightVertex_swap (μ := μ) (r := rFin.cast (by omega)) |>.mp h'
+        convert this using 1
+        exact Fin.ext rfl
+      have hIL := insertLeft_removeLeft (μ := μ.swap) (r := rFin') hL
+      convert hIL.symm using 2 <;>
+        (first | rfl | congr 1 <;> ext <;> simp [rFin', Fin.val_cast, swap])
+    · simpa [hr_eq] using congrArg Fin.val (insertIndex_removeRight h')
 
 
 /- The images of `insertLeftStep` and `insertRightStep` are disjoint:
@@ -2580,7 +2635,8 @@ lemma swapDiagonalSteps_flip_prev {p q : ℕ} (μ : Shuffle (p) (q))
       generalize_proofs at *;
       by_cases hL : isLeftStep μ ⟨ r.val - 1, by have := ( isDiagonalVertex_bounds hr ).2; omega ⟩ <;> simp_all +decide [ swapDiagonalSteps_apply_ne ];
       · rcases r with ⟨ _ | r, hr ⟩ <;> simp_all +decide [ isLeftStep ];
-        · exact?;
+        · unfold isDiagonalVertex at hr
+          simp at hr
         · rw [ swapDiagonalSteps_apply_r_of_left ] <;> norm_num [ hL ];
           · constructor <;> intro h <;> contrapose! h;
             · convert Nat.le_refl _ using 1;
