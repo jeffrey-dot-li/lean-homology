@@ -19,7 +19,7 @@ identity morphism and are closed under composition.
 
 open CategoryTheory
 
-universe v u
+universe w v u
 
 namespace HomologyLean.InfinityCategories
 
@@ -112,6 +112,148 @@ abbrev IsPlus {X Y : A} (f : X ⟶ Y) : Prop :=
 /-- A morphism belongs to the negative wide subcategory `A⁻`. -/
 abbrev IsMinus {X Y : A} (f : X ⟶ Y) : Prop :=
   EilenbergZilberCategory.minus.hom f
+
+namespace Presheaf
+
+/--
+A decomposition of a section `x` of a presheaf consists of a section over an
+object of strictly smaller degree whose restriction is `x`.
+-/
+structure Decomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) where
+  /-- The object over which the decomposing section is defined. -/
+  b : A
+  /-- The map along which the decomposing section restricts to `x`. -/
+  σ : a ⟶ b
+  /-- The decomposing section lies over an object of strictly smaller degree. -/
+  degree_lt : EilenbergZilberCategory.degree b < EilenbergZilberCategory.degree a
+  /-- The section over `b` that restricts to `x`. -/
+  y : X.obj (Opposite.op b)
+  /-- Restricting `y` along `σ` gives `x`. -/
+  map_y : X.map σ.op y = x
+
+/-- A section of a presheaf is degenerate when it admits a decomposition. -/
+def IsDegenerate (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) : Prop :=
+  Nonempty (Decomposition X x)
+
+/-- A section of a presheaf is nondegenerate when it is not degenerate. -/
+def IsNondegenerate (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) : Prop :=
+  ¬IsDegenerate X x
+
+/--
+A section belongs to the `n`-skeleton when it is induced from a section over
+an object of degree at most `n`.
+-/
+def IsInSkeleton (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) : Prop :=
+  ∃ (b : A) (_ : EilenbergZilberCategory.degree b ≤ n)
+    (σ : a ⟶ b) (y : X.obj (Opposite.op b)), X.map σ.op y = x
+
+/-- The `n`-skeleton of a presheaf. -/
+def skeleton (n : ℕ) (X : Aᵒᵖ ⥤ Type w) : Aᵒᵖ ⥤ Type w where
+  obj a := {x : X.obj a // IsInSkeleton n X (a := a.unop) x}
+  map f := ↾fun x ↦ ⟨X.map f x.1, by
+    rcases x.2 with ⟨b, hb, σ, y, hy⟩
+    refine ⟨b, hb, f.unop ≫ σ, y, ?_⟩
+    change X.map (σ.op ≫ f) y = X.map f x.1
+    rw [X.map_comp]
+    change X.map f (X.map σ.op y) = X.map f x.1
+    rw [hy]⟩
+  map_id := by
+    intro a
+    ext x
+    simp
+  map_comp := by
+    intro a b c f g
+    ext x
+    simp
+
+/-- The canonical inclusion of the `n`-skeleton into the original presheaf. -/
+def skeletonι (n : ℕ) (X : Aᵒᵖ ⥤ Type w) : skeleton n X ⟶ X where
+  app _ := ↾fun x ↦ x.1
+  naturality := by
+    intro a b f
+    ext x
+    rfl
+
+/-- A morphism of presheaves restricts to a morphism of their `n`-skeleta. -/
+def skeletonMap (n : ℕ) {X Y : Aᵒᵖ ⥤ Type w} (f : X ⟶ Y) :
+    skeleton n X ⟶ skeleton n Y where
+  app a := ↾fun x ↦ ⟨f.app a x.1, by
+    rcases x.2 with ⟨b, hb, σ, y, hy⟩
+    refine ⟨b, hb, σ, f.app (Opposite.op b) y, ?_⟩
+    rw [← hy]
+    exact (ConcreteCategory.congr_hom (f.naturality σ.op) y).symm⟩
+  naturality := by
+    intro a b g
+    ext x
+    apply Subtype.ext
+    change f.app b (X.map g x.1) = Y.map g (f.app a x.1)
+    exact ConcreteCategory.congr_hom (f.naturality g) x.1
+
+/-- Taking the `n`-skeleton is functorial in the presheaf. -/
+def skeletonFunctor (n : ℕ) :
+    (Aᵒᵖ ⥤ Type w) ⥤ Aᵒᵖ ⥤ Type w where
+  obj X := skeleton n X
+  map f := skeletonMap n f
+  map_id := by
+    intro X
+    ext a x
+    apply Subtype.ext
+    rfl
+  map_comp := by
+    intro X Y Z f g
+    ext a x
+    apply Subtype.ext
+    rfl
+
+/-- Every section over an object of degree at most `n` belongs to the `n`-skeleton. -/
+lemma isInSkeleton_of_degree_le (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (ha : EilenbergZilberCategory.degree a ≤ n) (x : X.obj (Opposite.op a)) :
+    IsInSkeleton n X x := by
+  refine ⟨a, ha, 𝟙 a, x, ?_⟩
+  simp
+
+/--
+Above degree `n`, every section in the `n`-skeleton is degenerate in the
+original presheaf.
+-/
+lemma isDegenerate_of_isInSkeleton (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (ha : n < EilenbergZilberCategory.degree a) (x : X.obj (Opposite.op a))
+    (hx : IsInSkeleton n X x) :
+    IsDegenerate X x := by
+  rcases hx with ⟨b, hb, σ, y, hy⟩
+  exact ⟨{
+    b := b
+    σ := σ
+    degree_lt := hb.trans_lt ha
+    y := y
+    map_y := hy
+  }⟩
+
+/-- The square expressing naturality of the skeleton inclusion commutes. -/
+@[reassoc]
+lemma skeletonMap_comp_ι (n : ℕ) {X Y : Aᵒᵖ ⥤ Type w} (f : X ⟶ Y) :
+    skeletonMap n f ≫ skeletonι n Y = skeletonι n X ≫ f := by
+  ext a x
+  rfl
+
+/--
+`skeletonMap n f` is the unique morphism between skeleta compatible with `f`
+and the canonical inclusions.
+-/
+lemma skeletonMap_unique (n : ℕ) {X Y : Aᵒᵖ ⥤ Type w} (f : X ⟶ Y)
+    (g : skeleton n X ⟶ skeleton n Y)
+    (hg : g ≫ skeletonι n Y = skeletonι n X ≫ f) :
+    g = skeletonMap n f := by
+  ext a x
+  apply Subtype.ext
+  have h := congrArg (fun k ↦ k.app a) hg
+  simpa [skeletonι, skeletonMap] using ConcreteCategory.congr_hom h x
+
+end Presheaf
 
 /--
 Two epimorphisms in the simplex category with the same sections are equal.
