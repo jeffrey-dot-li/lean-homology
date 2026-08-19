@@ -1,76 +1,3 @@
-/-
-This file was edited by Aristotle (https://aristotle.harmonic.fun).
-
-Lean version: leanprover/lean4:v4.24.0
-Mathlib version: f897ebcf72cd16f89ab4577d0c826cd14afaafc7
-This project request had uuid: 835e988f-99c7-4b44-a6a3-e4cd095f31dc
-
-To cite Aristotle, tag @Aristotle-Harmonic on GitHub PRs/issues, and add as co-author to commits:
-Co-authored-by: Aristotle (Harmonic) <aristotle-harmonic@harmonic.fun>
-
-The following was proved by Aristotle:
-
-- private lemma insertLeftIndex_ge {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
-    j.val ≤ (insertLeftIndex ν j).val
-
-- private lemma insertRightIndex_ge {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
-    k.val ≤ (insertRightIndex ν k).val
-
-- private lemma insertRightIndex_iff {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2))
-    (r : Fin (p + q)) :
-    (ν.1 r).2.val < k.val ↔ r.val < (insertRightIndex ν k).val
-
-- lemma shuffle_fst_succ_le {p q : ℕ} (ν : Shuffle p q) (i : Fin (p + q + 1))
-    (hi : i.val + 1 < p + q + 1) :
-    (ν.1 ⟨i.val + 1, by omega⟩).1.val ≤ (ν.1 ⟨i.val, i.isLt⟩).1.val + 1
-
-- lemma insertLeftStep_face {p q : ℕ} (ν : Shuffle p q) (j : Fin (p + 2)) :
-    ∀ (k : Index (p + q)),
-      (insertLeftStep ν j).1 (Fin.succAbove
-        (⟨(insertLeftIndex ν j).val, by omega⟩ : Fin ((p) + q + 1))
-        (k.cast (by omega))) =
-      (j.succAbove (ν.1 k).1, (ν.1 k).2)
-
-- lemma insertRightStep_face {p q : ℕ} (ν : Shuffle p q) (k : Fin (q + 2)) :
-    ∀ (i : Index (p + q)),
-      (insertRightStep ν k).1 (Fin.succAbove
-        (⟨(insertRightIndex ν k).val, by omega⟩ : Fin (p + (q + 1) + 1))
-        (i.cast (by omega))) =
-      ((ν.1 i).1, k.succAbove (ν.1 i).2)
-
-- lemma insertLeftStep_injective {p q : ℕ}
-    (j₁ j₂ : Fin (p + 2)) (ν₁ ν₂ : Shuffle p q)
-    (hμ : insertLeftStep ν₁ j₁ = insertLeftStep ν₂ j₂)
-    (hr : insertLeftIndex ν₁ j₁ = insertLeftIndex ν₂ j₂) :
-    j₁ = j₂ ∧ ν₁ = ν₂
-
-- lemma insertRightStep_injective {p q : ℕ}
-    (k₁ k₂ : Fin (q + 2)) (ν₁ ν₂ : Shuffle p q)
-    (hμ : insertRightStep ν₁ k₁ = insertRightStep ν₂ k₂)
-    (hr : insertRightIndex ν₁ k₁ = insertRightIndex ν₂ k₂) :
-    k₁ = k₂ ∧ ν₁ = ν₂
-
-At Harmonic, we use a modified version of the `generalize_proofs` tactic.
-For compatibility, we include this tactic at the start of the file.
-If you add the comment "-- Harmonic `generalize_proofs` tactic" to your file, we will not do this.
--/
-
-/-
-This file was edited by Aristotle (https://aristotle.harmonic.fun).
-
-Lean version: leanprover/lean4:v4.24.0
-Mathlib version: f897ebcf72cd16f89ab4577d0c826cd14afaafc7
-This project request had uuid: 50b54e27-aba5-4286-9db7-cdfc0d8f251f
-
-To cite Aristotle, tag @Aristotle-Harmonic on GitHub PRs/issues, and add as co-author to commits:
-Co-authored-by: Aristotle (Harmonic) <aristotle-harmonic@harmonic.fun>
-
-The following was proved by Aristotle:
-
-- lemma invCount_add_invCount_swap {p q : ℕ} (u : Shuffle p q) :
-    u.invCount + (u.swap).invCount = p * q
--/
--- Harmonic `generalize_proofs` tactic
 import Mathlib.Tactic
 import Mathlib.GroupTheory.Perm.Sign
 import Mathlib.Order.Fin.Basic
@@ -82,7 +9,7 @@ namespace HomologyLean.SingularHomology
 /-! ### Shuffles -/
 
 /-- Backward-compatible copy of `Fin.val_castSucc` (not available in all Lean versions). -/
-private theorem fin_val_castSucc (i : Fin n) : (i.castSucc : Nat) = i := rfl
+private theorem fin_val_castSucc (i : Fin n) : (i.castSucc : Nat) = (i: Nat) := rfl
 
 /-- The finite chain object `0 ≤ 1 ≤ ··· ≤ k` in `PoSet`, represented by `Fin (k+1)`. -/
 abbrev Index (k : ℕ) := Fin (k + 1)
@@ -144,7 +71,7 @@ def swap {p q : ℕ} (μ : Shuffle p q) : Shuffle q p := by
     have : e a = e b := μ.2 hab'
     exact e.injective this
 
-@[simp]
+@[grind =, simp]
 theorem swap_swap {p q : ℕ} (μ : Shuffle p q) : swap (swap μ) = μ := by
   classical
   apply Subtype.ext
@@ -168,15 +95,14 @@ private lemma coordSum_lt {p q : ℕ} (u : Shuffle p q)
   have hinj : u.1 i ≠ u.1 j := fun h => (ne_of_lt hij) (u.2 h)
   obtain ⟨h1, h2⟩ := hmono
   -- Extract val-level inequalities for omega
-  have h1v : (u.1 i).1.val ≤ (u.1 j).1.val := h1
-  have h2v : (u.1 i).2.val ≤ (u.1 j).2.val := h2
-  rcases Nat.lt_or_eq_of_le h1v with h1' | h1'
-  · omega
-  · rcases Nat.lt_or_eq_of_le h2v with h2' | h2'
-    · omega
+  rcases Nat.lt_or_eq_of_le h1 with h1' | h1'
+  · grind
+  · rcases Nat.lt_or_eq_of_le h2 with h2' | h2'
+    · grind
     · exact absurd (Prod.ext (Fin.ext h1') (Fin.ext h2')) hinj
 
 /-- At every position `r`, the coordinate sum equals `r.val`. -/
+@[grind =]
 lemma coordSum_eq {p q : ℕ} (u : Shuffle p q) (r : Fin (p + q + 1)) :
     (u.1 r).1.val + (u.1 r).2.val = r.val := by
   have castSucc_lt_succ : ∀ i : Fin (p + q), i.castSucc < i.succ := by
@@ -219,6 +145,9 @@ private lemma shuffle_fst_lt_iff_not_snd_lt {p q : ℕ} (u : Shuffle p q) (r : F
     ¬ ((u.1 r.castSucc).2.val < (u.1 r.succ).2.val) := by
   rcases shuffle_step u r with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> omega
 
+
+set_option trace.grind true
+-- set_option trace.grind
 /-- A shuffle path crosses every intermediate `snd`-level: for `i + 1 ≤ q` there is a step `a`
 that is a **`q`-step at level `i`** — the second coordinate goes `i → i + 1` while the first
 coordinate is fixed. This is the degeneracy analog of the face-insertion step lemmas, and is what
@@ -237,27 +166,22 @@ lemma exists_snd_step {p q : ℕ} (μ : Shuffle p q) (i : ℕ) (hi : i + 1 ≤ q
     omega
   have hSne : S.Nonempty := ⟨_, hlast⟩
   set a0 := S.min' hSne with ha0_def
-  have ha0S : a0 ∈ S := S.min'_mem hSne
   have ha0 : i + 1 ≤ (μ.1 a0).2.val := by
-    have h := ha0S; simp only [S, Finset.mem_filter, Finset.mem_univ, true_and] at h; exact h
+    grind [Finset.min'_mem]
   have ha0pos : 0 < a0.val := by
-    rcases Nat.eq_zero_or_pos a0.val with h | h
-    · exfalso
-      have hsum := coordSum_eq μ a0
-      rw [h] at hsum
-      omega
-    · exact h
+    refine Or.resolve_left (Nat.eq_zero_or_pos a0.val) ?_
+    grind [(coordSum_eq μ a0)]
   set a : Fin (p + q) := ⟨a0.val - 1, by have := a0.isLt; omega⟩ with ha_def
   have ha_val : a.val = a0.val - 1 := rfl
   have hsucc : a.succ = a0 := Fin.ext (by rw [Fin.val_succ, ha_val]; omega)
   have hcast_lt : a.castSucc < a0 := by
-    rw [Fin.lt_def, Fin.coe_castSucc, ha_val]; omega
+    rw [Fin.lt_def, Fin.val_castSucc, ha_val]; omega
   have hcast_notin : a.castSucc ∉ S := fun h => absurd (S.min'_le _ h) (not_le.mpr hcast_lt)
   have hcast_le : (μ.1 a.castSucc).2.val ≤ i := by
     by_contra h
     exact hcast_notin
       (by simp only [S, Finset.mem_filter, Finset.mem_univ, true_and]; omega)
-  have hsucc_ge : i + 1 ≤ (μ.1 a.succ).2.val := by rw [hsucc]; exact ha0
+  have hsucc_ge : i + 1 ≤ (μ.1 a.succ).2.val := by rw [hsucc]; grind [Finset.min'_mem]
   rcases shuffle_step μ a with ⟨hf, hs⟩ | ⟨hf, hs⟩
   · exact absurd hs (by omega)
   · exact ⟨a, by omega, by omega, Fin.ext hf⟩
@@ -293,7 +217,7 @@ lemma exists_fst_step {p q : ℕ} (μ : Shuffle p q) (i : ℕ) (hi : i + 1 ≤ p
   have ha_val : a.val = a0.val - 1 := rfl
   have hsucc : a.succ = a0 := Fin.ext (by rw [Fin.val_succ, ha_val]; omega)
   have hcast_lt : a.castSucc < a0 := by
-    rw [Fin.lt_def, Fin.coe_castSucc, ha_val]; omega
+    rw [Fin.lt_def, Fin.val_castSucc, ha_val]; omega
   have hcast_notin : a.castSucc ∉ S := fun h => absurd (S.min'_le _ h) (not_le.mpr hcast_lt)
   have hcast_le : (μ.1 a.castSucc).1.val ≤ i := by
     by_contra h
@@ -3032,27 +2956,21 @@ private lemma swapDiagonalSteps_invCount_sum_odd {p q : ℕ}
     rw [hcs_r, hsucc_r] at hstep_r
     have hisL_r : isLeftStep μ ⟨r.val, (isDiagonalVertex_bounds hr).2⟩ := by
       unfold isDiagonalVertex at hr
-      simp [(isDiagonalVertex_bounds hr).1, (isDiagonalVertex_bounds hr).2] at hr
-      tauto
+      grind
     have hfst_r : (μ.1 r'.succ).1.val = (μ.1 r).1.val + 1 := by
       rcases hstep_r with ⟨h1, _⟩ | ⟨h1, _⟩
       · omega
-      · exfalso; unfold isLeftStep at hisL_r; rw [hcs_r, hsucc_r] at hisL_r; omega
-    simp only [Prod.fst, Prod.snd, Fin.val_mk] at *
-    have h1 : (μ.1 r).1.val + 1 - (μ.1 rm1.castSucc).1.val = 1 := by omega
-    have h2 : (μ.1 r).1.val - (μ.1 rm1.castSucc).1.val = 0 := by omega
-    have h3 : (μ.1 r'.succ).1.val - ((μ.1 r).1.val + 1) = 0 := by omega
-    have h4 : (μ.1 r'.succ).1.val - (μ.1 r).1.val = 1 := by omega
-    rw [h1, h2, h3, h4]
-    simp only [Nat.mul_zero, Nat.mul_one, Nat.zero_add, Nat.add_zero]
-    rw [← hsnd]
-    exact ⟨(μ.1 rm1.castSucc).2.val, by omega⟩
+      · unfold isLeftStep at hisL_r; rw [hcs_r, hsucc_r] at hisL_r; omega
+
+    grind
+
 
 /-- The swap negates the signed coefficient.
 
 Derives from `swapDiagonalSteps_invCount_sum_odd`: since the invCount sum is
 odd, `(-1)^invCount' * (-1)^invCount = -1`, and multiplying both sides by
 `(-1)^invCount` (which squares to 1) gives `(-1)^invCount' = -(-1)^invCount`. -/
+@[grind =]
 lemma swapDiagonalSteps_neg_sign {p q : ℕ}
     (μ : Shuffle (p) (q)) (r : Index (p + (q)))
     (hr : isDiagonalVertex μ r) :
@@ -3064,13 +2982,7 @@ lemma swapDiagonalSteps_neg_sign {p q : ℕ}
     rw [← pow_add]; exact Odd.neg_one_pow (swapDiagonalSteps_invCount_sum_odd μ r hr)
   have sq : (-1 : ℤ) ^ μ.invCount * (-1 : ℤ) ^ μ.invCount = 1 := by
     rw [← mul_pow]; norm_num
-  calc (-1 : ℤ) ^ (swapDiagonalSteps μ r hr).invCount
-      = _ * 1 := (mul_one _).symm
-    _ = _ * ((-1) ^ μ.invCount * (-1) ^ μ.invCount) := by rw [sq]
-    _ = (_ * (-1) ^ μ.invCount) * (-1) ^ μ.invCount := by
-        rw [mul_assoc]
-    _ = -1 * (-1) ^ μ.invCount := by rw [key]
-    _ = -((-1) ^ μ.invCount) := neg_one_mul _
+  grind
 
 /-- The swap involution is never the identity: swapping two steps of different
 type always produces a distinct shuffle. -/
@@ -3079,11 +2991,7 @@ lemma swapDiagonalSteps_ne {p q : ℕ}
     (hr : isDiagonalVertex μ r) :
     swapDiagonalSteps μ r hr ≠ μ := by
   apply mt (congrArg Shuffle.sign)
-  rw [swapDiagonalSteps_neg_sign]
-  simpa [Shuffle.sign] using
-    (CharZero.neg_eq_self_iff (R := ℤ) (a := (-1 : ℤ) ^ μ.invCount)).not.2
-      (pow_ne_zero _ (show (-1 : ℤ) ≠ 0 by decide))
-
+  grind [Int.neg_one_pow_ne_zero, Shuffle.sign]
 
 
 end Shuffle
@@ -3114,11 +3022,52 @@ instance Unique_Shuffle_n_0 {n : ℕ} : Unique (Shuffle n 0) where
       exact congrArg Fin.val (heq i)
     · simp
 
+attribute [grind =] OrderHom.coe_mk
+
+#discr_tree_key OrderHom.coe_mk
+
+set_option trace.Meta.Tactic.simp true
+
+-- set_option pp.all true
+-- set_option pp.universes false
+
+-- @DFunLike.coe (@OrderHom α β inst✝¹ inst✝) α (fun (x : α) ↦ β) (@OrderHom.instFunLike α β inst✝¹ inst✝) (@OrderHom.mk α β inst✝¹ inst✝ f hf) x
+-- @DFunLike.coe (@OrderHom α β inst✝¹ inst✝) α (fun (x : α) ↦ β) (@OrderHom.instFunLike α β inst✝¹ inst✝) (@OrderHom.mk α β inst✝¹ inst✝ f hf)
+
+
+-- instance : FunLike (α →o β) α β where
+--   coe := toFun
+--   coe_injective f g h := by cases
+-- @[grind? =]
+-- lemma generalized_guy  {α β γ : Type} (f : α → β)  (mk : (α → β) → γ)
+--   [FunLike γ α β] (mk_coe_inv : (g : α → β) → DFunLike.coe (mk g) = g) ( x : α):
+--   DFunLike.coe (mk f) x = f x := by
+--   -- grind
+--   -- dsimp?
+--   simp [mk_coe_inv]
+
+
+@[grind? =]
+lemma OrderHom.coe_apply {α β : Type} [Preorder α] [Preorder β] (f : α → β) (hf : Monotone f) (x : α) :
+   DFunLike.coe (OrderHom.mk f hf) x = f x := by
+  simp only [OrderHom.coe_mk]
+
+
+-- @[grind =]
+-- lemma OrderHom.thing {α β : Type} [Preorder α] [Preorder β] (f : α → β) (hf : Monotone f) (x : α) :
+--     (OrderHom.mk f hf) x = f x := by?
+
+--   simp only [OrderHom.coe_mk]
+
+-- set_option trace.grind.assert true in
+
+
 instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
   default := ⟨⟨fun i => (0, i.cast (by omega)),
     fun i j h => ⟨by simp, by simpa using h⟩⟩,
     fun i j h => by ext; simpa using congrArg (Fin.val ∘ Prod.snd) h⟩
   uniq := fun ⟨⟨f, hf⟩, hinj⟩ => by
+
     apply Subtype.ext; apply OrderHom.ext; funext i
     have hmono : StrictMono (fun i => (f i).2) := by
       intro a b hab
@@ -3130,17 +3079,15 @@ instance Unique_Shuffle_0_n {n : ℕ} : Unique (Shuffle 0 n) where
       | inr hlt => exact hlt
     let g : Fin (n + 1) → Fin (n + 1) := fun j => (f (j.cast (by omega))).2
     have hg : StrictMono g := fun a b h =>
+      -- grind
       hmono (show a.cast _ < b.cast _ by exact_mod_cast h)
     have hg_eq : ∀ j, g j = j :=
       fun j => le_antisymm (StrictMono.le_id hg j) (StrictMono.id_le hg j)
-    have hcast : ∀ i : Fin (0 + n + 1),
-        (i.cast (show 0 + n + 1 = n + 1 by omega)).cast
-          (show n + 1 = 0 + n + 1 by omega) = i :=
-      fun i => Fin.ext (by simp)
-    have h2 : (f i).2 = i.cast (by omega) := by
-      have := hg_eq (i.cast (by omega))
-      simp only [g, hcast] at this; exact this
-    exact Prod.ext (Fin.eq_zero _) h2
+    apply Prod.ext (Fin.eq_zero _)
+    simp only [OrderHom.coe_mk, Fin.isValue]
+    grind
+    -- grind only [= Fin.val_cast, = Lean.Grind.toInt_fin, = OrderHom.coe_mk]
+    -- exact Prod.ext (Fin.eq_zero _) h2
 
 /-- The unique `(n,0)`-shuffle has sign `1`. -/
 lemma Shuffle.sign_default_zero_right {n : ℕ} : (default : Shuffle n 0).sign = 1 := by

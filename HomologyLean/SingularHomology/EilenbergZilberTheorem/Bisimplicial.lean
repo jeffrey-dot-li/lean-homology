@@ -354,7 +354,7 @@ noncomputable def alexanderWhitney (X : BisimplicialObject C) :
     subst h
 
     -- Expand the total differential on the left into its `D₁ + D₂` pieces.
-    simp only [Preadditive.sum_comp, Category.assoc]
+    simp [Preadditive.sum_comp, Category.assoc]
     change ∑ x : Fin (j + 2), _ ≫ _ ≫ _ ≫
       (HomologicalComplex₂.total (doubleComplex X) (ComplexShape.down ℕ)).d (j + 1) j = _
     rw [HomologicalComplex₂.total_d]

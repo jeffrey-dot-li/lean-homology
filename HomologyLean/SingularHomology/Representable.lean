@@ -9,7 +9,7 @@ import Mathlib.CategoryTheory.Yoneda
 import Mathlib.CategoryTheory.Monoidal.Category
 import Mathlib.CategoryTheory.Adjunction.Basic
 import Mathlib.CategoryTheory.Adjunction.Unique
-import Mathlib.CategoryTheory.ConcreteCategory.Basic
+import Mathlib.CategoryTheory.ConcreteCategory.Forget
 import Mathlib.CategoryTheory.Monoidal.Closed.Types
 import Mathlib.CategoryTheory.Limits.Shapes.Products
 import Mathlib.Algebra.Category.ModuleCat.Monoidal.Closed
@@ -27,7 +27,9 @@ scoped[Representable] notation "Hom[-| " X "]" => yoneda.obj X
 
 open Representable
 -- Note this doesn't require the forgetful functor to be right adjoint, only that it is faithful
-variable (C : Type u) [Category.{v} C] [MonoidalCategory C] [HasForget.{v} C]
+variable (C : Type u) [Category.{v} C] [MonoidalCategory C]
+  {FC : C → C → Type*} {CC : C → Type v} [∀ X Y, FunLike (FC X Y) (CC X) (CC Y)]
+  [ConcreteCategory.{v} C FC]
 
 /-- The forgetful functor `forget C` is naturally isomorphic to `Hom(𝟙_ C, -)`. -/
 class MonoidalUnitorRepresentable where
@@ -50,7 +52,8 @@ end ModuleCat
 section SigmaConstIsoFree
 
 variable {C : Type u} [Category.{v} C] [Limits.HasCoproducts C] [MonoidalCategory C]
-  [HasForget.{v} C] [MonoidalUnitorRepresentable (C := C)]
+  {FC : C → C → Type*} {CC : C → Type v} [∀ X Y, FunLike (FC X Y) (CC X) (CC Y)]
+  [ConcreteCategory.{v} C FC] [MonoidalUnitorRepresentable (C := C)]
   [(forget C).IsRightAdjoint]
 
 /-- `Limits.sigmaConst.obj (𝟙_ C)` is naturally isomorphic to
