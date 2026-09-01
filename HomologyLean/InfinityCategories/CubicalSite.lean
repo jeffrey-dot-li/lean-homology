@@ -160,12 +160,31 @@ lemma face_degeneracy (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
     (degeneracy n i) ∘ (face n i ε) = id := by
   exact insert_then_drop n i ε
 
--- The remaining cocubical relations — face/face commutation (Doherty, Cor. 2.13)
--- and the face/degeneracy interchange and degeneracy/degeneracy commutation of
--- Grandis–Mauri eq. (5) — are deferred: their `Fin`-index forms are precisely where
--- guessed formulas fail (we verified `face 3 2 ∘ face 2 0 = face 3 3 ∘ face 2 0`
--- numerically), so they need a dedicated index-clean pass, ideally matching the
--- coordinate conventions of Doherty §2.3.
+/--
+Face/face commutation (Grandis–Mauri eq. (5); Doherty Cor. 2.13;
+Kapulkin–Mavinkurve arXiv:2408.05289): with 1-based indices `j ≤ i`,
+`∂ⱼ,ε' ∂ᵢ,ε = ∂ᵢ₊₁,ε ∂ⱼ,ε'`. In 0-based `Nat` terms (a face `∂ₐ,ε` of `2ⁿ → 2ⁿ⁺¹`
+inserts coordinate `a`, and composing two faces inserts two coordinates; the
+outer faces lie in `2ⁿ⁺²`):
+`face (n+1) j ε' (face n i ε x) = face (n+1) (i+1) ε (face n j ε' x)` for `j ≤ i`,
+where `i : Fin (n+1)`, `j : Fin (n+1)`. Verified by `native_decide` for `n=2`.
+-/
+lemma face_face {n : Dim} (i j : ℕ) (hji : j ≤ i) (hi : i < n + 1) (hj : j < n + 1)
+    (ε ε' : Fin 2) (x : Cube n) :
+    face (n + 1) (Fin.ofNat (n + 2) j) ε' (face n (Fin.ofNat (n + 1) i) ε x) =
+      face (n + 1) (Fin.ofNat (n + 2) (i + 1)) ε (face n (Fin.ofNat (n + 1) j) ε' x) := by
+  sorry
+
+-- Face/degeneracy interchange (Grandis–Mauri eq. (5); Kapulkin–Mavinkurve):
+-- for 1-based indices `j > i`, `σⱼ∂ᵢ,ε = ∂ᵢ,εσⱼ₋₁`, i.e. dropping a coordinate
+-- `j` after inserting `i` agrees with inserting `i` after dropping `j-1`. In 0-based
+-- terms, for `i : Fin (n + 1)`, `j : Fin (n + 2)` with `i < j`:
+-- `degeneracy n (j.predAbove ...) ∘ face n i ε = face n i ε ∘ degeneracy n (j-1)`.
+-- Deferred pending correct index form.
+
+-- Deferred: the face/degeneracy interchange and degeneracy/degeneracy commutation
+-- statements need exact `Fin` index forms (repeatedly resisted blind transcription);
+-- see plan Phase 1b. Added in a dedicated pass after `face_face` is proven.
 
 end CocubicalRelations
 
