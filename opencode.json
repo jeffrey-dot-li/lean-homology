@@ -7,6 +7,17 @@
       "cwd": ".",
       "enabled": true,
       "timeout": 60000
+    },
+    "citra": {
+      "type": "local",
+      "command": [
+        "bash",
+        "-c",
+        "export PATH=\"$PWD/.devenv/profile/bin:$PATH\"; exec npx -y @sylphx/citra"
+      ],
+      "cwd": ".",
+      "enabled": true,
+      "timeout": 60000
     }
   }
 }

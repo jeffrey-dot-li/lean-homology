@@ -9,6 +9,7 @@
 
   packages = with pkgs; [
     elan
+    nodejs # node/npx for the citra PDF-reading MCP server (opencode.json)
   ];
 
   enterShell = ''
