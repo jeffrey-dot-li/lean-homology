@@ -3,6 +3,7 @@ import Mathlib.CategoryTheory.MorphismProperty.Factorization
 import Mathlib.CategoryTheory.EpiMono
 import Mathlib.AlgebraicTopology.SimplexCategory.Basic
 import Mathlib.CategoryTheory.Comma.Presheaf.Basic
+import Mathlib.AlgebraicTopology.SimplicialSet.Degenerate
 
 /-!
 # Eilenberg–Zilber categories
@@ -67,6 +68,12 @@ class EilenbergZilberCategory (A : Type u) [Category.{v} A] where
   minus : WideSubcategory A
   /-- The degree of an object. -/
   degree : A → ℕ
+  /--
+  Every isomorphism is induced by an equality of objects; in particular,
+  there are no nontrivial automorphisms.
+  -/
+  isIso_eqToHom {X Y : A} (f : X ⟶ Y) (hf : IsIso f) :
+    ∃ h : X = Y, f = eqToHom h
   -- Any Isomorphism is in both A+ and A-
   isomorphisms_le_plus :
     MorphismProperty.isomorphisms A ≤ plus.hom
@@ -141,6 +148,327 @@ def IsDegenerate (X : Aᵒᵖ ⥤ Type w) {a : A}
 def IsNondegenerate (X : Aᵒᵖ ⥤ Type w) {a : A}
     (x : X.obj (Opposite.op a)) : Prop :=
   ¬IsDegenerate X x
+
+/--
+An inverse decomposition of a section `x` consists of an `A⁻`-morphism
+`σ : a ⟶ b` and a section over `b` whose restriction along `σ` is `x`.
+
+Unlike `Decomposition`, this permits `σ` to be an identity.
+-/
+structure MinusDecomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) where
+  /-- The object over which the decomposing section is defined. -/
+  b : A
+  /-- The inverse morphism along which the section restricts to `x`. -/
+  σ : a ⟶ b
+  /-- The decomposing morphism belongs to `A⁻`. -/
+  σ_mem : IsMinus σ
+  /-- The section over `b`. -/
+  y : X.obj (Opposite.op b)
+  /-- Restricting `y` along `σ` gives `x`. -/
+  map_y : X.map σ.op y = x
+
+/-- Compose two inverse decompositions. -/
+def MinusDecomposition.comp {X : Aᵒᵖ ⥤ Type w} {a : A}
+    {x : X.obj (Opposite.op a)} (d : MinusDecomposition X x)
+    (e : MinusDecomposition X d.y) :
+    MinusDecomposition X x where
+  b := e.b
+  σ := d.σ ≫ e.σ
+  σ_mem := EilenbergZilberCategory.minus.comp_mem d.σ_mem e.σ_mem
+  y := e.y
+  map_y := by
+    calc
+      X.map (d.σ ≫ e.σ).op e.y =
+          X.map d.σ.op (X.map e.σ.op e.y) :=
+        ConcreteCategory.congr_hom (X.map_comp e.σ.op d.σ.op) e.y
+      _ = X.map d.σ.op d.y := by rw [e.map_y]
+      _ = x := d.map_y
+
+/--
+A section is degenerate exactly when it admits an inverse decomposition whose
+target object has strictly smaller degree.
+-/
+lemma isDegenerate_iff_exists_minusDecomposition_degree_lt
+    (X : Aᵒᵖ ⥤ Type w) {a : A} (x : X.obj (Opposite.op a)) :
+    IsDegenerate X x ↔
+      ∃ d : MinusDecomposition X x,
+        EilenbergZilberCategory.degree d.b < EilenbergZilberCategory.degree a := by
+  constructor
+  · rintro ⟨d⟩
+    obtain ⟨F⟩ :=
+      EilenbergZilberCategory.factorization.nonempty_mapFactorizationData d.σ
+    let y' := X.map F.p.op d.y
+    have hmap : X.map F.i.op y' = x := by
+      calc
+        X.map F.i.op (X.map F.p.op d.y) =
+            X.map (F.p.op ≫ F.i.op) d.y :=
+          (ConcreteCategory.congr_hom (X.map_comp F.p.op F.i.op) d.y).symm
+        _ = X.map (F.i ≫ F.p).op d.y := rfl
+        _ = X.map d.σ.op d.y := by rw [F.fac]
+        _ = x := d.map_y
+    refine ⟨{
+      b := F.Z
+      σ := F.i
+      σ_mem := F.hi
+      y := y'
+      map_y := hmap
+    }, ?_⟩
+    have hle : EilenbergZilberCategory.degree F.Z ≤
+        EilenbergZilberCategory.degree d.b := by
+      by_cases hp : IsIso F.p
+      · obtain ⟨h, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.p hp
+        exact (congrArg EilenbergZilberCategory.degree h).le
+      · exact (EilenbergZilberCategory.degree_lt_of_plus F.p F.hp hp).le
+    exact hle.trans_lt d.degree_lt
+  · rintro ⟨d, hd⟩
+    exact ⟨{
+      b := d.b
+      σ := d.σ
+      degree_lt := hd
+      y := d.y
+      map_y := d.map_y
+    }⟩
+
+/--
+If a section over `c` restricts to a nondegenerate section over `b`, then the
+degree of `b` is at most that of `c`.
+-/
+lemma degree_le_of_map_eq_nondegenerate
+    (X : Aᵒᵖ ⥤ Type w) {b c : A}
+    (u : b ⟶ c) (y : X.obj (Opposite.op b)) (z : X.obj (Opposite.op c))
+    (hu : X.map u.op z = y) (hy : IsNondegenerate X y) :
+    EilenbergZilberCategory.degree b ≤ EilenbergZilberCategory.degree c := by
+  obtain ⟨F⟩ :=
+    EilenbergZilberCategory.factorization.nonempty_mapFactorizationData u
+  let y' := X.map F.p.op z
+  have hmap : X.map F.i.op y' = y := by
+    calc
+      X.map F.i.op (X.map F.p.op z) =
+          X.map (F.p.op ≫ F.i.op) z :=
+        (ConcreteCategory.congr_hom (X.map_comp F.p.op F.i.op) z).symm
+      _ = X.map (F.i ≫ F.p).op z := rfl
+      _ = X.map u.op z := by rw [F.fac]
+      _ = y := hu
+  have hFi : IsIso F.i := by
+    by_contra h
+    apply hy
+    rw [isDegenerate_iff_exists_minusDecomposition_degree_lt]
+    exact ⟨{
+      b := F.Z
+      σ := F.i
+      σ_mem := F.hi
+      y := y'
+      map_y := hmap
+    }, EilenbergZilberCategory.degree_lt_of_minus F.i F.hi h⟩
+  obtain ⟨hbZ, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.i hFi
+  have hZc : EilenbergZilberCategory.degree F.Z ≤
+      EilenbergZilberCategory.degree c := by
+    by_cases hFp : IsIso F.p
+    · obtain ⟨hZc, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.p hFp
+      exact (congrArg EilenbergZilberCategory.degree hZc).le
+    · exact (EilenbergZilberCategory.degree_lt_of_plus F.p F.hp hFp).le
+  simpa only [hbZ] using hZc
+
+/--
+A map between equal-degree objects that carries a section to a nondegenerate
+section is an isomorphism.
+-/
+lemma isIso_of_map_eq_nondegenerate_of_degree_eq
+    (X : Aᵒᵖ ⥤ Type w) {b c : A}
+    (u : b ⟶ c) (y : X.obj (Opposite.op b)) (z : X.obj (Opposite.op c))
+    (hu : X.map u.op z = y) (hy : IsNondegenerate X y)
+    (hdeg : EilenbergZilberCategory.degree b = EilenbergZilberCategory.degree c) :
+    IsIso u := by
+  obtain ⟨F⟩ :=
+    EilenbergZilberCategory.factorization.nonempty_mapFactorizationData u
+  let y' := X.map F.p.op z
+  have hmap : X.map F.i.op y' = y := by
+    calc
+      X.map F.i.op (X.map F.p.op z) =
+          X.map (F.p.op ≫ F.i.op) z :=
+        (ConcreteCategory.congr_hom (X.map_comp F.p.op F.i.op) z).symm
+      _ = X.map (F.i ≫ F.p).op z := rfl
+      _ = X.map u.op z := by rw [F.fac]
+      _ = y := hu
+  have hFi : IsIso F.i := by
+    by_contra h
+    apply hy
+    rw [isDegenerate_iff_exists_minusDecomposition_degree_lt]
+    exact ⟨{
+      b := F.Z
+      σ := F.i
+      σ_mem := F.hi
+      y := y'
+      map_y := hmap
+    }, EilenbergZilberCategory.degree_lt_of_minus F.i F.hi h⟩
+  obtain ⟨hbZ, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.i hFi
+  have hFp : IsIso F.p := by
+    by_contra h
+    have hp := EilenbergZilberCategory.degree_lt_of_plus F.p F.hp h
+    have hdegZ : EilenbergZilberCategory.degree F.Z =
+        EilenbergZilberCategory.degree b :=
+      congrArg EilenbergZilberCategory.degree hbZ.symm
+    rw [hdegZ, hdeg] at hp
+    exact (lt_irrefl _ hp)
+  rw [← F.fac]
+  letI : IsIso F.i := hFi
+  letI : IsIso F.p := hFp
+  infer_instance
+
+/--
+Two `A⁻`-morphisms inducing the same section from the same nondegenerate
+section are equal.
+-/
+lemma eq_of_minus_maps_eq_nondegenerate
+    (X : Aᵒᵖ ⥤ Type w) {a b : A}
+    (x : X.obj (Opposite.op a)) (y : X.obj (Opposite.op b))
+    (σ τ : a ⟶ b) (hσ : IsMinus σ) (hτ : IsMinus τ)
+    (hσy : X.map σ.op y = x) (hτy : X.map τ.op y = x)
+    (hy : IsNondegenerate X y) :
+    σ = τ := by
+  have section_imp (f g : a ⟶ b)
+      (hf : X.map f.op y = x) (hg : X.map g.op y = x) :
+      ∀ s : b ⟶ a, s ≫ f = 𝟙 b → s ≫ g = 𝟙 b := by
+    intro s hs
+    have hmap : X.map (s ≫ g).op y = y := by
+      calc
+        X.map (s ≫ g).op y = X.map s.op (X.map g.op y) :=
+          ConcreteCategory.congr_hom (X.map_comp g.op s.op) y
+        _ = X.map s.op x := by rw [hg]
+        _ = X.map s.op (X.map f.op y) := by rw [hf]
+        _ = X.map (f.op ≫ s.op) y :=
+          (ConcreteCategory.congr_hom (X.map_comp f.op s.op) y).symm
+        _ = X.map (s ≫ f).op y := rfl
+        _ = X.map (𝟙 b).op y := by rw [hs]
+        _ = y := by simp
+    have hiso : IsIso (s ≫ g) :=
+      isIso_of_map_eq_nondegenerate_of_degree_eq
+        X (s ≫ g) y y hmap hy rfl
+    obtain ⟨h, heq⟩ :=
+      EilenbergZilberCategory.isIso_eqToHom (s ≫ g) hiso
+    simpa using heq
+  apply EilenbergZilberCategory.eq_of_sections_eq σ τ hσ hτ
+  intro s
+  exact ⟨section_imp σ τ hσy hτy s, section_imp τ σ hτy hσy s⟩
+
+/-- Extensionality for inverse decompositions, including dependent transport. -/
+lemma MinusDecomposition.ext {X : Aᵒᵖ ⥤ Type w} {a : A}
+    {x : X.obj (Opposite.op a)} {d e : MinusDecomposition X x}
+    (h : d.b = e.b)
+    (hy : X.map (eqToHom h).op e.y = d.y)
+    (hσ : d.σ ≫ eqToHom h = e.σ) :
+    d = e := by
+  cases d with
+  | mk db dσ dσ_mem dy dmap =>
+    cases e with
+    | mk eb eσ eσ_mem ey emap =>
+      change db = eb at h
+      change X.map (eqToHom h).op ey = dy at hy
+      change dσ ≫ eqToHom h = eσ at hσ
+      subst eb
+      simp at hy hσ
+      subst ey
+      subst eσ
+      rfl
+
+/--
+Every section admits a unique inverse decomposition whose target section is
+nondegenerate.
+-/
+theorem existsUnique_minusDecomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
+    (x : X.obj (Opposite.op a)) :
+    ∃! d : MinusDecomposition X x, IsNondegenerate X d.y := by
+  classical
+  let d₀ : MinusDecomposition X x := {
+    b := a
+    σ := 𝟙 a
+    σ_mem := EilenbergZilberCategory.minus.id_mem a
+    y := x
+    map_y := by simp
+  }
+  let P : ℕ → Prop := fun m ↦
+    ∃ d : MinusDecomposition X x, EilenbergZilberCategory.degree d.b = m
+  have hP : ∃ m, P m :=
+    ⟨EilenbergZilberCategory.degree a, d₀, rfl⟩
+  obtain ⟨d, hd⟩ := Nat.find_spec hP
+  have hd_nondegenerate : IsNondegenerate X d.y := by
+    intro hdeg
+    obtain ⟨e, he⟩ :=
+      (isDegenerate_iff_exists_minusDecomposition_degree_lt X d.y).mp hdeg
+    have hmin : Nat.find hP ≤ EilenbergZilberCategory.degree e.b :=
+      Nat.find_min' hP ⟨d.comp e, rfl⟩
+    apply (not_lt_of_ge hmin)
+    simpa only [hd] using he
+  refine ⟨d, hd_nondegenerate, ?_⟩
+  intro e he_nondegenerate
+  have comparison_map (p q : MinusDecomposition X x)
+      (s : p.b ⟶ a) (hs : s ≫ p.σ = 𝟙 p.b) :
+      X.map (s ≫ q.σ).op q.y = p.y := by
+    calc
+      X.map (s ≫ q.σ).op q.y =
+          X.map s.op (X.map q.σ.op q.y) :=
+        ConcreteCategory.congr_hom (X.map_comp q.σ.op s.op) q.y
+      _ = X.map s.op x := by rw [q.map_y]
+      _ = X.map s.op (X.map p.σ.op p.y) := by rw [p.map_y]
+      _ = X.map (p.σ.op ≫ s.op) p.y :=
+        (ConcreteCategory.congr_hom (X.map_comp p.σ.op s.op) p.y).symm
+      _ = X.map (s ≫ p.σ).op p.y := rfl
+      _ = X.map (𝟙 p.b).op p.y := by rw [hs]
+      _ = p.y := by simp
+  obtain ⟨sd⟩ :=
+    (EilenbergZilberCategory.section_of_minus d.σ d.σ_mem).exists_splitEpi
+  obtain ⟨se⟩ :=
+    (EilenbergZilberCategory.section_of_minus e.σ e.σ_mem).exists_splitEpi
+  let u : d.b ⟶ e.b := sd.section_ ≫ e.σ
+  let v : e.b ⟶ d.b := se.section_ ≫ d.σ
+  have hu : X.map u.op e.y = d.y :=
+    comparison_map d e sd.section_ sd.id
+  have hv : X.map v.op d.y = e.y :=
+    comparison_map e d se.section_ se.id
+  have hde : EilenbergZilberCategory.degree d.b ≤
+      EilenbergZilberCategory.degree e.b :=
+    degree_le_of_map_eq_nondegenerate X u d.y e.y hu hd_nondegenerate
+  have hed : EilenbergZilberCategory.degree e.b ≤
+      EilenbergZilberCategory.degree d.b :=
+    degree_le_of_map_eq_nondegenerate X v e.y d.y hv he_nondegenerate
+  have hdegree : EilenbergZilberCategory.degree d.b =
+      EilenbergZilberCategory.degree e.b :=
+    le_antisymm hde hed
+  have hu_iso : IsIso u :=
+    isIso_of_map_eq_nondegenerate_of_degree_eq
+      X u d.y e.y hu hd_nondegenerate hdegree
+  obtain ⟨h, hu_eq⟩ :=
+    EilenbergZilberCategory.isIso_eqToHom u hu_iso
+  have hy : X.map (eqToHom h).op e.y = d.y := by
+    rw [← hu_eq]
+    exact hu
+  have hdσ_mem : IsMinus (d.σ ≫ eqToHom h) :=
+    EilenbergZilberCategory.minus.comp_mem d.σ_mem
+      (EilenbergZilberCategory.isomorphisms_le_minus
+        (eqToHom h) (by infer_instance))
+  have hdσ_map : X.map (d.σ ≫ eqToHom h).op e.y = x := by
+    calc
+      X.map (d.σ ≫ eqToHom h).op e.y =
+          X.map d.σ.op (X.map (eqToHom h).op e.y) :=
+        ConcreteCategory.congr_hom
+          (X.map_comp (eqToHom h).op d.σ.op) e.y
+      _ = X.map d.σ.op d.y := by rw [hy]
+      _ = x := d.map_y
+  have hσ : d.σ ≫ eqToHom h = e.σ :=
+    eq_of_minus_maps_eq_nondegenerate X x e.y
+      (d.σ ≫ eqToHom h) e.σ hdσ_mem e.σ_mem
+      hdσ_map e.map_y he_nondegenerate
+  exact (MinusDecomposition.ext h hy hσ).symm
+
+/-- Any two inverse decompositions with nondegenerate target sections are equal. -/
+lemma MinusDecomposition.eq_of_nondegenerate
+    (X : Aᵒᵖ ⥤ Type w) {a : A} {x : X.obj (Opposite.op a)}
+    (d e : MinusDecomposition X x)
+    (hd : IsNondegenerate X d.y) (he : IsNondegenerate X e.y) :
+    d = e := by
+  obtain ⟨z, hz, hunique⟩ := existsUnique_minusDecomposition X x
+  exact (hunique d hd).trans (hunique e he).symm
 
 /--
 A section belongs to the `n`-skeleton when it is induced from a section over
@@ -311,6 +639,12 @@ instance SimplexCategory.eilenbergZilberCategory :
     comp_mem := fun hf hg ↦ epi_comp' hf hg
   }
   degree := fun n ↦ n.len
+  isIso_eqToHom := by
+    intro X Y f hf
+    letI : IsIso f := hf
+    have hXY : X = Y := SimplexCategory.ext (SimplexCategory.len_eq_of_isIso f)
+    subst Y
+    exact ⟨rfl, SimplexCategory.eq_id_of_isIso f⟩
   isomorphisms_le_minus := fun _ _ f hf ↦
     @IsIso.epi_of_iso _ _ _ _ f hf
   isomorphisms_le_plus := fun _ _ f hf ↦
@@ -363,6 +697,229 @@ instance SimplexCategory.eilenbergZilberCategory :
   eq_of_sections_eq := by
     intro X Y f g hf hg hsections
     exact SimplexCategory.eq_of_epi_of_sections_eq f g hf hg hsections
+
+/-! ## Recovering Mathlib's simplicial-set decomposition theorems
+
+This section specializes the general Eilenberg–Zilber decomposition theorem to
+`SimplexCategory`. After identifying the general degeneracy predicates with
+Mathlib's predicates, it restates and reproves Mathlib's decomposition theorems
+as corollaries of the general result.
+-/
+
+namespace SimplexCategoryCorollaries
+
+open Opposite Simplicial
+
+section MathlibRestatements
+
+variable {X : SSet.{w}} {n : ℕ}
+
+/--
+For simplicial sets, the general Eilenberg–Zilber notion of degeneracy agrees
+with Mathlib's existing predicate.
+-/
+lemma isDegenerate_iff_mem_degenerate (x : X _⦋n⦌) :
+    Presheaf.IsDegenerate X x ↔ x ∈ X.degenerate n := by
+  constructor
+  · rintro ⟨⟨b, σ, hb, y, hy⟩⟩
+    induction b using SimplexCategory.rec with
+    | _ m =>
+      exact ⟨m, hb, σ, y, hy⟩
+  · rintro ⟨m, hm, f, y, hy⟩
+    exact ⟨{
+      b := ⦋m⦌
+      σ := f
+      degree_lt := hm
+      y := y
+      map_y := hy
+    }⟩
+
+/--
+For simplicial sets, the general Eilenberg–Zilber notion of nondegeneracy
+agrees with Mathlib's existing predicate.
+-/
+lemma isNondegenerate_iff_mem_nonDegenerate (x : X _⦋n⦌) :
+    Presheaf.IsNondegenerate X x ↔ x ∈ X.nonDegenerate n := by
+  simp only [Presheaf.IsNondegenerate,
+    SSet.mem_nonDegenerate_iff_notMem_degenerate,
+    isDegenerate_iff_mem_degenerate]
+
+/--
+Restatement of Mathlib's `SSet.exists_nonDegenerate`, deduced from the general
+Eilenberg–Zilber decomposition theorem.
+-/
+lemma exists_nonDegenerate_of_eilenbergZilber (x : X _⦋n⦌) :
+    ∃ (m : ℕ) (f : ⦋n⦌ ⟶ ⦋m⦌) (_ : Epi f)
+      (y : X.nonDegenerate m), x = X.map f.op y := by
+  obtain ⟨d, hd, _⟩ := Presheaf.existsUnique_minusDecomposition X x
+  rcases d with ⟨b, f, hf, y, hy⟩
+  induction b using SimplexCategory.rec with
+  | _ m =>
+    exact ⟨m, f, hf, ⟨y, (isNondegenerate_iff_mem_nonDegenerate y).mp hd⟩, hy.symm⟩
+
+/--
+Restatement of Mathlib's `SSet.unique_nonDegenerate_dim`, deduced from the
+general Eilenberg–Zilber uniqueness theorem.
+-/
+lemma unique_nonDegenerate_dim_of_eilenbergZilber (x : X _⦋n⦌) {m₁ m₂ : ℕ}
+    (f₁ : ⦋n⦌ ⟶ ⦋m₁⦌) [Epi f₁]
+    (y₁ : X.nonDegenerate m₁) (hy₁ : x = X.map f₁.op y₁)
+    (f₂ : ⦋n⦌ ⟶ ⦋m₂⦌) [Epi f₂]
+    (y₂ : X.nonDegenerate m₂) (hy₂ : x = X.map f₂.op y₂) :
+    m₁ = m₂ := by
+  let d₁ : Presheaf.MinusDecomposition X x := {
+    b := ⦋m₁⦌
+    σ := f₁
+    σ_mem := (inferInstance : Epi f₁)
+    y := y₁
+    map_y := hy₁.symm
+  }
+  let d₂ : Presheaf.MinusDecomposition X x := {
+    b := ⦋m₂⦌
+    σ := f₂
+    σ_mem := (inferInstance : Epi f₂)
+    y := y₂
+    map_y := hy₂.symm
+  }
+  have hd₁ : Presheaf.IsNondegenerate X d₁.y := by
+    change Presheaf.IsNondegenerate X (y₁ : X _⦋m₁⦌)
+    exact (isNondegenerate_iff_mem_nonDegenerate
+      (X := X) (n := m₁) y₁.1).mpr y₁.2
+  have hd₂ : Presheaf.IsNondegenerate X d₂.y := by
+    change Presheaf.IsNondegenerate X (y₂ : X _⦋m₂⦌)
+    exact (isNondegenerate_iff_mem_nonDegenerate
+      (X := X) (n := m₂) y₂.1).mpr y₂.2
+  have hd : d₁ = d₂ :=
+    Presheaf.MinusDecomposition.eq_of_nondegenerate X d₁ d₂
+      hd₁ hd₂
+  simpa [d₁, d₂] using congrArg
+    (fun d : Presheaf.MinusDecomposition X x ↦ d.b.len) hd
+
+/--
+If one equal-dimensional nondegenerate decomposition is along an epimorphism,
+then the map in any other such decomposition is also an epimorphism.
+-/
+lemma epi_of_nonDegenerate_decompositions (x : X _⦋n⦌) {m : ℕ}
+    (f₁ : ⦋n⦌ ⟶ ⦋m⦌) [Epi f₁]
+    (y₁ : X.nonDegenerate m) (hy₁ : x = X.map f₁.op y₁)
+    (f₂ : ⦋n⦌ ⟶ ⦋m⦌)
+    (y₂ : X.nonDegenerate m) (hy₂ : x = X.map f₂.op y₂) :
+    Epi f₂ := by
+  obtain ⟨sf⟩ :=
+    (EilenbergZilberCategory.section_of_minus f₁
+      (inferInstance : Epi f₁)).exists_splitEpi
+  let g := sf.section_ ≫ f₂
+  have hg : X.map g.op y₂ = y₁ := by
+    calc
+      X.map (sf.section_ ≫ f₂).op y₂ =
+          X.map sf.section_.op (X.map f₂.op y₂) :=
+        ConcreteCategory.congr_hom (X.map_comp f₂.op sf.section_.op) y₂
+      _ = X.map sf.section_.op x := by rw [← hy₂]
+      _ = X.map sf.section_.op (X.map f₁.op y₁) := by rw [hy₁]
+      _ = X.map (f₁.op ≫ sf.section_.op) y₁ :=
+        (ConcreteCategory.congr_hom
+          (X.map_comp f₁.op sf.section_.op) y₁).symm
+      _ = X.map (sf.section_ ≫ f₁).op y₁ := rfl
+      _ = X.map (𝟙 ⦋m⦌).op y₁ := by rw [sf.id]
+      _ = y₁ := by simp
+  have hg_iso : IsIso g :=
+    Presheaf.isIso_of_map_eq_nondegenerate_of_degree_eq
+      X g y₁ y₂ hg
+      ((isNondegenerate_iff_mem_nonDegenerate
+        (X := X) (n := m) y₁.1).mpr y₁.2) rfl
+  letI : IsIso g := hg_iso
+  haveI : Epi g := inferInstance
+  exact epi_of_epi sf.section_ f₂
+
+/--
+Both the simplex and map in an equal-dimensional nondegenerate decomposition
+are unique.
+-/
+lemma unique_nonDegenerate_decomposition_of_eilenbergZilber
+    (x : X _⦋n⦌) {m : ℕ}
+    (f₁ : ⦋n⦌ ⟶ ⦋m⦌) [Epi f₁]
+    (y₁ : X.nonDegenerate m) (hy₁ : x = X.map f₁.op y₁)
+    (f₂ : ⦋n⦌ ⟶ ⦋m⦌)
+    (y₂ : X.nonDegenerate m) (hy₂ : x = X.map f₂.op y₂) :
+    y₁ = y₂ ∧ f₁ = f₂ := by
+  letI : Epi f₂ :=
+    epi_of_nonDegenerate_decompositions x f₁ y₁ hy₁ f₂ y₂ hy₂
+  let d₁ : Presheaf.MinusDecomposition X x := {
+    b := ⦋m⦌
+    σ := f₁
+    σ_mem := (inferInstance : Epi f₁)
+    y := y₁
+    map_y := hy₁.symm
+  }
+  let d₂ : Presheaf.MinusDecomposition X x := {
+    b := ⦋m⦌
+    σ := f₂
+    σ_mem := (inferInstance : Epi f₂)
+    y := y₂
+    map_y := hy₂.symm
+  }
+  have hd₁ : Presheaf.IsNondegenerate X d₁.y := by
+    change Presheaf.IsNondegenerate X (y₁ : X _⦋m⦌)
+    exact (isNondegenerate_iff_mem_nonDegenerate
+      (X := X) (n := m) y₁.1).mpr y₁.2
+  have hd₂ : Presheaf.IsNondegenerate X d₂.y := by
+    change Presheaf.IsNondegenerate X (y₂ : X _⦋m⦌)
+    exact (isNondegenerate_iff_mem_nonDegenerate
+      (X := X) (n := m) y₂.1).mpr y₂.2
+  have hd : d₁ = d₂ :=
+    Presheaf.MinusDecomposition.eq_of_nondegenerate X d₁ d₂ hd₁ hd₂
+  have hySigma := congrArg
+    (fun d : Presheaf.MinusDecomposition X x ↦
+      (⟨d.b, d.y⟩ : Σ b, X.obj (op b))) hd
+  change (⟨⦋m⦌, y₁.1⟩ : Σ b, X.obj (op b)) =
+    (⟨⦋m⦌, y₂.1⟩ : Σ b, X.obj (op b)) at hySigma
+  have hfSigma := congrArg
+    (fun d : Presheaf.MinusDecomposition X x ↦
+      (⟨d.b, d.σ⟩ : Σ b, ⦋n⦌ ⟶ b)) hd
+  change (⟨⦋m⦌, f₁⟩ : Σ b, ⦋n⦌ ⟶ b) =
+    (⟨⦋m⦌, f₂⟩ : Σ b, ⦋n⦌ ⟶ b) at hfSigma
+  constructor
+  · apply Subtype.ext
+    injection hySigma
+  · injection hfSigma
+
+/--
+Restatement of Mathlib's `SSet.unique_nonDegenerate_simplex`, deduced from the
+general Eilenberg–Zilber uniqueness theorem.
+-/
+lemma unique_nonDegenerate_simplex_of_eilenbergZilber (x : X _⦋n⦌) {m : ℕ}
+    (f₁ : ⦋n⦌ ⟶ ⦋m⦌) [Epi f₁]
+    (y₁ : X.nonDegenerate m) (hy₁ : x = X.map f₁.op y₁)
+    (f₂ : ⦋n⦌ ⟶ ⦋m⦌)
+    (y₂ : X.nonDegenerate m) (hy₂ : x = X.map f₂.op y₂) :
+    y₁ = y₂ := by
+  exact (unique_nonDegenerate_decomposition_of_eilenbergZilber
+    x f₁ y₁ hy₁ f₂ y₂ hy₂).1
+
+/--
+Restatement of Mathlib's `SSet.unique_nonDegenerate_map`, deduced from the
+general Eilenberg–Zilber uniqueness theorem.
+-/
+lemma unique_nonDegenerate_map_of_eilenbergZilber (x : X _⦋n⦌) {m : ℕ}
+    (f₁ : ⦋n⦌ ⟶ ⦋m⦌) [Epi f₁]
+    (y₁ : X.nonDegenerate m) (hy₁ : x = X.map f₁.op y₁)
+    (f₂ : ⦋n⦌ ⟶ ⦋m⦌)
+    (y₂ : X.nonDegenerate m) (hy₂ : x = X.map f₂.op y₂) :
+    f₁ = f₂ := by
+  exact (unique_nonDegenerate_decomposition_of_eilenbergZilber
+    x f₁ y₁ hy₁ f₂ y₂ hy₂).2
+
+end MathlibRestatements
+
+end SimplexCategoryCorollaries
+
+/-! ## Eilenberg–Zilber structure on costructured-arrow categories
+
+This section collects the constructions used to lift an Eilenberg–Zilber
+structure from `A` to the category of elements `CostructuredArrow yoneda X`.
+-/
+
+section CostructuredArrows
 
 /--
 A factorization of the underlying map of a morphism of costructured arrows
@@ -434,6 +991,28 @@ lemma CostructuredArrow.isSplitEpi_of_left
   simp only [S.map_id, Category.id_comp]
 
 /--
+Two costructured arrows are equal when their left objects are equal and their
+structure maps agree after transport along that equality.
+-/
+lemma CostructuredArrow.eq_of_left_eq
+    {C D : Type*} [Category C] [Category D] {S : C ⥤ D} {T : D}
+    {U V : CostructuredArrow S T} (h : U.left = V.left)
+    (hw : S.map (eqToHom h) ≫ V.hom = U.hom) :
+    U = V := by
+  cases U with
+  | mk Ul Ur Uh =>
+    cases V with
+    | mk Vl Vr Vh =>
+      change Ul = Vl at h
+      change S.map (eqToHom h) ≫ Vh = Uh at hw
+      subst Vl
+      have hright : Ur = Vr := Subsingleton.elim _ _
+      subst Vr
+      simp at hw
+      subst Vh
+      rfl
+
+/--
 The category of elements `A/X` of a presheaf `X` on an Eilenberg–Zilber
 category `A` is an Eilenberg–Zilber category.
 -/
@@ -446,6 +1025,20 @@ noncomputable instance costructuredArrowEilenbergZilberCategory
     plus := EilenbergZilberCategory.plus.inverseImage π
     minus := EilenbergZilberCategory.minus.inverseImage π
     degree := fun Y ↦ EilenbergZilberCategory.degree (π.obj Y)
+    isIso_eqToHom := by
+      intro U V f hf
+      letI : IsIso f := hf
+      haveI : IsIso (π.map f) := inferInstance
+      obtain ⟨h, hf_left⟩ :=
+        EilenbergZilberCategory.isIso_eqToHom (π.map f) (inferInstance : IsIso (π.map f))
+      change U.left = V.left at h
+      change f.left = eqToHom h at hf_left
+      have hw : yoneda.map (eqToHom h) ≫ V.hom = U.hom := by
+        rw [← hf_left]
+        exact CostructuredArrow.w f
+      have hUV : U = V := CostructuredArrow.eq_of_left_eq h hw
+      subst V
+      exact ⟨rfl, CostructuredArrow.hom_ext _ _ (by simpa using hf_left)⟩
     isomorphisms_le_plus := by
       intro Y Z f hf
       letI : IsIso f := hf
@@ -527,6 +1120,8 @@ noncomputable instance costructuredArrowEilenbergZilberCategory
         have hs'f := (hsections s').mpr (CostructuredArrow.sectionMk_comp g s hs)
         exact congrArg CostructuredArrow.Hom.left hs'f
   }
+
+end CostructuredArrows
 
 end EilenbergZilberCategory
 
