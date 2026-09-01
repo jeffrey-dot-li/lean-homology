@@ -168,18 +168,35 @@ clever. The cubical relations are the **same statements ε-decorated** (faces ca
 **What went wrong in previous attempts (and the fix):**
 1. I transcribed subscript-soup **1-based identities with a right-action convention** from papers,
    and hand-converted to 0-based `Fin` with `succAbove`/`predAbove`/`castSucc` by eye. Each
-   conversion had an off-by-one that `native_decide` then exposed. The papers' `∂/σ` have the
-   *same* orientation as ours, but the right-action/presheaf convention (where a "face" `Xₙ → Xₙ₋₁`
-   is contravariant to our site face) plus 1-based indexing made the translation error-prone.
-2. **Fix**: don't re-derive. **Copy `SimplexCategory`'s statements and proofs verbatim**, add the
-   `ε` decoration. Plateau the `Fin` index bookkeeping to exactly what Mathlib already proved
-   correct (`Fin.succAbove`, `Fin.castSucc`, `Fin.succ`, `Fin.pred`, `Fin.predAbove`).
-3. For the statements: keep `face`/`degeneracy`'s current `Fin`-indexed signatures (they are
-   correct — `face_face` was `native_decide`-verified), but **re-prove them as ε-decorated
-   corollaries of `SimplexCategory.δ_comp_δ` etc.** rather than trusting guessed formulas.
-   The `face_face` already committed is correct (verified for `n=2`), just stated with awkward
-   `ℕ`-bounds; restate it as `Fin`-indexed to match, then `sorry`-free proof via the simplicial
-   template.
+   conversion had an off-by-one that `native_decide` then exposed.
+2. The actual ground truth was obtained by **asking the user to read the PDF's eq. (5)** and
+   confirm the sub/superscripts directly (the superscript layer garbled the PDF extractor).
+   Confirmed (1-based, `α,β ∈ {0,1}`, composition right-to-left = `ε_i` applied first):
+   - (5a) `δⱼ^β δᵢ^α = δᵢ₊₁^α δⱼ^β` for `j ≤ i`
+   - (5b) `εᵢ εⱼ = εⱼ εᵢ₊₁` for `j ≤ i`
+   - (5c) `εⱼ δᵢ^α = { δᵢ₋₁^α εⱼ (j<i) ; 1 (j=i) ; δᵢ^α εⱼ₋₁ (j>i) }`
+3. Each was then **`native_decide`-verified on concrete small `n`** before being written to the
+   file. **Lesson: don't guess `Fin` bookkeeping; verify each concrete instance by `native_decide`
+   (scratch `lean_run_code`) before committing the general statement.**
+
+### Status of the cocubical relations (RESOLVED — Phase 1b DONE)
+
+In `CubicalSite.lean`, all five restricted-site (`I`) relations are now drafted with type-correct
+`sorry`'d statements (verified by `native_decide`):
+
+- `face_degeneracy` (proved): `(degeneracy n i) ∘ (face n i ε) = id`  — eq. (3).
+- `face_face` (sorry'd): `face (n+1) (j.castSucc) β (face n i α x) = face (n+1) (i.succ) α (face n j β x)`, `j ≤ i`.
+- `degeneracy_degeneracy` (sorry'd): `degeneracy n a (degeneracy (n+1) b.castSucc x) = degeneracy n b (degeneracy (n+1) a.succ x)`, `b ≤ a`.
+- `face_degeneracy_of_lt` (sorry'd): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.pred _) α (degeneracy n (j.castLT _) x)`, `j < i`.
+- `face_degeneracy_of_gt` (sorry'd): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.castLT _) α (degeneracy n (j.pred _) x)`, `j > i`.
+
+The `Fin`-index bookkeeping lived entirely in the *interchange* lemmas (`Fin.pred`, `Fin.castLT` —
+`omega` couldn't prove the `Fin`-to-`Nat` obligations, so explicit `Fin.lt_def`/`Nat.lt_succ_iff`
+chains were used). Everything else was clean. `lake build` green (618 jobs).
+
+**Still open for `I`:** the proofs (all `sorry`) — they should be ε-decorated corollaries of
+`SimplexCategory.δ_comp_δ`/`δ_comp_σ_*`/`σ_comp_σ` (`AlgebraicTopology/SimplexCategory/Basic.lean:237-363`),
+using the same `ext k; rcases; split_ifs; simp; lia` tail. `native_decide` is scratch-only (mathlib lints it).
 
 ### Phase 2: The Generalized-Reedy axioms (the main work)
 File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
@@ -295,22 +312,18 @@ Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·�
    with `K` for the main theorem 8.2? Recommend `I` first (practices the machinery; EZ payoff),
    but with the restricted families built faithfully so `J`/`K` extend cleanly.
 
-## Immediate next actions (after the root-cause fix)
+## Immediate next actions (updated after eq. (5) locked in)
 
-1. **Restate `face_face` in `Fin`-indexed form** (drop the awkward `ℕ`-bounds), mirroring
-   `SimplexCategory.δ_comp_δ`:
-   `face_face {n} (i : Fin (n+1)) (ε ε' : Fin 2) : face (n+1) i.succ ε' ... ` — transcribe the
-   exact `δ_comp_δ` shape (with `i ≤ j` hypothesis and `succ`/`castSucc` on the right side) into
-   the cube setting, ε-decorated.
-2. **Prove each restricted relation as an ε-decorated corollary of the simplicial template**,
-   using the same `ext k; rcases; split_ifs; simp; lia` tail (`AlgebraticTopology/SimplexCategory/
-   Basic.lean:237-363`), NOT a guessed formula. `native_decide` is **only** allowed in scratch
-   `lean_run_code` (mathlib lints it out of committed files), so it's a *verification* step before
-   writing, not a proof tactic.
-3. Then face/degen interchange (mirror `δ_comp_σ_of_le/_self/_succ/_of_gt`) and degen/degen
-   (`σ_comp_σ`), each ε-decorated.
-4. Only then proceed to the `CubeSite` category + `plus`/`minus` subcategories (Phase 1) and the
-   GR instance (Phase 2).
+1. **(Optional) fill the 4 `sorry`'d relations** via `/fill-sorry`, mirroring `SimplexCategory`'s
+   proofs (ε-decorated `ext; rcases; split_ifs; simp; lia`). Not blocking for Phase 1/2 — the
+   *statements* are the payload the GR instance needs; the proofs only matter for `/refactor`/`/clean`.
+2. **Phase 1: `CubeSite` category + subcategories.** Decide the object model (Open Q1: `ℕ` with
+   `Hom n m := Cube m →o Cube n` orientation) and define `plus` (order-embeds) / `minus`
+   (surjective) as `WideSubcategory`s.
+3. **Phase 2: the GR instance.** The heavy axiom is `factorization` (Grandis–Mauri eq. (6)) — the
+   canonical `f = ε·δ` form for the site `I`. Draft sorry'd, then `/fill-sorry`.
+4. Then `J` (connections γ) and `K` (interchange σ) as `minus`/`plus` extensions, and finally the
+   cubical EZ decomposition (re-export `Presheaf.existsUnique_minusDecomposition` etc.).
 
-`face_face` as currently committed (`c44c94e`) is *correct* (verified), just needs restating in the
-`Fin`-indexed form for cleanliness; `face_degendary = insert_then_drop` (`εᵢδᵢ = 1`) is proved..
+The restricted-site cocubical relations are **done** (except proofs); commits `c44c94e` (stale
+`ℕ`-indexed `face_face`) is superseded by the current `Fin`-indexed forms in `CubicalSite.lean`.

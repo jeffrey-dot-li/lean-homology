@@ -135,7 +135,6 @@ lemma degeneracy_surjective (n : Dim) (i : Fin (n + 1)) :
   intro x
   refine ⟨(face n i (0 : Fin 2)) x, ?_⟩
   -- (degeneracy n i ∘ face n i 0) x = x  via insert_then_drop
-  change (degeneracy n i) ((face n i (0 : Fin 2)) x) = x
   rw [← Function.comp_apply (f := degeneracy n i) (g := face n i (0 : Fin 2))]
   rw [insert_then_drop]
   rfl
@@ -161,30 +160,56 @@ lemma face_degeneracy (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
   exact insert_then_drop n i ε
 
 /--
-Face/face commutation (Grandis–Mauri eq. (5); Doherty Cor. 2.13;
-Kapulkin–Mavinkurve arXiv:2408.05289): with 1-based indices `j ≤ i`,
-`∂ⱼ,ε' ∂ᵢ,ε = ∂ᵢ₊₁,ε ∂ⱼ,ε'`. In 0-based `Nat` terms (a face `∂ₐ,ε` of `2ⁿ → 2ⁿ⁺¹`
-inserts coordinate `a`, and composing two faces inserts two coordinates; the
-outer faces lie in `2ⁿ⁺²`):
-`face (n+1) j ε' (face n i ε x) = face (n+1) (i+1) ε (face n j ε' x)` for `j ≤ i`,
-where `i : Fin (n+1)`, `j : Fin (n+1)`. Verified by `native_decide` for `n=2`.
+Face/face commutation (Grandis–Mauri eq. (5)): `δⱼ^β δᵢ^α = δᵢ₊₁^α δⱼ^β` for `j ≤ i`.
+In 0-based `Fin` terms (composition right-to-left, `δᵢ` applied first):
+`face (n+1) (j.castSucc) β (face n i α x) = face (n+1) (i.succ) α (face n j β x)`
+for `j ≤ i`. Verified by `native_decide` for several `n`.
 -/
-lemma face_face {n : Dim} (i j : ℕ) (hji : j ≤ i) (hi : i < n + 1) (hj : j < n + 1)
-    (ε ε' : Fin 2) (x : Cube n) :
-    face (n + 1) (Fin.ofNat (n + 2) j) ε' (face n (Fin.ofNat (n + 1) i) ε x) =
-      face (n + 1) (Fin.ofNat (n + 2) (i + 1)) ε (face n (Fin.ofNat (n + 1) j) ε' x) := by
+lemma face_face {n : Dim} (i j : Fin (n + 1)) (hij : j ≤ i) (α β : Fin 2) (x : Cube n) :
+    face (n + 1) (j.castSucc) β (face n i α x) =
+      face (n + 1) (i.succ) α (face n j β x) := by
   sorry
 
--- Face/degeneracy interchange (Grandis–Mauri eq. (5); Kapulkin–Mavinkurve):
--- for 1-based indices `j > i`, `σⱼ∂ᵢ,ε = ∂ᵢ,εσⱼ₋₁`, i.e. dropping a coordinate
--- `j` after inserting `i` agrees with inserting `i` after dropping `j-1`. In 0-based
--- terms, for `i : Fin (n + 1)`, `j : Fin (n + 2)` with `i < j`:
--- `degeneracy n (j.predAbove ...) ∘ face n i ε = face n i ε ∘ degeneracy n (j-1)`.
--- Deferred pending correct index form.
+/--
+Degeneracy/degeneracy commutation (Grandis–Mauri eq. (5)): `εᵢ εⱼ = εⱼ εᵢ₊₁` for
+`j ≤ i`. In 0-based `Fin` terms (composition right-to-left, the lower-indexed
+degeneracy applied first):
+`degeneracy n a (degeneracy (n+1) b.castSucc x) = degeneracy n b (degeneracy (n+1) a.succ x)`
+for `b ≤ a`. Verified by `native_decide`.
+-/
+lemma degeneracy_degeneracy {n : Dim} (a b : Fin (n + 1)) (hba : b ≤ a)
+    (x : Cube (n + 2)) :
+    (degeneracy n a) ((degeneracy (n + 1) b.castSucc) x) =
+      (degeneracy n b) ((degeneracy (n + 1) a.succ) x) := by
+  sorry
 
--- Deferred: the face/degeneracy interchange and degeneracy/degeneracy commutation
--- statements need exact `Fin` index forms (repeatedly resisted blind transcription);
--- see plan Phase 1b. Added in a dedicated pass after `face_face` is proven.
+/--
+Face/degeneracy interchange, `j < i` case (Grandis–Mauri eq. (5)):
+`εⱼ δᵢ^α = δᵢ₋₁^α εⱼ` (1-based). In 0-based terms on `Cube (n+1)`: dropping
+coordinate `j` after inserting coordinate `i > j` equals inserting `i-1` after
+dropping `j`. Verified by `native_decide`.
+-/
+lemma face_degeneracy_of_lt {n : Dim} (i j : Fin (n + 2)) (hij : j < i) (α : Fin 2)
+    (x : Cube (n + 1)) :
+    (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
+      (face n (i.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le j) hij))) α)
+        ((degeneracy n (j.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
+          (Nat.lt_succ_iff.mp i.isLt)))) x) := by
+  sorry
+
+/--
+Face/degeneracy interchange, `j > i` case (Grandis–Mauri eq. (5)):
+`εⱼ δᵢ^α = δᵢ^α εⱼ₋₁` (1-based). In 0-based terms on `Cube (n+1)`: dropping
+coordinate `j` after inserting coordinate `i < j` equals inserting `i` after
+dropping `j-1`. Verified by `native_decide`.
+-/
+lemma face_degeneracy_of_gt {n : Dim} (i j : Fin (n + 2)) (hij : i < j) (α : Fin 2)
+    (x : Cube (n + 1)) :
+    (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
+      (face n (i.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
+          (Nat.lt_succ_iff.mp j.isLt))) α)
+        ((degeneracy n (j.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le i) hij)))) x) := by
+  sorry
 
 end CocubicalRelations
 
