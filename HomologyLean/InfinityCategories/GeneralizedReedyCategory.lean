@@ -36,7 +36,7 @@ every map factors through `R⁻` followed by `R⁺` uniquely up to a unique isom
 and isomorphisms see the maps in `R⁻` as epimorphisms.
 -/
 class GeneralizedReedyCategory (R : Type u) [Category.{v} R]
-    (ι : Type w) [LinearOrder ι] where
+    (ι : outParam (Type w)) [LinearOrder ι] where
   /-- The degree-raising wide subcategory `R⁺`. -/
   plus : WideSubcategory R
   /-- The degree-lowering wide subcategory `R⁻`. -/
@@ -80,11 +80,11 @@ variable {R : Type u} [Category.{v} R] {ι : Type w} [LinearOrder ι]
 
 /-- A morphism belongs to the positive wide subcategory `R⁺`. -/
 abbrev IsPlus {X Y : R} (f : X ⟶ Y) : Prop :=
-  GeneralizedReedyCategory.plus (R := R) (ι := ι).hom f
+  GeneralizedReedyCategory.plus.hom f
 
 /-- A morphism belongs to the negative wide subcategory `R⁻`. -/
 abbrev IsMinus {X Y : R} (f : X ⟶ Y) : Prop :=
-  GeneralizedReedyCategory.minus (R := R) (ι := ι).hom f
+  GeneralizedReedyCategory.minus.hom f
 
 end GeneralizedReedyCategory
 
