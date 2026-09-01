@@ -143,6 +143,14 @@ with `γ` "active" and `∂` a face-composite, uniquely — this is our GR `fact
 These 1-based identities are the ground truth to transcribe into `CubicalSite.lean` (converting to
 0-based `Fin` / `succAbove` conventions), superseding the guessed `Fin` formulas that failed.
 
+**Convention trap (ROOT CAUSE of repeated failures):** many sources (incl. Kapulkin–Mavinkurve
+arXiv:2408.05289; also Carranza–Kapulkin) use the **dual** convention: faces `∂ᵢ,ε` *lower*
+dimension (`2ⁿ→2ⁿ⁻¹`) and degeneracies `σᵢ` *raise* (`2ⁿ→2ⁿ⁺¹`), with operators written on the
+right. **Our `Cube`/`face`/`degeneracy` uses the Grandis–Mauri/Doherty convention**: faces
+insert/raise, degeneracies drop/lower. Transcribing a dual-convention table directly yields false
+statements (confirmed repeatedly by `native_decide`). **Always transcribe from Grandis–Mauri eq.(5)
+(or Doherty) for our convention; dualize Kapulkin–Mavinkurve only after flipping δ/σ.**
+
 ### Phase 2: The Generalized-Reedy axioms (the main work)
 File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
 
