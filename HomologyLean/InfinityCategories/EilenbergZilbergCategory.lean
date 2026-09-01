@@ -4,18 +4,17 @@ import Mathlib.CategoryTheory.EpiMono
 import Mathlib.AlgebraicTopology.SimplexCategory.Basic
 import Mathlib.CategoryTheory.Comma.Presheaf.Basic
 import Mathlib.AlgebraicTopology.SimplicialSet.Degenerate
+import HomologyLean.InfinityCategories.WideSubcategory
+import HomologyLean.InfinityCategories.GeneralizedReedyCategory
 
 /-!
 # Eilenberg–Zilber categories
 
 This file introduces the data underlying an Eilenberg–Zilber category.
 
-An Eilenberg–Zilber category consists of a category `A`, two wide subcategories
-`A⁺` and `A⁻`, and a degree function from the objects of `A` to the natural
-numbers. The defining axioms will be added alongside their formalization.
-
-Wide subcategories are represented by morphism properties that contain every
-identity morphism and are closed under composition.
+An Eilenberg–Zilber category is a generalized Reedy category `A → ℕ` whose
+isomorphisms are induced by equalities of objects, and whose degree-lowering maps
+are split epimorphisms determined by their sections.
 -/
 
 open CategoryTheory
@@ -25,81 +24,24 @@ universe w v u
 namespace HomologyLean.InfinityCategories
 
 /--
-A wide subcategory of `A`, represented by the morphisms that belong to it.
-
-Because it is wide, it has every object of `A`; closure under identities and
-composition is therefore enough to specify its category structure.
+An Eilenberg–Zilber category: a generalized Reedy category `A` with degree into
+the natural numbers, further requiring that every isomorphism is induced by an
+equality of objects (there are no nontrivial automorphisms), that every map in
+`A⁻` admits a section, and that two maps in `A⁻` are equal when they have equal
+sections.
 -/
-structure WideSubcategory (A : Type u) [Category.{v} A] where
-  /-- The morphisms belonging to the wide subcategory. -/
-  hom : MorphismProperty A
-  /-- Every identity morphism belongs to the wide subcategory. -/
-  id_mem : ∀ X : A, hom (𝟙 X)
-  /-- The composite of two morphisms in the wide subcategory also belongs to it. -/
-  comp_mem :
-    ∀ {X Y Z : A} {f : X ⟶ Y} {g : Y ⟶ Z},
-      hom f → hom g → hom (f ≫ g)
-
-/-- The inverse image of a wide subcategory under a functor. -/
-def WideSubcategory.inverseImage {A : Type u} {B : Type*}
-    [Category.{v} A] [Category B] (W : WideSubcategory A) (F : B ⥤ A) :
-    WideSubcategory B where
-  hom := W.hom.inverseImage F
-  id_mem := fun X ↦ by
-    simpa using W.id_mem (F.obj X)
-  comp_mem := fun hf hg ↦ by
-    simpa using W.comp_mem hf hg
-
-abbrev splitEpimorphisms (A : Type u) [Category.{v} A] :
-    MorphismProperty A :=
-  fun _ _ f => IsSplitEpi f
-
-/--
-The initial data of an Eilenberg–Zilber category.
-
-The fields `plus` and `minus` represent the wide subcategories `A⁺` and `A⁻`,
-respectively. Further fields will express the degree, factorization, and
-pushout axioms from the definition.
--/
-class EilenbergZilberCategory (A : Type u) [Category.{v} A] where
-  /-- The degree-raising wide subcategory `A⁺`. -/
-  plus : WideSubcategory A
-  /-- The degree-lowering wide subcategory `A⁻`. -/
-  minus : WideSubcategory A
-  /-- The degree of an object. -/
-  degree : A → ℕ
+class EilenbergZilberCategory (A : Type u) [Category.{v} A]
+    extends GeneralizedReedyCategory A ℕ where
   /--
   Every isomorphism is induced by an equality of objects; in particular,
   there are no nontrivial automorphisms.
   -/
   isIso_eqToHom {X Y : A} (f : X ⟶ Y) (hf : IsIso f) :
     ∃ h : X = Y, f = eqToHom h
-  -- Any Isomorphism is in both A+ and A-
-  isomorphisms_le_plus :
-    MorphismProperty.isomorphisms A ≤ plus.hom
-  isomorphisms_le_minus :
-    MorphismProperty.isomorphisms A ≤ minus.hom
-  -- Non isos change degree
-  degree_lt_of_plus {X Y : A} (f : X ⟶ Y)
-      (hf : plus.hom f) (hf_noniso : ¬ IsIso f) :
-    degree X < degree Y
-  degree_lt_of_minus {X Y : A} (f : X ⟶ Y)
-      (hf : minus.hom f) (hf_noniso : ¬ IsIso f) :
-    degree Y < degree X
-  -- Factorization
-  factorization :
-    MorphismProperty.HasFactorization minus.hom plus.hom
-  -- Factorization Unique
-  factorization_unique {X Y : A} (f : X ⟶ Y)
-      (F G : MorphismProperty.MapFactorizationData
-        minus.hom plus.hom f) :
-    ∃! e : F.Z ≅ G.Z,
-      F.i ≫ e.hom = G.i ∧
-        e.hom ≫ G.p = F.p
-  -- Section
+  /-- Every map in `A⁻` is a split epimorphism. -/
   section_of_minus :
     minus.hom ≤ splitEpimorphisms A
-  -- Section Unique
+  /-- Two maps in `A⁻` with the same sections are equal. -/
   eq_of_sections_eq {X Y : A} (f g : X ⟶ Y)
       (hf : minus.hom f) (hg : minus.hom g)
       (hsections : ∀ s : Y ⟶ X,
@@ -118,11 +60,11 @@ lemma skeletal : Skeletal A :=
 
 /-- A morphism belongs to the positive wide subcategory `A⁺`. -/
 abbrev IsPlus {X Y : A} (f : X ⟶ Y) : Prop :=
-  EilenbergZilberCategory.plus.hom f
+  (GeneralizedReedyCategory.plus (R := A) (ι := ℕ)).hom f
 
 /-- A morphism belongs to the negative wide subcategory `A⁻`. -/
 abbrev IsMinus {X Y : A} (f : X ⟶ Y) : Prop :=
-  EilenbergZilberCategory.minus.hom f
+  (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).hom f
 
 namespace Presheaf
 
@@ -137,7 +79,7 @@ structure Decomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
   /-- The map along which the decomposing section restricts to `x`. -/
   σ : a ⟶ b
   /-- The decomposing section lies over an object of strictly smaller degree. -/
-  degree_lt : EilenbergZilberCategory.degree b < EilenbergZilberCategory.degree a
+  degree_lt : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) b < (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) a
   /-- The section over `b` that restricts to `x`. -/
   y : X.obj (Opposite.op b)
   /-- Restricting `y` along `σ` gives `x`. -/
@@ -179,7 +121,7 @@ def MinusDecomposition.comp {X : Aᵒᵖ ⥤ Type w} {a : A}
     MinusDecomposition X x where
   b := e.b
   σ := d.σ ≫ e.σ
-  σ_mem := EilenbergZilberCategory.minus.comp_mem d.σ_mem e.σ_mem
+  σ_mem := (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).comp_mem d.σ_mem e.σ_mem
   y := e.y
   map_y := by
     calc
@@ -197,11 +139,11 @@ lemma isDegenerate_iff_exists_minusDecomposition_degree_lt
     (X : Aᵒᵖ ⥤ Type w) {a : A} (x : X.obj (Opposite.op a)) :
     IsDegenerate X x ↔
       ∃ d : MinusDecomposition X x,
-        EilenbergZilberCategory.degree d.b < EilenbergZilberCategory.degree a := by
+        (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b < (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) a := by
   constructor
   · rintro ⟨d⟩
     obtain ⟨F⟩ :=
-      EilenbergZilberCategory.factorization.nonempty_mapFactorizationData d.σ
+      (GeneralizedReedyCategory.factorization (R := A) (ι := ℕ)).nonempty_mapFactorizationData d.σ
     let y' := X.map F.p.op d.y
     have hmap : X.map F.i.op y' = x := by
       calc
@@ -218,12 +160,12 @@ lemma isDegenerate_iff_exists_minusDecomposition_degree_lt
       y := y'
       map_y := hmap
     }, ?_⟩
-    have hle : EilenbergZilberCategory.degree F.Z ≤
-        EilenbergZilberCategory.degree d.b := by
+    have hle : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) F.Z ≤
+        (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b := by
       by_cases hp : IsIso F.p
       · obtain ⟨h, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.p hp
-        exact (congrArg EilenbergZilberCategory.degree h).le
-      · exact (EilenbergZilberCategory.degree_lt_of_plus F.p F.hp hp).le
+        exact (congrArg (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) h).le
+      · exact ((GeneralizedReedyCategory.degree_lt_of_plus (R := A) (ι := ℕ)) F.p F.hp hp).le
     exact hle.trans_lt d.degree_lt
   · rintro ⟨d, hd⟩
     exact ⟨{
@@ -242,9 +184,9 @@ lemma degree_le_of_map_eq_nondegenerate
     (X : Aᵒᵖ ⥤ Type w) {b c : A}
     (u : b ⟶ c) (y : X.obj (Opposite.op b)) (z : X.obj (Opposite.op c))
     (hu : X.map u.op z = y) (hy : IsNondegenerate X y) :
-    EilenbergZilberCategory.degree b ≤ EilenbergZilberCategory.degree c := by
+    (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) b ≤ (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) c := by
   obtain ⟨F⟩ :=
-    EilenbergZilberCategory.factorization.nonempty_mapFactorizationData u
+    (GeneralizedReedyCategory.factorization (R := A) (ι := ℕ)).nonempty_mapFactorizationData u
   let y' := X.map F.p.op z
   have hmap : X.map F.i.op y' = y := by
     calc
@@ -264,14 +206,14 @@ lemma degree_le_of_map_eq_nondegenerate
       σ_mem := F.hi
       y := y'
       map_y := hmap
-    }, EilenbergZilberCategory.degree_lt_of_minus F.i F.hi h⟩
+    }, (GeneralizedReedyCategory.degree_lt_of_minus (R := A) (ι := ℕ)) F.i F.hi h⟩
   obtain ⟨hbZ, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.i hFi
-  have hZc : EilenbergZilberCategory.degree F.Z ≤
-      EilenbergZilberCategory.degree c := by
+  have hZc : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) F.Z ≤
+      (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) c := by
     by_cases hFp : IsIso F.p
     · obtain ⟨hZc, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.p hFp
-      exact (congrArg EilenbergZilberCategory.degree hZc).le
-    · exact (EilenbergZilberCategory.degree_lt_of_plus F.p F.hp hFp).le
+      exact (congrArg (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) hZc).le
+    · exact ((GeneralizedReedyCategory.degree_lt_of_plus (R := A) (ι := ℕ)) F.p F.hp hFp).le
   simpa only [hbZ] using hZc
 
 /--
@@ -282,10 +224,10 @@ lemma isIso_of_map_eq_nondegenerate_of_degree_eq
     (X : Aᵒᵖ ⥤ Type w) {b c : A}
     (u : b ⟶ c) (y : X.obj (Opposite.op b)) (z : X.obj (Opposite.op c))
     (hu : X.map u.op z = y) (hy : IsNondegenerate X y)
-    (hdeg : EilenbergZilberCategory.degree b = EilenbergZilberCategory.degree c) :
+    (hdeg : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) b = (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) c) :
     IsIso u := by
   obtain ⟨F⟩ :=
-    EilenbergZilberCategory.factorization.nonempty_mapFactorizationData u
+    (GeneralizedReedyCategory.factorization (R := A) (ι := ℕ)).nonempty_mapFactorizationData u
   let y' := X.map F.p.op z
   have hmap : X.map F.i.op y' = y := by
     calc
@@ -305,14 +247,14 @@ lemma isIso_of_map_eq_nondegenerate_of_degree_eq
       σ_mem := F.hi
       y := y'
       map_y := hmap
-    }, EilenbergZilberCategory.degree_lt_of_minus F.i F.hi h⟩
+    }, (GeneralizedReedyCategory.degree_lt_of_minus (R := A) (ι := ℕ)) F.i F.hi h⟩
   obtain ⟨hbZ, _⟩ := EilenbergZilberCategory.isIso_eqToHom F.i hFi
   have hFp : IsIso F.p := by
     by_contra h
-    have hp := EilenbergZilberCategory.degree_lt_of_plus F.p F.hp h
-    have hdegZ : EilenbergZilberCategory.degree F.Z =
-        EilenbergZilberCategory.degree b :=
-      congrArg EilenbergZilberCategory.degree hbZ.symm
+    have hp := (GeneralizedReedyCategory.degree_lt_of_plus (R := A) (ι := ℕ)) F.p F.hp h
+    have hdegZ : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) F.Z =
+        (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) b :=
+      congrArg (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) hbZ.symm
     rw [hdegZ, hdeg] at hp
     exact (lt_irrefl _ hp)
   rw [← F.fac]
@@ -387,20 +329,20 @@ theorem existsUnique_minusDecomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
   let d₀ : MinusDecomposition X x := {
     b := a
     σ := 𝟙 a
-    σ_mem := EilenbergZilberCategory.minus.id_mem a
+    σ_mem := (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).id_mem a
     y := x
     map_y := by simp
   }
   let P : ℕ → Prop := fun m ↦
-    ∃ d : MinusDecomposition X x, EilenbergZilberCategory.degree d.b = m
+    ∃ d : MinusDecomposition X x, (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b = m
   have hP : ∃ m, P m :=
-    ⟨EilenbergZilberCategory.degree a, d₀, rfl⟩
+    ⟨(GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) a, d₀, rfl⟩
   obtain ⟨d, hd⟩ := Nat.find_spec hP
   have hd_nondegenerate : IsNondegenerate X d.y := by
     intro hdeg
     obtain ⟨e, he⟩ :=
       (isDegenerate_iff_exists_minusDecomposition_degree_lt X d.y).mp hdeg
-    have hmin : Nat.find hP ≤ EilenbergZilberCategory.degree e.b :=
+    have hmin : Nat.find hP ≤ (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) e.b :=
       Nat.find_min' hP ⟨d.comp e, rfl⟩
     apply (not_lt_of_ge hmin)
     simpa only [hd] using he
@@ -430,14 +372,14 @@ theorem existsUnique_minusDecomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
     comparison_map d e sd.section_ sd.id
   have hv : X.map v.op d.y = e.y :=
     comparison_map e d se.section_ se.id
-  have hde : EilenbergZilberCategory.degree d.b ≤
-      EilenbergZilberCategory.degree e.b :=
+  have hde : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b ≤
+      (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) e.b :=
     degree_le_of_map_eq_nondegenerate X u d.y e.y hu hd_nondegenerate
-  have hed : EilenbergZilberCategory.degree e.b ≤
-      EilenbergZilberCategory.degree d.b :=
+  have hed : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) e.b ≤
+      (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b :=
     degree_le_of_map_eq_nondegenerate X v e.y d.y hv he_nondegenerate
-  have hdegree : EilenbergZilberCategory.degree d.b =
-      EilenbergZilberCategory.degree e.b :=
+  have hdegree : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) d.b =
+      (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) e.b :=
     le_antisymm hde hed
   have hu_iso : IsIso u :=
     isIso_of_map_eq_nondegenerate_of_degree_eq
@@ -448,8 +390,8 @@ theorem existsUnique_minusDecomposition (X : Aᵒᵖ ⥤ Type w) {a : A}
     rw [← hu_eq]
     exact hu
   have hdσ_mem : IsMinus (d.σ ≫ eqToHom h) :=
-    EilenbergZilberCategory.minus.comp_mem d.σ_mem
-      (EilenbergZilberCategory.isomorphisms_le_minus
+    (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).comp_mem d.σ_mem
+      ((GeneralizedReedyCategory.isomorphisms_le_minus (R := A) (ι := ℕ))
         (eqToHom h) (by infer_instance))
   have hdσ_map : X.map (d.σ ≫ eqToHom h).op e.y = x := by
     calc
@@ -480,7 +422,7 @@ an object of degree at most `n`.
 -/
 def IsInSkeleton (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
     (x : X.obj (Opposite.op a)) : Prop :=
-  ∃ (b : A) (_ : EilenbergZilberCategory.degree b ≤ n)
+  ∃ (b : A) (_ : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) b ≤ n)
     (σ : a ⟶ b) (y : X.obj (Opposite.op b)), X.map σ.op y = x
 
 /-- The `n`-skeleton of a presheaf. -/
@@ -543,7 +485,7 @@ def skeletonFunctor (n : ℕ) :
 
 /-- Every section over an object of degree at most `n` belongs to the `n`-skeleton. -/
 lemma isInSkeleton_of_degree_le (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
-    (ha : EilenbergZilberCategory.degree a ≤ n) (x : X.obj (Opposite.op a)) :
+    (ha : (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) a ≤ n) (x : X.obj (Opposite.op a)) :
     IsInSkeleton n X x := by
   refine ⟨a, ha, 𝟙 a, x, ?_⟩
   simp
@@ -553,7 +495,7 @@ Above degree `n`, every section in the `n`-skeleton is degenerate in the
 original presheaf.
 -/
 lemma isDegenerate_of_isInSkeleton (n : ℕ) (X : Aᵒᵖ ⥤ Type w) {a : A}
-    (ha : n < EilenbergZilberCategory.degree a) (x : X.obj (Opposite.op a))
+    (ha : n < (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) a) (x : X.obj (Opposite.op a))
     (hx : IsInSkeleton n X x) :
     IsDegenerate X x := by
   rcases hx with ⟨b, hb, σ, y, hy⟩
@@ -701,6 +643,13 @@ instance SimplexCategory.eilenbergZilberCategory :
   eq_of_sections_eq := by
     intro X Y f g hf hg hsections
     exact SimplexCategory.eq_of_epi_of_sections_eq f g hf hg hsections
+  degree_eq_of_isIso := by
+    intro X Y f hf
+    exact SimplexCategory.len_eq_of_isIso f
+  iso_eq_id_of_comp_minus := by
+    intro X Y f hf θ hθ h
+    letI : IsIso θ := hθ
+    exact SimplexCategory.eq_id_of_isIso θ
 
 /-! ## Recovering Mathlib's simplicial-set decomposition theorems
 
@@ -1026,9 +975,9 @@ noncomputable instance costructuredArrowEilenbergZilberCategory
     EilenbergZilberCategory (CostructuredArrow yoneda X) := by
   let π : CostructuredArrow yoneda X ⥤ A := CostructuredArrow.proj yoneda X
   refine {
-    plus := EilenbergZilberCategory.plus.inverseImage π
-    minus := EilenbergZilberCategory.minus.inverseImage π
-    degree := fun Y ↦ EilenbergZilberCategory.degree (π.obj Y)
+    plus := (GeneralizedReedyCategory.plus (R := A) (ι := ℕ)).inverseImage π
+    minus := (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).inverseImage π
+    degree := fun Y ↦ (GeneralizedReedyCategory.degree (R := A) (ι := ℕ)) (π.obj Y)
     isIso_eqToHom := by
       intro U V f hf
       letI : IsIso f := hf
@@ -1046,38 +995,38 @@ noncomputable instance costructuredArrowEilenbergZilberCategory
     isomorphisms_le_plus := by
       intro Y Z f hf
       letI : IsIso f := hf
-      exact EilenbergZilberCategory.isomorphisms_le_plus (π.map f) inferInstance
+      exact (GeneralizedReedyCategory.isomorphisms_le_plus (R := A) (ι := ℕ)) (π.map f) inferInstance
     isomorphisms_le_minus := by
       intro Y Z f hf
       letI : IsIso f := hf
-      exact EilenbergZilberCategory.isomorphisms_le_minus (π.map f) inferInstance
+      exact (GeneralizedReedyCategory.isomorphisms_le_minus (R := A) (ι := ℕ)) (π.map f) inferInstance
     degree_lt_of_plus := by
       intro Y Z f hf hf_noniso
-      apply EilenbergZilberCategory.degree_lt_of_plus (π.map f) hf
+      apply (GeneralizedReedyCategory.degree_lt_of_plus (R := A) (ι := ℕ)) (π.map f) hf
       intro hπ
       letI : IsIso (π.map f) := hπ
       exact hf_noniso (isIso_of_reflects_iso f π)
     degree_lt_of_minus := by
       intro Y Z f hf hf_noniso
-      apply EilenbergZilberCategory.degree_lt_of_minus (π.map f) hf
+      apply (GeneralizedReedyCategory.degree_lt_of_minus (R := A) (ι := ℕ)) (π.map f) hf
       intro hπ
       letI : IsIso (π.map f) := hπ
       exact hf_noniso (isIso_of_reflects_iso f π)
     factorization := {
       nonempty_mapFactorizationData := fun f ↦ by
         obtain ⟨F⟩ :=
-          EilenbergZilberCategory.factorization.nonempty_mapFactorizationData (π.map f)
+          (GeneralizedReedyCategory.factorization (R := A) (ι := ℕ)).nonempty_mapFactorizationData (π.map f)
         exact ⟨MorphismProperty.MapFactorizationData.liftCostructuredArrow
-          EilenbergZilberCategory.minus.hom EilenbergZilberCategory.plus.hom f F⟩
+          (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).hom (GeneralizedReedyCategory.plus (R := A) (ι := ℕ)).hom f F⟩
     }
     factorization_unique := by
       intro U V f F G
       let F₀ := MorphismProperty.MapFactorizationData.projectCostructuredArrow
-        EilenbergZilberCategory.minus.hom EilenbergZilberCategory.plus.hom f F
+        (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).hom (GeneralizedReedyCategory.plus (R := A) (ι := ℕ)).hom f F
       let G₀ := MorphismProperty.MapFactorizationData.projectCostructuredArrow
-        EilenbergZilberCategory.minus.hom EilenbergZilberCategory.plus.hom f G
+        (GeneralizedReedyCategory.minus (R := A) (ι := ℕ)).hom (GeneralizedReedyCategory.plus (R := A) (ι := ℕ)).hom f G
       obtain ⟨e₀, he₀, he₀_unique⟩ :=
-        EilenbergZilberCategory.factorization_unique f.left F₀ G₀
+        (GeneralizedReedyCategory.factorization_unique (R := A) (ι := ℕ)) f.left F₀ G₀
       change F.Z.left ≅ G.Z.left at e₀
       change F.i.left ≫ e₀.hom = G.i.left ∧ e₀.hom ≫ G.p.left = F.p.left at he₀
       change ∀ y : F.Z.left ≅ G.Z.left,
@@ -1123,6 +1072,25 @@ noncomputable instance costructuredArrowEilenbergZilberCategory
         let s' := CostructuredArrow.sectionMk g s hs
         have hs'f := (hsections s').mpr (CostructuredArrow.sectionMk_comp g s hs)
         exact congrArg CostructuredArrow.Hom.left hs'f
+    degree_eq_of_isIso := by
+      intro U V f hf
+      letI : IsIso f := hf
+      letI : IsIso (π.map f) := inferInstance
+      exact (GeneralizedReedyCategory.degree_eq_of_isIso (R := A) (ι := ℕ)) (π.map f) inferInstance
+    iso_eq_id_of_comp_minus := by
+      intro U V f hf θ hθ h
+      letI : IsIso θ := hθ
+      letI : IsIso (π.map θ) := inferInstance
+      have hπ : π.map f ≫ π.map θ = π.map f := by
+        calc
+          π.map f ≫ π.map θ = π.map (f ≫ θ) := by simp
+          _ = π.map f := by rw [h]
+      have hθπ : π.map θ = 𝟙 (π.obj V) :=
+        (GeneralizedReedyCategory.iso_eq_id_of_comp_minus (R := A) (ι := ℕ)) (π.map f) hf (π.map θ)
+          (by infer_instance) hπ
+      apply CostructuredArrow.hom_ext
+      dsimp [π, CostructuredArrow.proj] at hθπ
+      exact hθπ
   }
 
 end CostructuredArrows
