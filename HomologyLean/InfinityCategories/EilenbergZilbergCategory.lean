@@ -112,6 +112,10 @@ namespace EilenbergZilberCategory
 
 variable {A : Type u} [Category.{v} A] [EilenbergZilberCategory A]
 
+/-- An Eilenberg–Zilber category is skeletal: isomorphic objects are equal. -/
+lemma skeletal : Skeletal A :=
+  fun _ _ ⟨e⟩ ↦ (EilenbergZilberCategory.isIso_eqToHom e.hom (inferInstance : IsIso e.hom)).1
+
 /-- A morphism belongs to the positive wide subcategory `A⁺`. -/
 abbrev IsPlus {X Y : A} (f : X ⟶ Y) : Prop :=
   EilenbergZilberCategory.plus.hom f
