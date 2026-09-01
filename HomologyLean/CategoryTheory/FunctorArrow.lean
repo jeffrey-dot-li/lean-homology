@@ -63,8 +63,8 @@ noncomputable def functorArrowEquiv : (C ⥤ Arrow D) ≌ Arrow (C ⥤ D) where
     -- An arrow η : F ⟶ G in (C ⥤ D) maps to the functor c ↦ Arrow.mk (η.app c).
     obj η := {
       obj := fun c => Arrow.mk (η.hom.app c)
-      map := fun {c c'} f => Arrow.homMk (η.left.map f) (η.right.map f) (by
-        simp)
+      map := fun {c c'} f =>
+        Arrow.homMk (η.left.map f) (η.right.map f) (η.hom.naturality f)
     }
     map {η η'} φ := {
       -- φ : η ⟶ η' in Arrow (C ⥤ D), i.e. φ.left : η.left ⟶ η'.left and

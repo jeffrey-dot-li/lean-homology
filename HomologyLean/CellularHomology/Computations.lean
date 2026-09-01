@@ -67,11 +67,15 @@ instance sphereCell_zero (n : ℕ) : Unique (SphereCell n 0) := by
   simp only [SphereCell, ↓reduceIte]
   infer_instance
 
-instance sphereCell_n (n : ℕ) (hn : n ≠ 0) : Unique (SphereCell n n) := by
+-- `def`, not `instance`: Lean 4.31 rejects instance binders (`hn : n ≠ 0`) that typeclass
+-- synthesis could never supply, since the hypothesis appears neither in an instance-implicit
+-- argument nor in the return type. As instances these were unusable anyway; keep them as
+-- named defs so `sphereChainComplex` can apply them explicitly.
+def sphereCell_n (n : ℕ) (hn : n ≠ 0) : Unique (SphereCell n n) := by
   simp only [SphereCell, hn, ↓reduceIte]
   infer_instance
 
-instance sphereCell_empty (n k : ℕ) (hk0 : k ≠ 0) (hkn : k ≠ n) : IsEmpty (SphereCell n k) := by
+def sphereCell_empty (n k : ℕ) (hk0 : k ≠ 0) (hkn : k ≠ n) : IsEmpty (SphereCell n k) := by
   simp only [SphereCell, hk0, ↓reduceIte, hkn]
   infer_instance
 
