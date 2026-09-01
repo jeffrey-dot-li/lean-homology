@@ -143,13 +143,43 @@ with `γ` "active" and `∂` a face-composite, uniquely — this is our GR `fact
 These 1-based identities are the ground truth to transcribe into `CubicalSite.lean` (converting to
 0-based `Fin` / `succAbove` conventions), superseding the guessed `Fin` formulas that failed.
 
-**Convention trap (ROOT CAUSE of repeated failures):** many sources (incl. Kapulkin–Mavinkurve
-arXiv:2408.05289; also Carranza–Kapulkin) use the **dual** convention: faces `∂ᵢ,ε` *lower*
-dimension (`2ⁿ→2ⁿ⁻¹`) and degeneracies `σᵢ` *raise* (`2ⁿ→2ⁿ⁺¹`), with operators written on the
-right. **Our `Cube`/`face`/`degeneracy` uses the Grandis–Mauri/Doherty convention**: faces
-insert/raise, degeneracies drop/lower. Transcribing a dual-convention table directly yields false
-statements (confirmed repeatedly by `native_decide`). **Always transcribe from Grandis–Mauri eq.(5)
-(or Doherty) for our convention; dualize Kapulkin–Mavinkurve only after flipping δ/σ.**
+## Root-cause diagnosis: why the `Fin` transcriptions kept failing
+
+The cube maps here are the **same combinatorial gadget as `SimplexCategory`** in Mathlib:
+
+- `Cube n = Fin n → Fin 2`
+- `face n i ε = Fin.insertNth i ε` (fill coordinate `i` with `ε`)
+- `degeneracy n i = precomposition with Fin.succAbove i` (delete coordinate `i`)
+
+Mathlib's `SimplexCategory` (`AlgebraicTopology/SimplexCategory/Basic.lean`) defines
+`δ i = Fin.succAboveOrderEmb i`, `σ i = i.predAboveOrderHom` and **already proves** the full
+simplicial identity family with correct `Fin` index arithmetic:
+
+| `SimplexCategory` (to mirror) | our cubical analogue |
+|---|---|
+| `δ_comp_δ {i j : Fin (n+2)} (H : i ≤ j) : δ i ≫ δ j.succ = δ j ≫ δ i.castSucc` | face/face |
+| `δ_comp_σ_of_le`, `δ_comp_σ_self`, `δ_comp_σ_succ`, `δ_comp_σ_of_gt` | face/degen interchange |
+| `σ_comp_σ {i j : Fin (n+1)} (H : i ≤ j)` | degen/degen |
+
+Their proofs are uniformly `ext k; rcases i/j/k; split_ifs <;> simp <;> lia` — mechanical, not
+clever. The cubical relations are the **same statements ε-decorated** (faces carry an extra
+`ε : Fin 2` label; `J` adds `γ`, `K` adds `σ`).
+
+**What went wrong in previous attempts (and the fix):**
+1. I transcribed subscript-soup **1-based identities with a right-action convention** from papers,
+   and hand-converted to 0-based `Fin` with `succAbove`/`predAbove`/`castSucc` by eye. Each
+   conversion had an off-by-one that `native_decide` then exposed. The papers' `∂/σ` have the
+   *same* orientation as ours, but the right-action/presheaf convention (where a "face" `Xₙ → Xₙ₋₁`
+   is contravariant to our site face) plus 1-based indexing made the translation error-prone.
+2. **Fix**: don't re-derive. **Copy `SimplexCategory`'s statements and proofs verbatim**, add the
+   `ε` decoration. Plateau the `Fin` index bookkeeping to exactly what Mathlib already proved
+   correct (`Fin.succAbove`, `Fin.castSucc`, `Fin.succ`, `Fin.pred`, `Fin.predAbove`).
+3. For the statements: keep `face`/`degeneracy`'s current `Fin`-indexed signatures (they are
+   correct — `face_face` was `native_decide`-verified), but **re-prove them as ε-decorated
+   corollaries of `SimplexCategory.δ_comp_δ` etc.** rather than trusting guessed formulas.
+   The `face_face` already committed is correct (verified for `n=2`), just stated with awkward
+   `ℕ`-bounds; restate it as `Fin`-indexed to match, then `sorry`-free proof via the simplicial
+   template.
 
 ### Phase 2: The Generalized-Reedy axioms (the main work)
 File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
@@ -264,3 +294,23 @@ Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·�
 4. **Which cube site exactly** do we instantiate first — `I` (fewest maps, the EZ case) or start
    with `K` for the main theorem 8.2? Recommend `I` first (practices the machinery; EZ payoff),
    but with the restricted families built faithfully so `J`/`K` extend cleanly.
+
+## Immediate next actions (after the root-cause fix)
+
+1. **Restate `face_face` in `Fin`-indexed form** (drop the awkward `ℕ`-bounds), mirroring
+   `SimplexCategory.δ_comp_δ`:
+   `face_face {n} (i : Fin (n+1)) (ε ε' : Fin 2) : face (n+1) i.succ ε' ... ` — transcribe the
+   exact `δ_comp_δ` shape (with `i ≤ j` hypothesis and `succ`/`castSucc` on the right side) into
+   the cube setting, ε-decorated.
+2. **Prove each restricted relation as an ε-decorated corollary of the simplicial template**,
+   using the same `ext k; rcases; split_ifs; simp; lia` tail (`AlgebraticTopology/SimplexCategory/
+   Basic.lean:237-363`), NOT a guessed formula. `native_decide` is **only** allowed in scratch
+   `lean_run_code` (mathlib lints it out of committed files), so it's a *verification* step before
+   writing, not a proof tactic.
+3. Then face/degen interchange (mirror `δ_comp_σ_of_le/_self/_succ/_of_gt`) and degen/degen
+   (`σ_comp_σ`), each ε-decorated.
+4. Only then proceed to the `CubeSite` category + `plus`/`minus` subcategories (Phase 1) and the
+   GR instance (Phase 2).
+
+`face_face` as currently committed (`c44c94e`) is *correct* (verified), just needs restating in the
+`Fin`-indexed form for cleanliness; `face_degendary = insert_then_drop` (`εᵢδᵢ = 1`) is proved..
