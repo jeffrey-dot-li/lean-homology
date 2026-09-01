@@ -2,6 +2,8 @@ import Mathlib.CategoryTheory.Monoidal.Category
 import Mathlib.CategoryTheory.Quotient
 import Mathlib.Order.Hom.Basic
 import Mathlib.Data.Fin.Tuple.Basic
+import Mathlib.Data.Fintype.Card
+import Mathlib.Data.Fintype.BigOperators
 import HomologyLean.InfinityCategories.WideSubcategory
 import HomologyLean.InfinityCategories.GeneralizedReedyCategory
 
@@ -151,6 +153,15 @@ Lemma 2.12.
 
 section CocubicalRelations
 
+/-- Double insertion commutation on the shifted indices:
+`i.succAbove (j.succAbove k) = j.castSucc.succAbove (i.succAbove k)` for `j ≤ i`. -/
+lemma succAbove_succAbove_comm {n : ℕ} (i j : Fin (n + 1)) (hij : j ≤ i) (k : Fin n) :
+    i.succ.succAbove (j.succAbove k) = j.castSucc.succAbove (i.succAbove k) := by
+  apply Fin.ext
+  dsimp only [Fin.succAbove]
+  rcases i with ⟨i, hi⟩; rcases j with ⟨j, hj⟩; rcases k with ⟨k, hk⟩
+  split_ifs <;> simp at * <;> omega
+
 /--
 A face followed by the corresponding degeneracy (dropping the just-inserted
 coordinate) is the identity: `εᵢ δᵢ = 1`. (Grandis–Mauri eq. (3).)
@@ -168,7 +179,25 @@ for `j ≤ i`. Verified by `native_decide` for several `n`.
 lemma face_face {n : Dim} (i j : Fin (n + 1)) (hij : j ≤ i) (α β : Fin 2) (x : Cube n) :
     face (n + 1) (j.castSucc) β (face n i α x) =
       face (n + 1) (i.succ) α (face n j β x) := by
-  sorry
+  funext k
+  -- Case-split on whether `k` is the `j.castSucc`-hole, then (if not) on whether its
+  -- preimage is the `i`-hole. Each case rewrites the index to `succAbove`-/`self`-shape
+  -- and finishes with `face_apply_self`/`face_apply_succAbove`.
+  by_cases hjk : k = j.castSucc
+  · subst k
+    -- RHS index `j.castSucc` is the `i.succ`-image of `j`, so the outer insertion is
+    -- peeled to the inner one, which returns `β` at position `j`.
+    rw [face_apply_self, (Fin.succAbove_succ_of_le i j hij).symm, face_apply_succAbove,
+      face_apply_self]
+  rcases Fin.exists_succAbove_eq hjk with ⟨a, rfl⟩
+  rw [face_apply_succAbove]
+  by_cases hai : a = i
+  · subst a
+    -- RHS index `j.castSucc.succAbove i = i.succ` (since `j ≤ i`), the `i.succ`-hole.
+    rw [face_apply_self, Fin.succAbove_castSucc_of_le j i hij, face_apply_self]
+  rcases Fin.exists_succAbove_eq hai with ⟨b, rfl⟩
+  rw [face_apply_succAbove, (succAbove_succAbove_comm i j hij b).symm,
+    face_apply_succAbove, face_apply_succAbove]
 
 /--
 Degeneracy/degeneracy commutation (Grandis–Mauri eq. (5)): `εᵢ εⱼ = εⱼ εᵢ₊₁` for
@@ -181,7 +210,10 @@ lemma degeneracy_degeneracy {n : Dim} (a b : Fin (n + 1)) (hba : b ≤ a)
     (x : Cube (n + 2)) :
     (degeneracy n a) ((degeneracy (n + 1) b.castSucc) x) =
       (degeneracy n b) ((degeneracy (n + 1) a.succ) x) := by
-  sorry
+  -- Both sides are `x` at a double-`succAbove` index; `succAbove_succAbove_comm`
+  -- equates the two indices.
+  funext j
+  simp only [degeneracy_apply, succAbove_succAbove_comm a b hba]
 
 /--
 Face/degeneracy interchange, `j < i` case (Grandis–Mauri eq. (5)):
@@ -195,7 +227,35 @@ lemma face_degeneracy_of_lt {n : Dim} (i j : Fin (n + 2)) (hij : j < i) (α : Fi
       (face n (i.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le j) hij))) α)
         ((degeneracy n (j.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
           (Nat.lt_succ_iff.mp i.isLt)))) x) := by
-  sorry
+  -- Restate with canonical proof terms (defeq by proof irrelevance) so the
+  -- `Fin.succAbove_*` API lemmas match syntactically.
+  change (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
+    (face n (i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij))) α)
+      ((degeneracy n (j.castLT (hij.trans_le (Fin.le_last i)))) x)
+  funext k
+  -- Case-split on whether `k` is the `i.pred`-hole; if not, write it as
+  -- `(i.pred _).succAbove b` and commute the two deletions via
+  -- `succAbove_succAbove_comm` instantiated at `(i.pred _, j.castLT _)`.
+  by_cases hk : k = i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij))
+  · subst k
+    -- LHS index `j.succAbove (i.pred _) = i` (since `j < i`): both faces hit their hole.
+    rw [degeneracy_apply, Fin.succAbove_pred_of_lt j i hij, face_apply_self, face_apply_self]
+  rcases Fin.exists_succAbove_eq hk with ⟨b, rfl⟩
+  have hle : j.castLT (hij.trans_le (Fin.le_last i)) ≤
+      i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij)) := by
+    have h := Fin.lt_def.mp hij
+    simp only [Fin.le_def, Fin.val_castLT, Fin.val_pred]
+    omega
+  have key : j.succAbove
+        ((i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij))).succAbove b) =
+      i.succAbove ((j.castLT (hij.trans_le (Fin.le_last i))).succAbove b) := by
+    have h := succAbove_succAbove_comm
+      (i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij)))
+      (j.castLT (hij.trans_le (Fin.le_last i))) hle b
+    rw [Fin.succ_pred, Fin.castSucc_castLT] at h
+    exact h.symm
+  rw [face_apply_succAbove, degeneracy_apply, degeneracy_apply, key, face_apply_succAbove]
+  rfl
 
 /--
 Face/degeneracy interchange, `j > i` case (Grandis–Mauri eq. (5)):
@@ -209,9 +269,230 @@ lemma face_degeneracy_of_gt {n : Dim} (i j : Fin (n + 2)) (hij : i < j) (α : Fi
       (face n (i.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
           (Nat.lt_succ_iff.mp j.isLt))) α)
         ((degeneracy n (j.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le i) hij)))) x) := by
-  sorry
+  -- Restate with canonical proof terms (defeq by proof irrelevance) so the
+  -- `Fin.succAbove_*` API lemmas match syntactically. (`castPred` and `castLT`
+  -- are both `⟨i, _⟩`, hence definitionally equal.)
+  change (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
+    (face n (i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j)))) α)
+      ((degeneracy n (j.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt i.zero_le hij)))) x)
+  funext k
+  -- Case-split on whether `k` is the `i.castPred`-hole; if not, write it as
+  -- `(i.castPred _).succAbove b` and commute the two deletions via
+  -- `succAbove_succAbove_comm` instantiated at `(j.pred _, i.castPred _)`.
+  by_cases hk : k = i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j)))
+  · subst k
+    -- LHS index `j.succAbove (i.castPred _) = i` (since `i < j`): both faces hit their hole.
+    rw [degeneracy_apply, Fin.succAbove_castPred_of_lt j i hij, face_apply_self,
+      face_apply_self]
+  rcases Fin.exists_succAbove_eq hk with ⟨b, rfl⟩
+  have hle : i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j))) ≤
+      j.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt i.zero_le hij)) := by
+    have h := Fin.lt_def.mp hij
+    simp only [Fin.le_def, Fin.coe_castPred, Fin.val_pred]
+    omega
+  have key : j.succAbove
+        ((i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j)))).succAbove b) =
+      i.succAbove ((j.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt i.zero_le hij))).succAbove b) := by
+    have h := succAbove_succAbove_comm
+      (j.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt i.zero_le hij)))
+      (i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j)))) hle b
+    rw [Fin.succ_pred, Fin.castSucc_castPred] at h
+    exact h
+  rw [face_apply_succAbove, degeneracy_apply, degeneracy_apply, key, face_apply_succAbove]
 
 end CocubicalRelations
+
+/-!
+## The cubical site as a category
+
+The site has objects the dimensions `n : ℕ` (standing for the cube `2ⁿ`) and
+morphisms the monotone maps `2ⁿ → 2ᵐ` **generated** by faces and degeneracies
+(Grandis–Mauri, restricted site `I`). We model the generated family as an
+inductive predicate on `OrderHom`s, so that a morphism of the site is an
+order-hom *bundled with a proof* that it is generated. Two morphisms are equal
+iff their underlying order-homs agree pointwise, so the cocubical relations
+above become genuine equalities in the category (no quotient needed).
+-/
+
+section CubeSiteCategory
+
+/--
+The generated family of cube maps (restricted site `I`): the smallest class of
+monotone maps containing the faces `δᵢᵉ : 2ⁿ → 2ⁿ⁺¹` and degeneracies
+`εᵢ : 2ⁿ⁺¹ → 2ⁿ`, and closed under identity and composition.
+-/
+inductive IsGen : (n m : Dim) → (Cube n →o Cube m) → Prop
+  /-- The identity is generated. -/
+  | id (n : Dim) : IsGen n n (OrderHom.id)
+  /-- Every face map is generated. -/
+  | face (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) : IsGen n (n + 1) (face n i ε)
+  /-- Every degeneracy is generated. -/
+  | degeneracy (n : Dim) (i : Fin (n + 1)) : IsGen (n + 1) n (degeneracy n i)
+  /-- The family is closed under composition (apply `f` first, then `g`). -/
+  | comp {n m k : Dim} {f : Cube n →o Cube m} {g : Cube m →o Cube k} :
+      IsGen n m f → IsGen m k g → IsGen n k (g.comp f)
+
+/-- A morphism of the cubical site from the `n`-cube to the `m`-cube: a
+monotone map `2ⁿ → 2ᵐ` generated by faces and degeneracies. -/
+structure CubeHom (n m : Dim) where
+  /-- The underlying monotone map `2ⁿ → 2ᵐ`. -/
+  toOrderHom : Cube n →o Cube m
+  /-- The underlying map is generated by faces and degeneracies. -/
+  isGen : IsGen n m toOrderHom
+
+namespace CubeHom
+
+/-- Extensionality: two cube maps are equal if their underlying order-homs
+agree. (Proof irrelevance discharges the `isGen` components.) -/
+@[ext]
+theorem ext {n m : Dim} {f g : CubeHom n m} (h : f.toOrderHom = g.toOrderHom) : f = g := by
+  cases f; cases g; subst h; rfl
+
+/-- The identity cube map. -/
+def id (n : Dim) : CubeHom n n := ⟨OrderHom.id, .id n⟩
+
+/-- Composition of cube maps (`f` first, then `g`), i.e. `f ≫ g`. -/
+def comp {n m k : Dim} (f : CubeHom n m) (g : CubeHom m k) : CubeHom n k :=
+  ⟨g.toOrderHom.comp f.toOrderHom, .comp f.isGen g.isGen⟩
+
+@[simp] theorem id_toOrderHom (n : Dim) : (id n).toOrderHom = OrderHom.id := rfl
+
+@[simp] theorem comp_toOrderHom {n m k : Dim} (f : CubeHom n m) (g : CubeHom m k) :
+    (comp f g).toOrderHom = g.toOrderHom.comp f.toOrderHom := rfl
+
+end CubeHom
+
+/-- The cubical site (restricted site `I`): objects are dimensions `n : ℕ`,
+morphisms `n ⟶ m` are the generated cube maps `2ⁿ → 2ᵐ`. -/
+instance cubeSiteCategory : Category Dim where
+  Hom := CubeHom
+  id := CubeHom.id
+  comp := CubeHom.comp
+  id_comp f := CubeHom.ext (OrderHom.id_comp _)
+  comp_id f := CubeHom.ext (OrderHom.comp_id _)
+  assoc f g h := CubeHom.ext (OrderHom.comp_assoc _ _ _)
+
+/-- The raising maps `R⁺`: order-embeddings (injective cube maps). These are
+the composites of faces. -/
+def plus : WideSubcategory Dim where
+  hom _ _ f := Function.Injective ⇑f.toOrderHom
+  id_mem n x y h := h
+  comp_mem hf hg := hg.comp hf
+
+/-- The lowering maps `R⁻`: surjective cube maps. These are the composites of
+degeneracies (all split epis on finite cubes). -/
+def minus : WideSubcategory Dim where
+  hom _ _ f := Function.Surjective ⇑f.toOrderHom
+  id_mem n x := ⟨x, rfl⟩
+  comp_mem hf hg := hg.comp hf
+
+/-!
+## The generalized Reedy structure (Phase 2 skeleton)
+
+Following Doherty (AGT 26:2, Prop 2.6) and Campion (arXiv:2303.06206, Thm 7.9),
+the cubical site is a generalized Reedy category with `degree = id : ℕ → ℕ`:
+raising maps are the injective cube maps (composites of faces), lowering maps
+are the surjective cube maps (composites of degeneracies), and every map factors
+as a degeneracy-composite followed by a face-composite (Grandis–Mauri eq. (6),
+`f = ε ∘ δ`).
+
+The `plus`/`minus` subcategories are defined above; the remaining axioms are
+sorry'd and constitute the Phase 2 work.
+-/
+
+/-- The number of points of the `n`-cube is `2ⁿ`. -/
+lemma card_cube (n : Dim) : Fintype.card (Cube n) = 2 ^ n := by
+  classical
+  simp [Cube, Fintype.card_fun]
+
+/-- A monotone injection `2ⁿ → 2ᵐ` forces `n ≤ m` (comparing `2ⁿ ≤ 2ᵐ`). -/
+lemma dim_le_of_injective {n m : Dim} {f : Cube n →o Cube m}
+    (hf : Function.Injective ⇑f) : n ≤ m := by
+  have h := Fintype.card_le_of_injective f hf
+  rw [card_cube, card_cube] at h
+  exact (Nat.pow_le_pow_iff_right (Nat.one_lt_two)).mp h
+
+/-- A monotone surjection `2ⁿ → 2ᵐ` forces `m ≤ n` (comparing `2ⁿ ≥ 2ᵐ`). -/
+lemma dim_le_of_surjective {n m : Dim} {f : Cube n →o Cube m}
+    (hf : Function.Surjective ⇑f) : m ≤ n := by
+  have h := Fintype.card_le_of_surjective f hf
+  rw [card_cube, card_cube] at h
+  exact (Nat.pow_le_pow_iff_right (Nat.one_lt_two)).mp h
+
+/-- The underlying order-hom of an isomorphism in the site is bijective. -/
+lemma bijective_of_isIso {n m : Dim} (f : n ⟶ m) (hf : IsIso f) :
+    Function.Bijective ⇑f.toOrderHom := by
+  obtain ⟨g, hgf, hfg⟩ := hf.out
+  -- `f ≫ g = 𝟙 n` means `g.toOrderHom ∘ f.toOrderHom = id` and
+  -- `g ≫ f = 𝟙 m` means `f.toOrderHom ∘ g.toOrderHom = id`, so they are inverse.
+  have h1 : ⇑g.toOrderHom ∘ ⇑f.toOrderHom = _root_.id := by
+    have h := congrArg (fun (e : n ⟶ n) => ⇑e.toOrderHom) hgf
+    change ⇑(CubeHom.comp f g).toOrderHom = ⇑(CubeHom.id n).toOrderHom at h
+    rw [CubeHom.comp_toOrderHom, CubeHom.id_toOrderHom] at h
+    exact h
+  have h2 : ⇑f.toOrderHom ∘ ⇑g.toOrderHom = _root_.id := by
+    have h := congrArg (fun (e : m ⟶ m) => ⇑e.toOrderHom) hfg
+    change ⇑(CubeHom.comp g f).toOrderHom = ⇑(CubeHom.id m).toOrderHom at h
+    rw [CubeHom.comp_toOrderHom, CubeHom.id_toOrderHom] at h
+    exact h
+  exact Function.bijective_iff_has_inverse.mpr
+    ⟨⇑g.toOrderHom, congrFun h1, congrFun h2⟩
+
+/-- An isomorphism of generated cube maps `2ⁿ ≅ 2ᵐ` forces `n = m`. -/
+lemma dim_eq_of_isIso {n m : Dim} (f : n ⟶ m) (hf : IsIso f) : n = m :=
+  le_antisymm (dim_le_of_injective (bijective_of_isIso f hf).1)
+    (dim_le_of_surjective (bijective_of_isIso f hf).2)
+
+/-- A bijective monotone self-map of a cube is an order-isomorphism, hence (for
+a generated map) an isomorphism in the site. -/
+lemma isIso_of_bijective {n : Dim} {f : n ⟶ n} (hf : Function.Bijective ⇑f.toOrderHom) :
+    IsIso f := sorry
+
+/-- The degree of a cube is its dimension. -/
+instance : GeneralizedReedyCategory Dim ℕ where
+  plus := plus
+  minus := minus
+  degree n := n
+  degree_lt_of_plus f hf hf_noniso := by
+    have hle := dim_le_of_injective hf
+    rcases hle.eq_or_lt with heq | hlt
+    · -- `n = m` with `f` injective on a finite set ⇒ bijective ⇒ iso, contradicting `hf_noniso`.
+      subst heq
+      exact absurd
+        (isIso_of_bijective ⟨hf, hf.surjective_of_finite (Equiv.refl _)⟩) hf_noniso
+    · exact hlt
+  degree_lt_of_minus f hf hf_noniso := by
+    have hle := dim_le_of_surjective hf
+    rcases hle.eq_or_lt with heq | hlt
+    · -- `n = m` with `f` surjective on a finite set ⇒ bijective ⇒ iso, contradicting `hf_noniso`.
+      subst heq
+      exact absurd
+        (isIso_of_bijective ⟨hf.injective_of_finite (Equiv.refl _), hf⟩) hf_noniso
+    · exact hlt
+  degree_eq_of_isIso f hf := dim_eq_of_isIso f hf
+  isomorphisms_le_plus X Y f hf := (bijective_of_isIso f hf).1
+  isomorphisms_le_minus X Y f hf := (bijective_of_isIso f hf).2
+  factorization := sorry
+  factorization_unique f F G := sorry
+  iso_eq_id_of_comp_minus f hf θ hθ h := by
+    -- `f ≫ θ = f` with `f` surjective forces `θ = 𝟙`: `θ` fixes every point in
+    -- the (full) image of `f`, and surjectivity makes that all of `Cube n`.
+    apply CubeHom.ext
+    apply OrderHom.ext
+    funext y
+    obtain ⟨x, rfl⟩ := hf y
+    -- From `f ≫ θ = f` we get `(f ≫ θ).toOrderHom x = f.toOrderHom x`.
+    have hcomp : (f ≫ θ).toOrderHom x = f.toOrderHom x := by
+      have h' : (f ≫ θ).toOrderHom = f.toOrderHom := congrArg CubeHom.toOrderHom h
+      rw [h']
+    change (CubeHom.comp f θ).toOrderHom x = f.toOrderHom x at hcomp
+    rw [CubeHom.comp_toOrderHom] at hcomp
+    -- `hcomp : (θ.toOrderHom ∘ f.toOrderHom) x = f.toOrderHom x`, i.e. `θ (f x) = f x`;
+    -- the RHS `(𝟙 Y).toOrderHom (f x)` reduces to `OrderHom.id (f x) = f x`.
+    show θ.toOrderHom (f.toOrderHom x) = OrderHom.id (f.toOrderHom x)
+    exact hcomp
+
+end CubeSiteCategory
 
 end Cubical
 

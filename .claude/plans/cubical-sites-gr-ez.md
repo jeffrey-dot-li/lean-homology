@@ -179,24 +179,24 @@ clever. The cubical relations are the **same statements ε-decorated** (faces ca
    file. **Lesson: don't guess `Fin` bookkeeping; verify each concrete instance by `native_decide`
    (scratch `lean_run_code`) before committing the general statement.**
 
-### Status of the cocubical relations (RESOLVED — Phase 1b DONE)
+### Status of the cocubical relations (RESOLVED — Phase 1b DONE, proofs DONE)
 
-In `CubicalSite.lean`, all five restricted-site (`I`) relations are now drafted with type-correct
-`sorry`'d statements (verified by `native_decide`):
+In `CubicalSite.lean`, all five restricted-site (`I`) relations are **stated and proved**
+(statements were verified by `native_decide`; proofs are the ε-decorated analogues of
+`SimplexCategory.δ_comp_δ`/`σ_comp_σ`):
 
 - `face_degeneracy` (proved): `(degeneracy n i) ∘ (face n i ε) = id`  — eq. (3).
-- `face_face` (sorry'd): `face (n+1) (j.castSucc) β (face n i α x) = face (n+1) (i.succ) α (face n j β x)`, `j ≤ i`.
-- `degeneracy_degeneracy` (sorry'd): `degeneracy n a (degeneracy (n+1) b.castSucc x) = degeneracy n b (degeneracy (n+1) a.succ x)`, `b ≤ a`.
-- `face_degeneracy_of_lt` (sorry'd): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.pred _) α (degeneracy n (j.castLT _) x)`, `j < i`.
-- `face_degeneracy_of_gt` (sorry'd): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.castLT _) α (degeneracy n (j.pred _) x)`, `j > i`.
+- `face_face` (proved): `face (n+1) (j.castSucc) β (face n i α x) = face (n+1) (i.succ) α (face n j β x)`, `j ≤ i`.
+- `degeneracy_degeneracy` (proved): `degeneracy n a (degeneracy (n+1) b.castSucc x) = degeneracy n b (degeneracy (n+1) a.succ x)`, `b ≤ a`.
+- `face_degeneracy_of_lt` (proved): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.pred _) α (degeneracy n (j.castLT _) x)`, `j < i`.
+- `face_degeneracy_of_gt` (proved): `degeneracy (n+1) j (face (n+1) i α x) = face n (i.castLT _) α (degeneracy n (j.pred _) x)`, `j > i`.
 
-The `Fin`-index bookkeeping lived entirely in the *interchange* lemmas (`Fin.pred`, `Fin.castLT` —
-`omega` couldn't prove the `Fin`-to-`Nat` obligations, so explicit `Fin.lt_def`/`Nat.lt_succ_iff`
-chains were used). Everything else was clean. `lake build` green (618 jobs).
-
-**Still open for `I`:** the proofs (all `sorry`) — they should be ε-decorated corollaries of
-`SimplexCategory.δ_comp_δ`/`δ_comp_σ_*`/`σ_comp_σ` (`AlgebraicTopology/SimplexCategory/Basic.lean:237-363`),
-using the same `ext k; rcases; split_ifs; simp; lia` tail. `native_decide` is scratch-only (mathlib lints it).
+All four commutations reduce to one master lemma `succAbove_succAbove_comm`
+(`i.succ.succAbove (j.succAbove k) = j.castSucc.succAbove (i.succAbove k)` for `j ≤ i`),
+proved by mathlib's `δ_comp_δ` recipe (`Fin.ext; dsimp only [Fin.succAbove]; rcases;
+split_ifs <;> simp at * <;> omega`). The `castPred`-vs-`castLT` and proof-term-`change`
+gotchas are recorded in `.claude/memory/api/fin-succabove.md`. `lake build` green,
+sorry-free.
 
 ### Phase 2: The Generalized-Reedy axioms (the main work)
 File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
@@ -312,11 +312,11 @@ Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·�
    with `K` for the main theorem 8.2? Recommend `I` first (practices the machinery; EZ payoff),
    but with the restricted families built faithfully so `J`/`K` extend cleanly.
 
-## Immediate next actions (updated after eq. (5) locked in)
+## Immediate next actions (updated after eq. (5) locked in and proved)
 
-1. **(Optional) fill the 4 `sorry`'d relations** via `/fill-sorry`, mirroring `SimplexCategory`'s
-   proofs (ε-decorated `ext; rcases; split_ifs; simp; lia`). Not blocking for Phase 1/2 — the
-   *statements* are the payload the GR instance needs; the proofs only matter for `/refactor`/`/clean`.
+1. **~~Fill the 4 `sorry`'d relations~~** — DONE. All restricted-site relations are proved
+   via the master lemma `succAbove_succAbove_comm` (see
+   `.claude/memory/api/fin-succabove.md`).
 2. **Phase 1: `CubeSite` category + subcategories.** Decide the object model (Open Q1: `ℕ` with
    `Hom n m := Cube m →o Cube n` orientation) and define `plus` (order-embeds) / `minus`
    (surjective) as `WideSubcategory`s.
@@ -325,5 +325,6 @@ Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·�
 4. Then `J` (connections γ) and `K` (interchange σ) as `minus`/`plus` extensions, and finally the
    cubical EZ decomposition (re-export `Presheaf.existsUnique_minusDecomposition` etc.).
 
-The restricted-site cocubical relations are **done** (except proofs); commits `c44c94e` (stale
-`ℕ`-indexed `face_face`) is superseded by the current `Fin`-indexed forms in `CubicalSite.lean`.
+The restricted-site cocubical relations are **fully done** (statements and proofs); commits
+`c44c94e` (stale `ℕ`-indexed `face_face`) is superseded by the current `Fin`-indexed forms in
+`CubicalSite.lean`.
