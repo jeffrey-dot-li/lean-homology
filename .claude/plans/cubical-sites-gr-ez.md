@@ -118,6 +118,31 @@ File: `CubicalSite.lean`
 4. Provisional `instance : GeneralizedReedyCategory CubeSite ℕ` (sorry'd) — see Phase 2 for the
    difficult axioms.
 
+### Phase 1b. The cocubical relations (the deferred index work) — RESOLVED from literature
+
+The **full generator relation table** (1-based indices), matching Krishnan–Rudman [13, Lemma 4.1]
+via Kapulkin–Mavinkurve (arXiv:2408.05289, §1) and Grandis–Mauri eq. (5)/(16)/(28)–(30):
+
+**Faces & degeneracies** (restricted site `I`):
+- `∂ⱼ,ε' ∂ᵢ,ε = ∂ᵢ₊₁,ε ∂ⱼ,ε'` for `j ≤ i`   — face/face commutation (the one I errored on)
+- `σⱼ ∂ᵢ,ε = { ∂ᵢ₋₁,ε σⱼ (j<i) ; id (j=i) ; ∂ᵢ,ε σⱼ₋₁ (j>i) }`   — face/degeneracy interchange
+- `σᵢ σⱼ = σⱼ σᵢ₊₁` for `j ≤ i`   — degeneracy/degeneracy commutation
+
+**Connections** (site `J`, `γᵢ,ε` = coord-wise max/min):
+- `γⱼ,ε' γᵢ,ε = { γᵢ,ε γⱼ₊₁,ε' (j>i) ; γᵢ,ε γᵢ₊₁,ε (j=i, ε'=ε) }`
+- `γⱼ,ε' ∂ᵢ,ε = { ∂ᵢ₋₁,ε γⱼ,ε' (j<i−1) ; id (j=i−1,i, ε=ε') ; ∂ᵢ,ε σᵢ (j=i−1,i, ε=1−ε') ; ∂ᵢ,ε γⱼ₋₁,ε' (j>i) }`
+- `σⱼ γᵢ,ε = { γᵢ₋₁,ε σⱼ (j<i) ; σᵢ σᵢ (j=i) ; γᵢ,ε σⱼ₊₁ (j>i) }`
+
+**Interchanges** (site `K`, `σᵢ` = transpose of coords `i,i+1`): Moore relations (28) +
+mixed (29),(30): `σᵢσᵢ=1`, `σᵢσⱼσᵢ=σⱼσᵢσⱼ` (adjacent, Yang–Baxter), `σᵢσⱼ=σⱼσᵢ` (|i−j|>1),
+`εⱼσᵢ`, `σᵢ∂...`, `σᵢγ...`.
+
+**Canonical factorization** (Doherty Lemma 2.12, Grandis–Mauri eq. (6)): every map `φ = ∂·γ`
+with `γ` "active" and `∂` a face-composite, uniquely — this is our GR `factorization`.
+
+These 1-based identities are the ground truth to transcribe into `CubicalSite.lean` (converting to
+0-based `Fin` / `succAbove` conventions), superseding the guessed `Fin` formulas that failed.
+
 ### Phase 2: The Generalized-Reedy axioms (the main work)
 File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
 
