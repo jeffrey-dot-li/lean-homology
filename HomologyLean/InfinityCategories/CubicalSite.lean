@@ -428,7 +428,7 @@ lemma isIso_of_bijective {n : Dim} {f : n ⟶ n} (hf : Function.Bijective ⇑f.t
     IsIso f := sorry
 
 /-- The degree of a cube is its dimension. -/
-instance : GeneralizedReedyCategory Dim ℕ where
+instance : BMGeneralizedReedyCategory Dim ℕ where
   plus := plus
   minus := minus
   degree n := n

@@ -1,27 +1,26 @@
 import HomologyLean.InfinityCategories.WideSubcategory
+import HomologyLean.InfinityCategories.AbsoluteLimits
 
 /-!
 # Generalized Reedy categories
 
-This file introduces the notion of a (Berger–Moerdijk) generalized Reedy category,
-following nLab, *generalized Reedy category*
-(`https://ncatlab.org/nlab/show/generalized+Reedy+category`) and Berger–Moerdijk,
-*On an extension of the notion of Reedy category* (2011).
+This file introduces the notion of a generalized Reedy category, following
+Campion, *Cubical sites as Eilenberg–Zilber categories* (arXiv:2303.06206,
+Def 1.1), which is the Berger–Moerdijk notion *without* the
+`iso_eq_id_of_comp_minus` condition.
 
-Ordinary Reedy categories cannot contain non-identity isomorphisms. A generalized
-Reedy category lifts this restriction, while retaining a factorization of every map
-into a degree-lowering part followed by a degree-raising part, unique up to a unique
-isomorphism, and hence the existence of a Reedy model structure on the category of
-presheaves.
+The hierarchy is:
+- `GeneralizedReedyCategory` (Campion): the base notion, with factorization
+  unique up to unique isomorphism.
+- `BMGeneralizedReedyCategory` (Berger–Moerdijk): Campion's notion plus the
+  `iso_eq_id_of_comp_minus` condition (isomorphisms see `R⁻` maps as epis).
+- `OrdinaryReedyCategory` (strict): BM's notion plus `isIso_eqToHom` (no
+  nontrivial isomorphisms).
 
 The related notion of an Eilenberg–Zilber category is the Cisinski variant: it
-strengthens the last axiom below by requiring maps in `R⁻` to be split
-epimorphisms that are determined by their sections.
-
-This file also introduces `OrdinaryReedyCategory`, the original (strict) notion
-due to Reedy, which strengthens a generalized Reedy category by requiring that
-every isomorphism is induced by an equality of objects (no nontrivial
-automorphisms). See the Reedy hierarchy in `.claude/plans/cubical-sites-gr-ez.md`.
+strengthens the structure by requiring maps in `R⁻` to be split epimorphisms
+that are determined by their sections. See the Reedy hierarchy in
+`.claude/plans/cubical-sites-gr-ez.md`.
 -/
 
 open CategoryTheory
@@ -31,14 +30,17 @@ universe w v u
 namespace HomologyLean.InfinityCategories
 
 /--
-A (Berger–Moerdijk) generalized Reedy category: a category `R` with two wide
-subcategories `R⁺` and `R⁻` and a degree function `degree : R → ι` into a linear
-order `ι`.
+A (Campion) generalized Reedy category: a category `R` with two wide
+subcategories `R⁺` and `R⁻` and a degree function `degree : R → ι` into a
+well-founded linear order `ι`.
 
 The axioms state that non-isomorphisms in `R⁺` raise the degree, non-isomorphisms
 in `R⁻` lower it, isomorphisms preserve it and belong to both wide subcategories,
-every map factors through `R⁻` followed by `R⁺` uniquely up to a unique isomorphism,
-and isomorphisms see the maps in `R⁻` as epimorphisms.
+and every map factors through `R⁻` followed by `R⁺` uniquely up to a unique
+isomorphism.
+
+This is Campion's Def 1.1 (arXiv:2303.06206), which omits the Berger–Moerdijk
+`iso_eq_id_of_comp_minus` condition.
 -/
 class GeneralizedReedyCategory (R : Type u) [Category.{v} R]
     (ι : outParam (Type w)) [LinearOrder ι] [WellFoundedLT ι] where
@@ -70,6 +72,18 @@ class GeneralizedReedyCategory (R : Type u) [Category.{v} R]
       (F G : MorphismProperty.MapFactorizationData minus.hom plus.hom f) :
     ∃! e : F.Z ≅ G.Z,
       F.i ≫ e.hom = G.i ∧ e.hom ≫ G.p = F.p
+
+/--
+A Berger–Moerdijk generalized Reedy category: a Campion generalized Reedy
+category satisfying the additional condition that isomorphisms see the maps in
+`R⁻` as epimorphisms.
+
+This is the standard notion in the literature (Berger–Moerdijk 2011), and is
+what our cubical sites formalization uses.
+-/
+class BMGeneralizedReedyCategory (R : Type u) [Category.{v} R]
+    (ι : outParam (Type w)) [LinearOrder ι] [WellFoundedLT ι]
+    extends GeneralizedReedyCategory R ι where
   /--
   (Berger–Moerdijk condition) Every isomorphism `θ` with `f ≫ θ = f` for a map
   `f` in `R⁻` is the identity: isomorphisms see the maps in `R⁻` as epimorphisms.
@@ -79,17 +93,35 @@ class GeneralizedReedyCategory (R : Type u) [Category.{v} R]
     θ = 𝟙 Y
 
 /--
-An ordinary (strict) Reedy category: a generalized Reedy category with no
-nontrivial isomorphisms. This is the original notion due to Reedy, where the
-only isomorphisms are the identities (forced by `isIso_eqToHom`).
+A Campion Eilenberg–Zilber category: a Campion generalized Reedy category in
+which every pair of `R⁻` maps with common domain has an absolute pushout.
+
+This is Campion's Def 3.1 (arXiv:2303.06206), which drops the Berger–Moerdijk
+requirement that `R⁺` consists of monomorphisms. It is characterized by the
+Eilenberg–Zilber lemma for presheaves.
+-/
+class CampionEZCategory (R : Type u) [Category.{v} R]
+    (ι : outParam (Type w)) [LinearOrder ι] [WellFoundedLT ι]
+    extends GeneralizedReedyCategory R ι where
+  /-- Every pair of `R⁻` maps with common domain has an absolute pushout. -/
+  absolute_pushout_of_minus {X Y Z : R} (f : X ⟶ Y) (g : X ⟶ Z)
+      (hf : minus.hom f) (hg : minus.hom g) :
+    ∃ (P : R) (inl : Y ⟶ P) (inr : Z ⟶ P),
+      IsAbsolutePushout f g inl inr
+
+/--
+An ordinary (strict) Reedy category: a Berger–Moerdijk generalized Reedy
+category with no nontrivial isomorphisms. This is the original notion due to
+Reedy, where the only isomorphisms are the identities (forced by
+`isIso_eqToHom`).
 
 Ordinary Reedy categories are the left column of the Reedy hierarchy; they are
-generalized Reedy categories in which the isomorphism condition is strengthened
-to skeletality.
+BM generalized Reedy categories in which the isomorphism condition is
+strengthened to skeletality.
 -/
 class OrdinaryReedyCategory (R : Type u) [Category.{v} R]
     (ι : outParam (Type w)) [LinearOrder ι] [WellFoundedLT ι]
-    extends GeneralizedReedyCategory R ι where
+    extends BMGeneralizedReedyCategory R ι where
   /-- Every isomorphism is induced by an equality of objects; in particular,
   there are no nontrivial automorphisms. -/
   isIso_eqToHom {X Y : R} (f : X ⟶ Y) (hf : IsIso f) :
@@ -107,8 +139,8 @@ subcategories and the degree:
 - `F` preserves degree: `degree (F.obj X) = degree X`.
 
 The category `ReedyCat` has objects Reedy categories and morphisms Reedy
-functors. The canonical forgetful functor `OrdinaryReedyCat ⥤ ReedyCat` is the
-inclusion of the full subcategory of strict Reedy categories.
+functors. The canonical forgetful functors are the inclusions of the full
+subcategories of stricter Reedy categories.
 -/
 
 /-- A Reedy functor: a functor between Reedy categories that preserves the
@@ -128,7 +160,7 @@ structure ReedyFunctor (R S : Type u) [Category.{v} R] [Category.{v} S]
   map_degree : ∀ X : R, GeneralizedReedyCategory.degree (toFunctor.obj X) =
     GeneralizedReedyCategory.degree X
 
-/-- The category of generalized Reedy categories and Reedy functors. -/
+/-- The category of Campion generalized Reedy categories and Reedy functors. -/
 structure ReedyCat (ι : Type w) [LinearOrder ι] [WellFoundedLT ι] where
   /-- Construct a Reedy category from a category with a Reedy structure. -/
   of ::
@@ -165,6 +197,52 @@ instance : Category (ReedyCat ι) where
 
 end ReedyCat
 
+/-- The category of Berger–Moerdijk generalized Reedy categories and Reedy
+functors. -/
+structure BMReedyCat (ι : Type w) [LinearOrder ι] [WellFoundedLT ι] where
+  /-- Construct a BM Reedy category from a category with a BM Reedy structure. -/
+  of ::
+  /-- The underlying category. -/
+  carrier : Type u
+  /-- The category structure. -/
+  [inst : Category.{v} carrier]
+  /-- The BM Reedy structure. -/
+  [reedy : BMGeneralizedReedyCategory carrier ι]
+
+attribute [instance] BMReedyCat.inst BMReedyCat.reedy
+
+namespace BMReedyCat
+
+variable {ι : Type w} [LinearOrder ι] [WellFoundedLT ι]
+
+instance : CoeSort (BMReedyCat ι) (Type u) :=
+  ⟨BMReedyCat.carrier⟩
+
+/-- The type of morphisms in `BMReedyCat`. -/
+@[ext]
+structure Hom (R S : BMReedyCat ι) where
+  /-- The underlying Reedy functor. -/
+  toReedyFunctor : ReedyFunctor R.carrier S.carrier ι
+
+instance : Category (BMReedyCat ι) where
+  Hom R S := Hom R S
+  id R := ⟨⟨𝟭 R.carrier, fun _ hf => hf, fun _ hf => hf, fun _ => rfl⟩⟩
+  comp F G := ⟨⟨F.toReedyFunctor.toFunctor ⋙ G.toReedyFunctor.toFunctor,
+    fun _ hf => G.toReedyFunctor.map_plus _ (F.toReedyFunctor.map_plus _ hf),
+    fun _ hf => G.toReedyFunctor.map_minus _ (F.toReedyFunctor.map_minus _ hf),
+    fun X => (G.toReedyFunctor.map_degree (F.toReedyFunctor.toFunctor.obj X)).trans
+      (F.toReedyFunctor.map_degree X)⟩⟩
+
+/-- The canonical forgetful functor from BM Reedy categories to Campion Reedy
+categories: the inclusion of the full subcategory of BM Reedy categories. -/
+def forgetful : BMReedyCat ι ⥤ ReedyCat ι where
+  obj R := ReedyCat.of R.carrier
+  map F := ⟨F.toReedyFunctor⟩
+  map_id _ := rfl
+  map_comp _ _ := rfl
+
+end BMReedyCat
+
 /-- The category of ordinary (strict) Reedy categories and Reedy functors. -/
 structure OrdinaryReedyCat (ι : Type w) [LinearOrder ι] [WellFoundedLT ι] where
   /-- Construct an ordinary Reedy category from a category with a strict Reedy structure. -/
@@ -200,11 +278,10 @@ instance : Category (OrdinaryReedyCat ι) where
     fun X => (G.toReedyFunctor.map_degree (F.toReedyFunctor.toFunctor.obj X)).trans
       (F.toReedyFunctor.map_degree X)⟩⟩
 
-/-- The canonical forgetful functor from ordinary Reedy categories to generalized
-Reedy categories: the inclusion of the full subcategory of strict Reedy
-categories. -/
-def forgetful : OrdinaryReedyCat ι ⥤ ReedyCat ι where
-  obj R := ReedyCat.of R.carrier
+/-- The canonical forgetful functor from ordinary Reedy categories to BM Reedy
+categories: the inclusion of the full subcategory of strict Reedy categories. -/
+def forgetful : OrdinaryReedyCat ι ⥤ BMReedyCat ι where
+  obj R := BMReedyCat.of R.carrier
   map F := ⟨F.toReedyFunctor⟩
   map_id _ := rfl
   map_comp _ _ := rfl

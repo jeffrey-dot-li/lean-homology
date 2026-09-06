@@ -31,21 +31,29 @@ allowed). The intersection is the strict EZ case.
 
 | Notion | Definition | Key property | Examples |
 |--------|-----------|--------------|----------|
-| **Ordinary Reedy** | Two wide subcats `R⁺`/`R⁻`, degree `d : Ob → α` (ordinal), non-iso `R⁺` raises degree, non-iso `R⁻` lowers, iso preserves, factorization `R⁻ ∘ R⁺` unique up to iso, `R⁺ ∩ R⁻` = isos | No nontrivial isomorphisms | `Δ`, `Θ` |
-| **Generalized Reedy** (BM) | Same but isomorphisms allowed | `R⁺ ∩ R⁻` = core (isos); iso `θ` with `f ≫ θ = f` for `f ∈ R⁻` forces `θ = 𝟙` | `Γ`, `Λ`, trees `Ω`, cubes with symmetries |
+| **Ordinary Reedy** | Two wide subcats `R⁺`/`R⁻`, degree `d : Ob → α` (ordinal), non-iso `R⁺` raises degree, non-iso `R⁻` lowers, iso preserves, factorization `R⁻ ∘ R⁺` unique up to iso, `R⁺ ∩ R⁻` = isos | No nontrivial isomorphisms | `Δ`, `Θ`; our `OrdinaryReedyCategory` |
+| **Generalized Reedy** (Campion) | Same as ordinary but isomorphisms allowed; drops the BM `iso_eq_id_of_comp_minus` condition | `R⁺ ∩ R⁻` = core (isos); factorization unique up to iso | Base for Campion EZ; our `GeneralizedReedyCategory` |
+| **Generalized Reedy** (BM) | Campion GR + `iso_eq_id_of_comp_minus`: iso `θ` with `f ≫ θ = f` for `f ∈ R⁻` forces `θ = 𝟙` | BM condition ensures `R⁻` maps are "epi enough" | `Γ`, `Λ`, trees `Ω`, cubes with symmetries; our `BMGeneralizedReedyCategory` |
 | **Elegant Reedy** | Ordinary Reedy + Reedy model structure = injective model structure | Every presheaf element is a degeneracy of a nondegenerate element uniquely | `Δ`, `Θ` |
 | **Bergner–Rezk EZ** | Elegant Reedy + (EZ1) every map has a section + (EZ2) maps with same sections are equal | Strict Reedy with split epis determined by sections | `Θ` |
-| **Berger–Moerdijk EZ** | Generalized Reedy + `A⁻` = split epis + `A⁺` = monos + absolute pushouts of `A⁻` | EZ lemma holds for presheaves | Cubes with symmetries, `Γ` |
-| **Campion EZ** | Generalized Reedy + absolute pushouts of `A⁻` (drops `A⁺` = monos) | Mild generalization of BM EZ; characterized by EZ lemma | Cubical sites without diagonals |
+| **Berger–Moerdijk EZ** | BM Generalized Reedy + `A⁻` = split epis + `A⁺` = monos + absolute pushouts of `A⁻` | EZ lemma holds for presheaves | Cubes with symmetries, `Γ` |
+| **Campion EZ** | Campion Generalized Reedy + absolute pushouts of `A⁻` (drops `A⁺` = monos) | Mild generalization of BM EZ; characterized by EZ lemma | Cubical sites without diagonals; our `CampionEZCategory` |
 
 **Where the cube sites sit**:
 - `I` (faces + degeneracies only): **strict EZ** (no nontrivial autos) — intersection of left and right columns
 - `J` (+ connections): **Campion EZ** (generalized, has autos)
 - `K` (+ interchange): **Campion EZ** (generalized, has autos)
 
-Our `GeneralizedReedyCategory.lean` is the **right column** (BM). Our
-`EilenbergZilbergCategory.lean` is **Campion's** mild generalization (extends
-`GeneralizedReedyCategory` directly, not `OrdinaryReedyCategory`).
+Our `GeneralizedReedyCategory.lean` is **Campion's Generalized Reedy** (the base,
+without `iso_eq_id_of_comp_minus`). Our `BMGeneralizedReedyCategory` adds the BM
+condition. Our `CampionEZCategory` is **Campion's** EZ notion (extends
+`GeneralizedReedyCategory` with absolute pushouts of `A⁻`). Our `EilenbergZilbergCategory.lean`
+is the older Cisinski variant (extends `GeneralizedReedyCategory` with split epis determined
+by sections).
+
+**Note on terminology**: Campion's "generalized Reedy category" (Def 1.1 in arXiv:2303.06206)
+omits the `iso_eq_id_of_comp_minus` condition; he reserves "Berger–Moerdijk generalized Reedy"
+for the version with that condition. Our formalization has both, with Campion's as the base.
 
 ## Why GR, not EZ, by default
 
