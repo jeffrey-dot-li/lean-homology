@@ -351,6 +351,219 @@ instance cubeSiteCategory : Category Dim where
   comp_id _f := CubeHom.ext (OrderHom.comp_id _)
   assoc _f _g _h := CubeHom.ext (OrderHom.comp_assoc _ _ _)
 
+/-- A face map bundled as a morphism of the restricted cubical site. -/
+def faceHom (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) : n ⟶ n + 1 :=
+  ⟨face n i ε, .face n i ε⟩
+
+/-- A degeneracy map bundled as a morphism of the restricted cubical site. -/
+def degeneracyHom (n : Dim) (i : Fin (n + 1)) : n + 1 ⟶ n :=
+  ⟨degeneracy n i, .degeneracy n i⟩
+
+/-- A morphism which is either an identity or a single face. -/
+inductive IsFaceAtom : {n m : Dim} → (n ⟶ m) → Prop
+  | id (n : Dim) : IsFaceAtom (𝟙 n)
+  | face (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
+      IsFaceAtom (faceHom n i ε)
+
+/-- A morphism composed entirely of face maps. -/
+inductive IsFaceComposite : {n m : Dim} → (n ⟶ m) → Prop
+  | atom {n m : Dim} {f : n ⟶ m} (hf : IsFaceAtom f) : IsFaceComposite f
+  | comp {n m k : Dim} {f : n ⟶ m} {g : m ⟶ k}
+      (hf : IsFaceComposite f) (hg : IsFaceComposite g) :
+      IsFaceComposite (f ≫ g)
+
+/-- A morphism composed entirely of degeneracy maps. -/
+inductive IsDegeneracyComposite : {n m : Dim} → (n ⟶ m) → Prop
+  | id (n : Dim) : IsDegeneracyComposite (𝟙 n)
+  | degeneracy (n : Dim) (i : Fin (n + 1)) :
+      IsDegeneracyComposite (degeneracyHom n i)
+  | comp {n m k : Dim} {f : n ⟶ m} {g : m ⟶ k}
+      (hf : IsDegeneracyComposite f) (hg : IsDegeneracyComposite g) :
+      IsDegeneracyComposite (f ≫ g)
+
+lemma IsFaceAtom.isComposite {n m : Dim} {f : n ⟶ m} (hf : IsFaceAtom f) :
+    IsFaceComposite f :=
+  .atom hf
+
+lemma IsFaceComposite.injective {n m : Dim} {f : n ⟶ m}
+    (hf : IsFaceComposite f) : Function.Injective ⇑f.toOrderHom := by
+  induction hf with
+  | atom hf =>
+      cases hf with
+      | id => exact fun _ _ h => h
+      | face i ε => exact face_injective _ i ε
+  | comp hf hg ihf ihg => exact ihg.comp ihf
+
+/-- Every face composite has a retraction made from degeneracy maps. -/
+lemma IsFaceComposite.hasRetraction {n m : Dim} {f : n ⟶ m}
+    (hf : IsFaceComposite f) : ∃ r : m ⟶ n, f ≫ r = 𝟙 n := by
+  induction hf with
+  | atom hf =>
+      cases hf with
+      | id => exact ⟨𝟙 _, by simp⟩
+      | face i α =>
+          refine ⟨degeneracyHom _ i, ?_⟩
+          apply CubeHom.ext
+          apply OrderHom.ext
+          funext x
+          exact congrFun (insert_then_drop _ i α) x
+  | @comp n m k f g hf hg ihf ihg =>
+      obtain ⟨rf, hrf⟩ := ihf
+      obtain ⟨rg, hrg⟩ := ihg
+      refine ⟨rg ≫ rf, ?_⟩
+      calc
+        (f ≫ g) ≫ (rg ≫ rf) = f ≫ ((g ≫ rg) ≫ rf) := by
+          simp only [Category.assoc]
+        _ = f ≫ rf := by rw [hrg, Category.id_comp]
+        _ = 𝟙 n := hrf
+
+lemma IsDegeneracyComposite.surjective {n m : Dim} {f : n ⟶ m}
+    (hf : IsDegeneracyComposite f) : Function.Surjective ⇑f.toOrderHom := by
+  induction hf with
+  | id n => exact fun x => ⟨x, rfl⟩
+  | degeneracy n i => exact degeneracy_surjective n i
+  | comp hf hg ihf ihg => exact ihg.comp ihf
+
+/-- Every degeneracy composite has a section made from face maps. -/
+lemma IsDegeneracyComposite.hasSection {n m : Dim} {f : n ⟶ m}
+    (hf : IsDegeneracyComposite f) : ∃ s : m ⟶ n, s ≫ f = 𝟙 m := by
+  induction hf with
+  | id n => exact ⟨𝟙 n, by simp⟩
+  | degeneracy n i =>
+      refine ⟨faceHom n i 0, ?_⟩
+      apply CubeHom.ext
+      apply OrderHom.ext
+      funext x
+      exact congrFun (insert_then_drop n i 0) x
+  | @comp n m k f g hf hg ihf ihg =>
+      obtain ⟨sf, hsf⟩ := ihf
+      obtain ⟨sg, hsg⟩ := ihg
+      refine ⟨sg ≫ sf, ?_⟩
+      calc
+        (sg ≫ sf) ≫ (f ≫ g) = sg ≫ ((sf ≫ f) ≫ g) := by simp only [Category.assoc]
+        _ = sg ≫ g := by rw [hsf, Category.id_comp]
+        _ = 𝟙 _ := hsg
+
+/-- A face followed by a degeneracy rewrites as a degeneracy followed by at most
+one face. This is the generator-level critical pair in the canonical-form proof. -/
+lemma face_degeneracy_factor (n : Dim) (i j : Fin (n + 1)) (α : Fin 2) :
+    ∃ (Z : Dim) (ε : n ⟶ Z) (δ : Z ⟶ n),
+      faceHom n i α ≫ degeneracyHom n j = ε ≫ δ ∧
+        IsDegeneracyComposite ε ∧ IsFaceAtom δ := by
+  cases n with
+  | zero =>
+      have hij : i = j := (Fin.eq_zero i).trans (Fin.eq_zero j).symm
+      subst j
+      refine ⟨0, 𝟙 0, 𝟙 0, ?_, .id 0, .id 0⟩
+      apply CubeHom.ext
+      apply OrderHom.ext
+      funext x
+      exact congrFun (insert_then_drop 0 i α) x
+  | succ n =>
+      rcases lt_trichotomy j i with hji | hji | hji
+      · let j' : Fin (n + 1) := j.castLT (hji.trans_le (Fin.le_last i))
+        let i' : Fin (n + 1) :=
+          i.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le j) hji))
+        refine ⟨n, degeneracyHom n j', faceHom n i' α, ?_,
+          .degeneracy n j', .face n i' α⟩
+        apply CubeHom.ext
+        apply OrderHom.ext
+        funext x
+        exact face_degeneracy_of_lt i j hji α x
+      · subst j
+        refine ⟨n + 1, 𝟙 (n + 1), 𝟙 (n + 1), ?_, .id _, .id _⟩
+        apply CubeHom.ext
+        apply OrderHom.ext
+        funext x
+        exact congrFun (insert_then_drop (n + 1) i α) x
+      · let i' : Fin (n + 1) :=
+          i.castLT (hji.trans_le (Fin.le_last j))
+        let j' : Fin (n + 1) :=
+          j.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le i) hji))
+        refine ⟨n, degeneracyHom n j', faceHom n i' α, ?_,
+          .degeneracy n j', .face n i' α⟩
+        apply CubeHom.ext
+        apply OrderHom.ext
+        funext x
+        exact face_degeneracy_of_gt i j hji α x
+
+/-- Commute an identity-or-single-face past an arbitrary degeneracy composite. -/
+lemma faceAtom_degeneracyComposite_factor {n m k : Dim} {δ : n ⟶ m} {ε : m ⟶ k}
+    (hδ : IsFaceAtom δ) (hε : IsDegeneracyComposite ε) :
+    ∃ (Z : Dim) (ε' : n ⟶ Z) (δ' : Z ⟶ k),
+      δ ≫ ε = ε' ≫ δ' ∧ IsDegeneracyComposite ε' ∧ IsFaceAtom δ' := by
+  induction hε generalizing n with
+  | id m =>
+      refine ⟨n, 𝟙 n, δ, ?_, .id n, hδ⟩
+      simp
+  | degeneracy m j =>
+      cases hδ with
+      | id =>
+          refine ⟨m, degeneracyHom m j, 𝟙 m, ?_, .degeneracy m j, .id m⟩
+          simp
+      | face i α =>
+          exact face_degeneracy_factor m i j α
+  | comp hε₁ hε₂ ih₁ ih₂ =>
+      obtain ⟨Z₁, ε₁, δ₁, h₁, hε₁', hδ₁⟩ := ih₁ hδ
+      obtain ⟨Z₂, ε₂, δ₂, h₂, hε₂', hδ₂⟩ := ih₂ hδ₁
+      refine ⟨Z₂, ε₁ ≫ ε₂, δ₂, ?_, .comp hε₁' hε₂', hδ₂⟩
+      calc
+        δ ≫ (_ ≫ _) = (δ ≫ _) ≫ _ := (Category.assoc _ _ _).symm
+        _ = (ε₁ ≫ δ₁) ≫ _ := by rw [h₁]
+        _ = ε₁ ≫ (δ₁ ≫ _) := Category.assoc _ _ _
+        _ = ε₁ ≫ (ε₂ ≫ δ₂) := by rw [h₂]
+        _ = (ε₁ ≫ ε₂) ≫ δ₂ := (Category.assoc _ _ _).symm
+
+/-- Commute an arbitrary face composite past an arbitrary degeneracy composite. -/
+lemma faceComposite_degeneracyComposite_factor {n m k : Dim} {δ : n ⟶ m} {ε : m ⟶ k}
+    (hδ : IsFaceComposite δ) (hε : IsDegeneracyComposite ε) :
+    ∃ (Z : Dim) (ε' : n ⟶ Z) (δ' : Z ⟶ k),
+      δ ≫ ε = ε' ≫ δ' ∧ IsDegeneracyComposite ε' ∧ IsFaceComposite δ' := by
+  induction hδ generalizing k with
+  | atom hδ =>
+      obtain ⟨Z, ε', δ', h, hε', hδ'⟩ :=
+        faceAtom_degeneracyComposite_factor hδ hε
+      exact ⟨Z, ε', δ', h, hε', hδ'.isComposite⟩
+  | comp hδ₁ hδ₂ ih₁ ih₂ =>
+      obtain ⟨Z₂, ε₂, δ₂, h₂, hε₂, hδ₂'⟩ := ih₂ hε
+      obtain ⟨Z₁, ε₁, δ₁, h₁, hε₁, hδ₁'⟩ := ih₁ hε₂
+      refine ⟨Z₁, ε₁, δ₁ ≫ δ₂, ?_, hε₁, .comp hδ₁' hδ₂'⟩
+      calc
+        (_ ≫ _) ≫ ε = _ ≫ (_ ≫ ε) := Category.assoc _ _ _
+        _ = _ ≫ (ε₂ ≫ δ₂) := by rw [h₂]
+        _ = (_ ≫ ε₂) ≫ δ₂ := (Category.assoc _ _ _).symm
+        _ = (ε₁ ≫ δ₁) ≫ δ₂ := by rw [h₁]
+        _ = ε₁ ≫ (δ₁ ≫ δ₂) := Category.assoc _ _ _
+
+/-- Every generated cube map has a syntactic degeneracy–face normal form. -/
+lemma isGen_factorization {n m : Dim} {f : Cube n →o Cube m} (hf : IsGen n m f) :
+    ∃ (Z : Dim) (ε : n ⟶ Z) (δ : Z ⟶ m),
+      ε ≫ δ = ⟨f, hf⟩ ∧ IsDegeneracyComposite ε ∧ IsFaceComposite δ := by
+  induction hf with
+  | id n =>
+      exact ⟨n, 𝟙 n, 𝟙 n, rfl, IsDegeneracyComposite.id n,
+        (IsFaceAtom.id n).isComposite⟩
+  | face n i α =>
+      exact ⟨n, 𝟙 n, faceHom n i α, rfl, IsDegeneracyComposite.id n,
+        (IsFaceAtom.face n i α).isComposite⟩
+  | degeneracy n i =>
+      exact ⟨n, degeneracyHom n i, 𝟙 n, rfl,
+        IsDegeneracyComposite.degeneracy n i, (IsFaceAtom.id n).isComposite⟩
+  | comp hf hg ihf ihg =>
+      obtain ⟨Zf, εf, δf, hf_eq, hεf, hδf⟩ := ihf
+      obtain ⟨Zg, εg, δg, hg_eq, hεg, hδg⟩ := ihg
+      obtain ⟨Z, ε', δ', hcomm, hε', hδ'⟩ :=
+        faceComposite_degeneracyComposite_factor hδf hεg
+      refine ⟨Z, εf ≫ ε', δ' ≫ δg, ?_, .comp hεf hε', .comp hδ' hδg⟩
+      calc
+        (εf ≫ ε') ≫ δ' ≫ δg = εf ≫ (ε' ≫ δ') ≫ δg := by simp
+        _ = εf ≫ (δf ≫ εg) ≫ δg := by rw [hcomm]
+        _ = (εf ≫ δf) ≫ εg ≫ δg := by simp
+        _ = _ := by
+          rw [hf_eq, hg_eq]
+          apply CubeHom.ext
+          rfl
+
 /-- The raising maps `R⁺`: order-embeddings (injective cube maps). These are
 the composites of faces. -/
 def plus : WideSubcategory Dim where
@@ -425,7 +638,87 @@ lemma dim_eq_of_isIso {n m : Dim} (f : n ⟶ m) (hf : IsIso f) : n = m :=
 /-- A bijective monotone self-map of a cube is an order-isomorphism, hence (for
 a generated map) an isomorphism in the site. -/
 lemma isIso_of_bijective {n : Dim} {f : n ⟶ n} (hf : Function.Bijective ⇑f.toOrderHom) :
-    IsIso f := sorry
+    IsIso f := by
+  obtain ⟨Z, ε, δ, h, hε, hδ⟩ := isGen_factorization f.isGen
+  have hnorm : ε ≫ δ = f := by
+    apply CubeHom.ext
+    exact congrArg CubeHom.toOrderHom h
+  have hnorm_apply (x : Cube n) : δ.toOrderHom (ε.toOrderHom x) = f.toOrderHom x := by
+    exact congrArg (fun q : n ⟶ n => q.toOrderHom x) hnorm
+  have hεinj : Function.Injective ⇑ε.toOrderHom := by
+    intro x y hxy
+    apply hf.1
+    rw [← hnorm_apply x, ← hnorm_apply y, hxy]
+  have hδsurj : Function.Surjective ⇑δ.toOrderHom := by
+    intro y
+    obtain ⟨x, hx⟩ := hf.2 y
+    refine ⟨ε.toOrderHom x, ?_⟩
+    exact (hnorm_apply x).trans hx
+  obtain ⟨sε, hsε⟩ := hε.hasSection
+  obtain ⟨rδ, hrδ⟩ := hδ.hasRetraction
+  have hεsε : ε ≫ sε = 𝟙 n := by
+    apply CubeHom.ext
+    apply OrderHom.ext
+    funext x
+    apply hεinj
+    exact congrArg (fun q : Z ⟶ Z => q.toOrderHom (ε.toOrderHom x)) hsε
+  have hrδδ : rδ ≫ δ = 𝟙 n := by
+    apply CubeHom.ext
+    apply OrderHom.ext
+    funext y
+    obtain ⟨x, rfl⟩ := hδsurj y
+    have h' := congrArg (fun q : Z ⟶ Z => q.toOrderHom x) hrδ
+    exact congrArg δ.toOrderHom h'
+  letI : IsIso ε := ⟨⟨sε, hεsε, hsε⟩⟩
+  letI : IsIso δ := ⟨⟨rδ, hrδ, hrδδ⟩⟩
+  rw [← hnorm]
+  infer_instance
+
+/-- Cancel a surjective cube map on the left. -/
+lemma cancel_precomposition_of_surjective {X Y Z : Dim} {f : X ⟶ Y} {g h : Y ⟶ Z}
+    (hf : Function.Surjective ⇑f.toOrderHom) (w : f ≫ g = f ≫ h) : g = h := by
+  apply CubeHom.ext
+  apply OrderHom.ext
+  funext y
+  obtain ⟨x, rfl⟩ := hf y
+  have w' := congrArg (fun q : X ⟶ Z => q.toOrderHom x) w
+  exact w'
+
+/-- Cancel an injective cube map on the right. -/
+lemma cancel_postcomposition_of_injective {X Y Z : Dim} {f g : X ⟶ Y} {h : Y ⟶ Z}
+    (hh : Function.Injective ⇑h.toOrderHom) (w : f ≫ h = g ≫ h) : f = g := by
+  apply CubeHom.ext
+  apply OrderHom.ext
+  funext x
+  apply hh
+  have w' := congrArg (fun q : X ⟶ Z => q.toOrderHom x) w
+  exact w'
+
+/-- Every surjective generated cube map is a split epimorphism in the cubical site. -/
+lemma hasSection_of_surjective {n m : Dim} (f : n ⟶ m)
+    (hf : Function.Surjective ⇑f.toOrderHom) : ∃ s : m ⟶ n, s ≫ f = 𝟙 m := by
+  obtain ⟨Z, ε, δ, h, hε, hδ⟩ := isGen_factorization f.isGen
+  have hnorm : ε ≫ δ = f := by
+    apply CubeHom.ext
+    exact congrArg CubeHom.toOrderHom h
+  have hδsurj : Function.Surjective ⇑δ.toOrderHom := by
+    intro y
+    obtain ⟨x, hx⟩ := hf y
+    refine ⟨ε.toOrderHom x, ?_⟩
+    have h' := congrArg (fun q : n ⟶ m => q.toOrderHom x) h
+    exact h'.trans hx
+  have hZm : Z = m :=
+    le_antisymm (dim_le_of_injective hδ.injective) (dim_le_of_surjective hδsurj)
+  subst m
+  letI : IsIso δ := isIso_of_bijective ⟨hδ.injective, hδsurj⟩
+  obtain ⟨sε, hsε⟩ := hε.hasSection
+  refine ⟨inv δ ≫ sε, ?_⟩
+  rw [← hnorm]
+  calc
+    (inv δ ≫ sε) ≫ (ε ≫ δ) = inv δ ≫ ((sε ≫ ε) ≫ δ) := by
+      simp only [Category.assoc]
+    _ = inv δ ≫ δ := by rw [hsε, Category.id_comp]
+    _ = 𝟙 Z := IsIso.inv_hom_id_assoc δ (𝟙 Z)
 
 /-- The degree of a cube is its dimension. -/
 instance : BMGeneralizedReedyCategory Dim ℕ where
@@ -451,8 +744,72 @@ instance : BMGeneralizedReedyCategory Dim ℕ where
   degree_eq_of_isIso f hf := dim_eq_of_isIso f hf
   isomorphisms_le_plus X Y f hf := (bijective_of_isIso f hf).1
   isomorphisms_le_minus X Y f hf := (bijective_of_isIso f hf).2
-  factorization := sorry
-  factorization_unique f F G := sorry
+  factorization := by
+    -- The canonical form (Grandis–Mauri eq. (6), Lemma 4.1): every generated map
+    -- factors as a degeneracy-composite followed by a face-composite.
+    constructor
+    intro n m f
+    obtain ⟨Z, ε, δ, h, hε, hδ⟩ := isGen_factorization f.isGen
+    exact ⟨⟨Z, ε, δ, h, hε.surjective, hδ.injective⟩⟩
+
+  factorization_unique f F G := by
+    obtain ⟨sF, hsF⟩ := hasSection_of_surjective F.i F.hi
+    obtain ⟨sG, hsG⟩ := hasSection_of_surjective G.i G.hi
+    let e : F.Z ⟶ G.Z := sF ≫ G.i
+    let e' : G.Z ⟶ F.Z := sG ≫ F.i
+    have he_i : F.i ≫ e = G.i := by
+      apply cancel_postcomposition_of_injective G.hp
+      dsimp only [e]
+      calc
+        (F.i ≫ sF ≫ G.i) ≫ G.p = F.i ≫ (sF ≫ (G.i ≫ G.p)) := by
+          simp only [Category.assoc]
+        _ = F.i ≫ (sF ≫ f) := by rw [G.fac]
+        _ = F.i ≫ (sF ≫ (F.i ≫ F.p)) := by rw [F.fac]
+        _ = F.i ≫ F.p := by
+          rw [← Category.assoc sF F.i F.p, hsF, Category.id_comp]
+        _ = G.i ≫ G.p := F.fac.trans G.fac.symm
+    have he'_i : G.i ≫ e' = F.i := by
+      apply cancel_postcomposition_of_injective F.hp
+      dsimp only [e']
+      calc
+        (G.i ≫ sG ≫ F.i) ≫ F.p = G.i ≫ (sG ≫ (F.i ≫ F.p)) := by
+          simp only [Category.assoc]
+        _ = G.i ≫ (sG ≫ f) := by rw [F.fac]
+        _ = G.i ≫ (sG ≫ (G.i ≫ G.p)) := by rw [G.fac]
+        _ = G.i ≫ G.p := by
+          rw [← Category.assoc sG G.i G.p, hsG, Category.id_comp]
+        _ = F.i ≫ F.p := G.fac.trans F.fac.symm
+    have he_p : e ≫ G.p = F.p := by
+      apply cancel_precomposition_of_surjective F.hi
+      calc
+        F.i ≫ (e ≫ G.p) = (F.i ≫ e) ≫ G.p := (Category.assoc _ _ _).symm
+        _ = G.i ≫ G.p := by rw [he_i]
+        _ = F.i ≫ F.p := G.fac.trans F.fac.symm
+    have he_hom_inv : e ≫ e' = 𝟙 F.Z := by
+      apply cancel_precomposition_of_surjective F.hi
+      calc
+        F.i ≫ (e ≫ e') = (F.i ≫ e) ≫ e' := (Category.assoc _ _ _).symm
+        _ = G.i ≫ e' := by rw [he_i]
+        _ = F.i := he'_i
+        _ = F.i ≫ 𝟙 F.Z := (Category.comp_id _).symm
+    have he_inv_hom : e' ≫ e = 𝟙 G.Z := by
+      apply cancel_precomposition_of_surjective G.hi
+      calc
+        G.i ≫ (e' ≫ e) = (G.i ≫ e') ≫ e := (Category.assoc _ _ _).symm
+        _ = F.i ≫ e := by rw [he'_i]
+        _ = G.i := he_i
+        _ = G.i ≫ 𝟙 G.Z := (Category.comp_id _).symm
+    let E : F.Z ≅ G.Z :=
+      { hom := e
+        inv := e'
+        hom_inv_id := he_hom_inv
+        inv_hom_id := he_inv_hom }
+    refine ⟨E, ⟨he_i, he_p⟩, ?_⟩
+    intro E' hE'
+    apply Iso.ext
+    apply cancel_precomposition_of_surjective F.hi
+    change F.i ≫ E'.hom = F.i ≫ e
+    exact hE'.1.trans he_i.symm
   iso_eq_id_of_comp_minus f hf θ hθ h := by
     -- `f ≫ θ = f` with `f` surjective forces `θ = 𝟙`: `θ` fixes every point in
     -- the (full) image of `f`, and surjectivity makes that all of `Cube n`.

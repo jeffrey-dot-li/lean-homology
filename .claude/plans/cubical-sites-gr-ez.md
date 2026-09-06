@@ -122,6 +122,13 @@ instance : EilenbergZilberCategory CubeSite           (restricted site I only, f
 
 - `WideSubcategory A` (wide subcat via `MorphismProperty`)
 - `GeneralizedReedyCategory R ι` with `ι : outParam` — **class we will instantiate**
+- The restricted site `I`, implemented concretely on `Dim := ℕ` with generated morphisms
+  `CubeHom n m`, where `Cube n := Fin n → Fin 2`.
+- The face/degeneracy cocubical relations and a syntactic canonical-factorization layer:
+  `IsFaceComposite`, `IsDegeneracyComposite`,
+  `faceComposite_degeneracyComposite_factor`, and `isGen_factorization`.
+- A sorry-free `BMGeneralizedReedyCategory Dim ℕ` instance for `I`, including factorization,
+  unique comparison isomorphisms, and the BM cancellation axiom.
 - `EilenbergZilberCategory A extends GeneralizedReedyCategory A ℕ` — `isIso_eqToHom` + sections
 - `EilenbergZilberCategory.Presheaf.*`: `Decomposition`, `IsDegenerate`, `IsNondegenerate`,
   `MinusDecomposition`, `existsUnique_minusDecomposition`, `IsInSkeleton`, `skeleton`,
@@ -130,11 +137,10 @@ instance : EilenbergZilberCategory CubeSite           (restricted site I only, f
 
 ## Detailed Steps
 
-### Phase 0: The cube comparsset and maps (restricted site content)
-File: `CubicalSite.lean` (scaffold already there)
+### Phase 0: The cube poset and maps (restricted site content) — DONE
+File: `CubicalSite.lean`
 
-1. `Cube (n : Dim) := Fin 2 → Fin n`; `Preorder` (pointwise). Instance `LinearOrder (Cube n)` exists
-   (finite product of `Fin`); provide if needed.
+1. `Cube (n : Dim) := Fin n → Fin 2`, with the pointwise order.
 2. **Faces** `δ (i : Fin (n+1)) (ε : Fin 2) : Cube n ↪o Cube (n+1)`:
    insert at position `i` a constant `ε` coordinate; on output coordinate `j`,
    `j = i ↦ ε`, else offset by `i`'s predecessor. (These are the two `2ⁿ →i 2^(n+1)` one-face maps.)
@@ -144,19 +150,14 @@ File: `CubicalSite.lean` (scaffold already there)
 4. `simp` lemmas: `δ` is monotone; `ε` is surjective; `ε ∘ δ`-type identities (face after
    degeneracy).
 
-### Phase 1: The `CubeSite` category and subcategories
+### Phase 1: The `CubeSite` category and subcategories — DONE
 File: `CubicalSite.lean`
 
-1. `structure CubeSite where dim : ℕ` — *or* just use `ℕ` directly with a bundled `Category`.
-   Decide: `abbrev CubeObj := ℕ` with `instance : Category CubeObj := {..custom}` where
-   `Hom m n := Cube n →o Cube m`. (Orientation: see Open Questions.) Provide `id_comp/comp_id/assoc`
-   via `OrderHom` composition.
-   - Note: we may instead define a bespoke `Category` on `ℕ` whose `Hom` is `Cube n →o Cube m`.
-2. `plus` : the wide subcategory whose maps are **order-embeddings** (= `Cube n ↪o Cube m`,
-   monos). `minus` : maps that are **surjective** (= split-epis on finite sets).
-3. Verify these are `WideSubcategory`s (`id_mem`, `comp_mem`).
-4. Provisional `instance : GeneralizedReedyCategory CubeSite ℕ` (sorry'd) — see Phase 2 for the
-   difficult axioms.
+1. Objects are dimensions `Dim := ℕ`.
+2. `Hom n m := CubeHom n m`, bundling an order hom `Cube n →o Cube m` with an `IsGen`
+   derivation from faces, degeneracies, identities, and composition.
+3. `plus` consists of injective generated maps; `minus` consists of surjective generated maps.
+4. The category laws and wide-subcategory closure properties are proved extensionally.
 
 ### Phase 1b. The cocubical relations (the deferred index work) — RESOLVED from literature
 
@@ -238,49 +239,52 @@ split_ifs <;> simp at * <;> omega`). The `castPred`-vs-`castLT` and proof-term-`
 gotchas are recorded in `.claude/memory/api/fin-succabove.md`. `lake build` green,
 sorry-free.
 
-### Phase 2: The Generalized-Reedy axioms (the main work)
-File: `CubicalSite.lean` (or `GeneralizedReedyCube.lean`)
+### Phase 2: The Generalized-Reedy axioms — DONE
+File: `CubicalSite.lean`
 
-Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·∥ = n` via cardinality.
+The restricted site now has a sorry-free `BMGeneralizedReedyCategory Dim ℕ` instance:
 
-- `degree_lt_of_plus`: an order-embedding `Cube m ↪o Cube n`, non-iso ⇒ `m < n` (strictly more
-  coordinates). Proof: an order-embedding between the two finite products has `n > m` unless it
-  hits everything; `Injectivity` + `card Cube n > card Cube m`.
-  - Equivalent, cleaner: any *order-elementary* map of cubes that is injective but not a bijection
-    has `m < n` (injectivity of the coordinate count). Use `card_le_card` / `Fin` cardinalities:
-    `card (Fin 2 → Fin m) = 2ᵐ ≤ 2ⁿ`, so `m ≤ n`, strict when non-surjective.
-- `degree_lt_of_minus`: a surjective `Cube n →o Cube m`, non-iso ⇒ `m < n`.
-- `degree_eq_of_isIso`: an order-iso `Cube m ≃o Cube n` ⇒ `m = n` (cardinality `2ᵐ=2ⁿ`, or the
-  iso is fundamentally a permutation of coordinates, so equal size).
-- `isomorphisms_le_plus/minus`: order-iso is both an order-embedding and surjective.
-- `factorization`: every monotone `f : Cube m →o Cube n` factors as surjective `Cube m ↠
-  image-set` then a mono — or (cleaner) use the order-*epi/mono* factorization `f.mono` from
-  `OrderHom` (`f.mono : m →o Set.range f`, `f.epi`), which *is* the canonical factorization
-  (`f = f.epi ≫ f.mono`).
-  - The `image` object must be a **cube of dimension `k`** for the *site* `I` (not Set.range of
-    an arbitrary intermediate set). For the site `I` (and precategory), the "image" of an inj+surj
-    decomposition lands in `Cube k` where `k = # of distinct surviving coordinates` — matches
-    `I`'s degenerate/face decomposition. This is the subtle part for **restricted `I`**
-    (surjectives can be non-projection? No — for `I`, `f = ε·δ` form: the factorization is
-    `ε : m → k`, `δ : k → n`).
-- `factorization_unique`: uniqueness of the `(k, ε, δ)` triangle up to unique iso, for site `I`.
-  This is the hard combinatorial lemma (the paper's "unique up to iso" factorization) — sorry it
-  and fill later.
-- `iso_eq_id_of_comp_minus` (BM): an iso `θ : Cube n →o Cube n` with `f ≫ θ = f` for a
-  surjective `f` forces `θ = 𝟙`. For `I`, an iso is a coordinate perm; `f` surjective + fixing all
-  points in image forces perman sorted... Prove: `θ` fixes every element of the image of `f`;
-  by surjectivity of `f`, `θ` is identity.
+- Degree inequalities and invariance under isomorphism follow from
+  `Fintype.card (Cube n) = 2 ^ n`.
+- Canonical factorization is proved by retaining syntactic certificates for face-only and
+  degeneracy-only composites. A face composite is commuted past a degeneracy composite using
+  the three cases of the face/degeneracy relation.
+- Degeneracy composites have face-composite sections; face composites have
+  degeneracy-composite retractions.
+- A bijective generated endomorphism is an isomorphism by factoring it as `ε ≫ δ` and upgrading
+  the one-sided inverses of `ε` and `δ` using injectivity/surjectivity.
+- Two semantic surjective/injective factorizations are uniquely isomorphic: sections construct
+  the comparison map, while surjective/injective cancellation proves its equations and uniqueness.
+- The BM axiom follows directly from surjectivity of the lowering map.
 
 - **Restricted `I` / EZ instance** (follow-up): `I` has no autos ⇒ add `isIso_eqToHom`,
-  `section_of_minus` (surjective ↦ split-epi on finite cubes: any surjective set-map has a
-  section via `Classical.choice`), `eq_of_sections_eq`. Then cubical presheaves get the full EZ
+  `section_of_minus` (the generated section is already available as
+  `hasSection_of_surjective`), and `eq_of_sections_eq`. Then cubical presheaves get the full EZ
   decomposition.
 
+### Deferred: Grandis–Mauri Theorem 4.2 and the tensor product
+
+The equivalent presentations of `I` in Theorem 4.2 are not prerequisites for constructing `J`,
+`K`, or their generalized Reedy structures. In particular, the current concrete `IsGen` model
+does **not yet** have a formal tensor product or a `MonoidalCategory` instance.
+
+Defer these until they are needed for the geometric product or the universal/classifying-category
+results:
+
+- define the block-sum tensor on maps over `Fin (m + n)`;
+- prove that generated maps are closed under this tensor;
+- construct the strict monoidal structure on `I`;
+- prove Theorem 4.2(b–e), including the free strict monoidal/category-of-models descriptions.
+
 ### Phase 3: Connections `J` (intermediate site)
-- Add `γᵢ : Cube (n+1) →o Cube n`, coordinate-wise max (or min). Surjective, in `minus`.
-- Adjoining `γ` keeps it a generalized Reedy category (Doherty Prop 2.6 lower = projections+
-  connections+).
-- No new basic axioms — reuses Phase 2 machinery with `minus` extended.
+- **NEXT.** Define positive and negative connections
+  `γᵢ : Cube (n+1) →o Cube n` by coordinate-wise min/max.
+- Define the generated morphism family for `J` by adjoining connections to the generators of `I`.
+- Prove the connection relations (Grandis–Mauri (16)).
+- Formalize the `δ · γ · ε` canonical form of Theorem 5.1, retaining syntactic certificates as
+  in Phase 2.
+- Instantiate the generalized Reedy structure with raising maps generated by faces and lowering
+  maps generated by degeneracies and connections.
 
 ### Phase 4: Interchange `K` (extended site)
 - Add `σ : Cube n →o Cube n`, the coordinate permutation (interchange `2²→2²`, generalized to any
@@ -328,43 +332,27 @@ Per Doherty/Campion, raise = order-embeds, lower = surjectives, `degree = ∥·�
    with the cocubical relations, as in the paper. The all-monotone model is a non-goal
    (its `f : Cube m →o Cube n` images neednot be cubes, and it would not satisfy the
    strict-site EZ structure).
+4. Orientation is covariant: `Hom n m` bundles generated order homs `Cube n →o Cube m`.
+5. The concrete restricted family is implemented by an inductive `IsGen` predicate, rather
+   than as a quotient of a free category.
+6. The restricted site `I` and its BM generalized Reedy structure are complete and sorry-free.
+7. Grandis–Mauri Theorem 4.2 and monoidal closure are deferred; they are not dependencies for
+   the concrete construction of `J` and `K`.
 
 **Open**
-1. **Orientation of homs.** We want `Hom n m := Cube n →o Cube m` (maps `2ⁿ → 2ᵐ`), but with `ℕ`
-   as the object set that's `Hom n m = Cube n →o Cube m` — no contravariance issue if we say
-   `Hom n m` literally. Must fix signs of faces/degs w.r.t. `+1`/`-1`. Use `Hom n m := Cube n →o
-   Cube m` where `n = source dim`, `m = target dim`.
-2. **The restricted hom sets vs all-monotone.** Resolved for faithfulness: the sites are the
-   restricted generated families. But *within* that, the concrete construction is still open:
-   (a) model the site as a category whose morphisms are a `subtype` of "coordinate-wise maps"
-   generated by faces/degs (closed under composition), or (b) build it as a Quotient of the free
-   category on the generators subject to the cocubical relations (paper's characterization (c/e)).
-   (a) is lighter and gives the EZ structure; (b) is most faithful to the paper's presentation and
-   gives the "classifying category" characterization. Draft will explore (a) first since it's
-   direct and compiles; keep (b) as the faithful-complete description later.
-3. **The factorization's middle object.** For the *site* `I` (`Hom` = generated maps), the middle
-   cube `k` = number of distinct output coordinates. For the *all-monotone* category, `f : Cube m
-   →o Cube n`'s canonical factorization lands in `Set.range f ≅ Cube k` only for `I`-maps; for a
-   general monotone map the image need not be a cube. So the GR instance should be on the
-   **restricted hom set** for correctness (the `I`-site), not on all monotone maps. Re-examine in
-   Phase 2.
-4. **Which cube site exactly** do we instantiate first — `I` (fewest maps, the EZ case) or start
-   with `K` for the main theorem 8.2? Recommend `I` first (practices the machinery; EZ payoff),
-   but with the restricted families built faithfully so `J`/`K` extend cleanly.
+1. Whether `J` and `K` should use separate generated-morphism structures or a common generator
+   parameterization that makes the inclusions `I ⟶ J ⟶ K` explicit.
+2. Whether to prove the strict `EilenbergZilberCategory` instance for `I` before starting `J`, or
+   return to it after the three concrete sites exist.
+3. When the geometric product becomes necessary, choose the concrete block-sum representation
+   for the tensor on `Fin (m + n)` and prove closure of each generated family.
 
-## Immediate next actions (updated after eq. (5) locked in and proved)
+## Immediate next actions
 
-1. **~~Fill the 4 `sorry`'d relations~~** — DONE. All restricted-site relations are proved
-   via the master lemma `succAbove_succAbove_comm` (see
-   `.claude/memory/api/fin-succabove.md`).
-2. **Phase 1: `CubeSite` category + subcategories.** Decide the object model (Open Q1: `ℕ` with
-   `Hom n m := Cube m →o Cube n` orientation) and define `plus` (order-embeds) / `minus`
-   (surjective) as `WideSubcategory`s.
-3. **Phase 2: the GR instance.** The heavy axiom is `factorization` (Grandis–Mauri eq. (6)) — the
-   canonical `f = ε·δ` form for the site `I`. Draft sorry'd, then `/fill-sorry`.
-4. Then `J` (connections γ) and `K` (interchange σ) as `minus`/`plus` extensions, and finally the
-   cubical EZ decomposition (re-export `Presheaf.existsUnique_minusDecomposition` etc.).
-
-The restricted-site cocubical relations are **fully done** (statements and proofs); commits
-`c44c94e` (stale `ℕ`-indexed `face_face`) is superseded by the current `Fin`-indexed forms in
-`CubicalSite.lean`.
+1. Define the positive and negative connection maps and prove monotonicity and surjectivity.
+2. Transcribe and prove the connection relations (16), validating the `Fin` index conventions on
+   small concrete dimensions before proving the general statements.
+3. Introduce the generated category `J` and its face/connection/degeneracy composite certificates.
+4. Prove Grandis–Mauri Theorem 5.1's canonical form and derive the generalized Reedy instance.
+5. Then add interchanges for `K`; defer tensor closure and Theorem 4.2 until required by geometric
+   products or universal properties.
