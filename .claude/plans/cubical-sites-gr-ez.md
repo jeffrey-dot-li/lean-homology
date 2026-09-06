@@ -15,6 +15,38 @@ maps between elementary cubes `2ⁿ = Fin 2 → Fin n`. We instantiate our
 object set `ℕ`, so that cubical presheaves `(site)ᵒᵖ ⥤ Type` inherit the decomposition
 machinery already in `EilenbergZilbergCategory.lean` (skeleta, unique decomposition).
 
+## The Reedy category hierarchy
+
+The literature has several related notions of "Reedy category". The hierarchy is:
+
+```
+Bergner–Rezk EZ ⊂ Elegant Reedy ⊂ Ordinary Reedy
+                      ∪                ∪
+Berger–Moerdijk EZ ⊂ Campion EZ ⊂ Generalized Reedy
+```
+
+**Key distinction**: the **left column** (Bergner–Rezk) is *strict* Reedy (no nontrivial
+isomorphisms); the **right column** (Berger–Moerdijk) is *generalized* (isomorphisms
+allowed). The intersection is the strict EZ case.
+
+| Notion | Definition | Key property | Examples |
+|--------|-----------|--------------|----------|
+| **Ordinary Reedy** | Two wide subcats `R⁺`/`R⁻`, degree `d : Ob → α` (ordinal), non-iso `R⁺` raises degree, non-iso `R⁻` lowers, iso preserves, factorization `R⁻ ∘ R⁺` unique up to iso, `R⁺ ∩ R⁻` = isos | No nontrivial isomorphisms | `Δ`, `Θ` |
+| **Generalized Reedy** (BM) | Same but isomorphisms allowed | `R⁺ ∩ R⁻` = core (isos); iso `θ` with `f ≫ θ = f` for `f ∈ R⁻` forces `θ = 𝟙` | `Γ`, `Λ`, trees `Ω`, cubes with symmetries |
+| **Elegant Reedy** | Ordinary Reedy + Reedy model structure = injective model structure | Every presheaf element is a degeneracy of a nondegenerate element uniquely | `Δ`, `Θ` |
+| **Bergner–Rezk EZ** | Elegant Reedy + (EZ1) every map has a section + (EZ2) maps with same sections are equal | Strict Reedy with split epis determined by sections | `Θ` |
+| **Berger–Moerdijk EZ** | Generalized Reedy + `A⁻` = split epis + `A⁺` = monos + absolute pushouts of `A⁻` | EZ lemma holds for presheaves | Cubes with symmetries, `Γ` |
+| **Campion EZ** | Generalized Reedy + absolute pushouts of `A⁻` (drops `A⁺` = monos) | Mild generalization of BM EZ; characterized by EZ lemma | Cubical sites without diagonals |
+
+**Where the cube sites sit**:
+- `I` (faces + degeneracies only): **strict EZ** (no nontrivial autos) — intersection of left and right columns
+- `J` (+ connections): **Campion EZ** (generalized, has autos)
+- `K` (+ interchange): **Campion EZ** (generalized, has autos)
+
+Our `GeneralizedReedyCategory.lean` is the **right column** (BM). Our
+`EilenbergZilbergCategory.lean` is **Campion's** mild generalization (extends
+`GeneralizedReedyCategory` directly, not `OrdinaryReedyCategory`).
+
 ## Why GR, not EZ, by default
 
 The elementary cube `2ⁿ` = product of `n` copies of `{0 < 1}` has the coordinate
