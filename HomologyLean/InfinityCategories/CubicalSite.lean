@@ -124,7 +124,8 @@ def faceOrderEmbedding (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
   }
   map_rel_iff' := face_reflection n i ε
 
-/-- Insert-a-coordinate-then-drop-the-same-coordinate is the identity. -/
+/-- A face followed by the corresponding degeneracy (dropping the just-inserted
+coordinate) is the identity: `εᵢ δᵢ = 1`. (Grandis–Mauri eq. (3).) -/
 lemma insert_then_drop (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
     (degeneracy n i) ∘ (face n i ε) = id := by
   funext x
@@ -163,14 +164,6 @@ lemma succAbove_succAbove_comm {n : ℕ} (i j : Fin (n + 1)) (hij : j ≤ i) (k 
   split_ifs <;> simp at * <;> omega
 
 /--
-A face followed by the corresponding degeneracy (dropping the just-inserted
-coordinate) is the identity: `εᵢ δᵢ = 1`. (Grandis–Mauri eq. (3).)
--/
-lemma face_degeneracy (n : Dim) (i : Fin (n + 1)) (ε : Fin 2) :
-    (degeneracy n i) ∘ (face n i ε) = id := by
-  exact insert_then_drop n i ε
-
-/--
 Face/face commutation (Grandis–Mauri eq. (5)): `δⱼ^β δᵢ^α = δᵢ₊₁^α δⱼ^β` for `j ≤ i`.
 In 0-based `Fin` terms (composition right-to-left, `δᵢ` applied first):
 `face (n+1) (j.castSucc) β (face n i α x) = face (n+1) (i.succ) α (face n j β x)`
@@ -198,14 +191,6 @@ lemma face_face {n : Dim} (i j : Fin (n + 1)) (hij : j ≤ i) (α β : Fin 2) (x
   rcases Fin.exists_succAbove_eq hai with ⟨b, rfl⟩
   rw [face_apply_succAbove, (succAbove_succAbove_comm i j hij b).symm,
     face_apply_succAbove, face_apply_succAbove]
-
-/--
-Degeneracy/degeneracy commutation (Grandis–Mauri eq. (5)): `εᵢ εⱼ = εⱼ εᵢ₊₁` for
-`j ≤ i`. In 0-based `Fin` terms (composition right-to-left, the lower-indexed
-degeneracy applied first):
-`degeneracy n a (degeneracy (n+1) b.castSucc x) = degeneracy n b (degeneracy (n+1) a.succ x)`
-for `b ≤ a`. Verified by `native_decide`.
--/
 lemma degeneracy_degeneracy {n : Dim} (a b : Fin (n + 1)) (hba : b ≤ a)
     (x : Cube (n + 2)) :
     (degeneracy n a) ((degeneracy (n + 1) b.castSucc) x) =
@@ -227,11 +212,6 @@ lemma face_degeneracy_of_lt {n : Dim} (i j : Fin (n + 2)) (hij : j < i) (α : Fi
       (face n (i.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le j) hij))) α)
         ((degeneracy n (j.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
           (Nat.lt_succ_iff.mp i.isLt)))) x) := by
-  -- Restate with canonical proof terms (defeq by proof irrelevance) so the
-  -- `Fin.succAbove_*` API lemmas match syntactically.
-  change (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
-    (face n (i.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt j.zero_le hij))) α)
-      ((degeneracy n (j.castLT (hij.trans_le (Fin.le_last i)))) x)
   funext k
   -- Case-split on whether `k` is the `i.pred`-hole; if not, write it as
   -- `(i.pred _).succAbove b` and commute the two deletions via
@@ -269,9 +249,8 @@ lemma face_degeneracy_of_gt {n : Dim} (i j : Fin (n + 2)) (hij : i < j) (α : Fi
       (face n (i.castLT (lt_of_lt_of_le (Fin.lt_def.mp hij)
           (Nat.lt_succ_iff.mp j.isLt))) α)
         ((degeneracy n (j.pred (ne_of_gt (lt_of_le_of_lt (Fin.zero_le i) hij)))) x) := by
-  -- Restate with canonical proof terms (defeq by proof irrelevance) so the
-  -- `Fin.succAbove_*` API lemmas match syntactically. (`castPred` and `castLT`
-  -- are both `⟨i, _⟩`, hence definitionally equal.)
+  -- The goal's `i.castLT _` is definitionally `i.castPred _` (both are `⟨i, _⟩`),
+  -- but `Fin.succAbove_castPred_of_lt` needs the latter syntactically.
   change (degeneracy (n + 1) j) ((face (n + 1) i α) x) =
     (face n (i.castPred (Fin.ne_of_lt (Nat.lt_of_lt_of_le hij (Fin.le_last j)))) α)
       ((degeneracy n (j.pred (Fin.ne_of_gt (Fin.lt_of_le_of_lt i.zero_le hij)))) x)
@@ -368,22 +347,22 @@ instance cubeSiteCategory : Category Dim where
   Hom := CubeHom
   id := CubeHom.id
   comp := CubeHom.comp
-  id_comp f := CubeHom.ext (OrderHom.id_comp _)
-  comp_id f := CubeHom.ext (OrderHom.comp_id _)
-  assoc f g h := CubeHom.ext (OrderHom.comp_assoc _ _ _)
+  id_comp _f := CubeHom.ext (OrderHom.id_comp _)
+  comp_id _f := CubeHom.ext (OrderHom.comp_id _)
+  assoc _f _g _h := CubeHom.ext (OrderHom.comp_assoc _ _ _)
 
 /-- The raising maps `R⁺`: order-embeddings (injective cube maps). These are
 the composites of faces. -/
 def plus : WideSubcategory Dim where
   hom _ _ f := Function.Injective ⇑f.toOrderHom
-  id_mem n x y h := h
+  id_mem _n _x _y h := h
   comp_mem hf hg := hg.comp hf
 
 /-- The lowering maps `R⁻`: surjective cube maps. These are the composites of
 degeneracies (all split epis on finite cubes). -/
 def minus : WideSubcategory Dim where
   hom _ _ f := Function.Surjective ⇑f.toOrderHom
-  id_mem n x := ⟨x, rfl⟩
+  id_mem _n x := ⟨x, rfl⟩
   comp_mem hf hg := hg.comp hf
 
 /-!
@@ -403,7 +382,7 @@ sorry'd and constitute the Phase 2 work.
 /-- The number of points of the `n`-cube is `2ⁿ`. -/
 lemma card_cube (n : Dim) : Fintype.card (Cube n) = 2 ^ n := by
   classical
-  simp [Cube, Fintype.card_fun]
+  simp [Cube]
 
 /-- A monotone injection `2ⁿ → 2ᵐ` forces `n ≤ m` (comparing `2ⁿ ≤ 2ᵐ`). -/
 lemma dim_le_of_injective {n m : Dim} {f : Cube n →o Cube m}
@@ -489,7 +468,7 @@ instance : GeneralizedReedyCategory Dim ℕ where
     rw [CubeHom.comp_toOrderHom] at hcomp
     -- `hcomp : (θ.toOrderHom ∘ f.toOrderHom) x = f.toOrderHom x`, i.e. `θ (f x) = f x`;
     -- the RHS `(𝟙 Y).toOrderHom (f x)` reduces to `OrderHom.id (f x) = f x`.
-    show θ.toOrderHom (f.toOrderHom x) = OrderHom.id (f.toOrderHom x)
+    change θ.toOrderHom (f.toOrderHom x) = OrderHom.id (f.toOrderHom x)
     exact hcomp
 
 end CubeSiteCategory
